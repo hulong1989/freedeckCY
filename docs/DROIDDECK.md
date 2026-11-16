@@ -117,7 +117,7 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 
 - 插件日志：`/tmp/freedeckcy.log`
 - 状态：`~/.local/share/freedeckCY/tianyi/state.json`
-- 健康检查：`curl 127.0.0.1:59271/_healthz`
+- 健康检查：`curl 127.0.0.1:59275/_healthz`
 
 ## 7. 已知限制
 

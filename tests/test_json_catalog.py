@@ -98,3 +98,103 @@ def test_default_catalog_still_csv_without_env(tmp_path, monkeypatch):
     catalog.load()
     assert catalog.source == "csv"
     assert len(catalog.entries) == 1
+
+
+class _FakeResponse:
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def read(self, limit: int = -1) -> bytes:
+        return self._data if limit < 0 else self._data[:limit]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def test_resolve_catalog_json_accepts_url(monkeypatch):
+    from game_catalog import resolve_default_catalog_json_path
+
+    url = "https://raw.githubusercontent.com/hulong1989/freedeckCY/main/catalog-json/all.json"
+    monkeypatch.setenv("FREEDECKCY_CATALOG_JSON", url)
+    monkeypatch.delenv("FRIENDECK_CATALOG_JSON", raising=False)
+    assert resolve_default_catalog_json_path() == url
+
+
+def test_load_remote_json_writes_cache(tmp_path, monkeypatch):
+    import game_catalog
+
+    payload = [_item("9", "Remote Game", platform="pc")]
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    calls = []
+
+    def _fake_urlopen(request, timeout=0):
+        calls.append(str(request.full_url))
+        return _FakeResponse(raw)
+
+    monkeypatch.setattr(game_catalog.urllib.request, "urlopen", _fake_urlopen)
+    cache_path = tmp_path / "remote-cache.json"
+
+    catalog = GameCatalog(
+        "",
+        json_path="https://example.com/all.json",
+        json_cache_path=str(cache_path),
+    )
+    catalog.load()
+
+    assert calls == ["https://example.com/all.json"]
+    assert catalog.source == "json-url"
+    assert [entry.game_id for entry in catalog.entries] == ["9"]
+    assert cache_path.is_file()
+
+
+def test_remote_cache_used_when_network_fails(tmp_path, monkeypatch):
+    import game_catalog
+
+    payload = [_item("10", "Cached Game", platform="pc")]
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    cache_path = tmp_path / "remote-cache.json"
+
+    monkeypatch.setattr(
+        game_catalog.urllib.request,
+        "urlopen",
+        lambda request, timeout=0: _FakeResponse(raw),
+    )
+    first = GameCatalog("", json_path="https://example.com/all.json", json_cache_path=str(cache_path))
+    first.load()
+    assert first.source == "json-url"
+
+    def _fail(request, timeout=0):
+        raise OSError("network down")
+
+    monkeypatch.setattr(game_catalog.urllib.request, "urlopen", _fail)
+    second = GameCatalog("", json_path="https://example.com/all.json", json_cache_path=str(cache_path))
+    second.load()
+
+    assert second.source == "json-url-cache"
+    assert [entry.game_id for entry in second.entries] == ["10"]
+
+
+def test_remote_failure_without_cache_falls_back_to_csv(tmp_path, monkeypatch):
+    import game_catalog
+
+    def _fail(request, timeout=0):
+        raise OSError("network down")
+
+    monkeypatch.setattr(game_catalog.urllib.request, "urlopen", _fail)
+    csv_path = tmp_path / "catalog.csv"
+    csv_path.write_text(
+        "game_id,title,platform,down_url,openpath\n"
+        "1,CSV Fallback,pc,https://cloud.189.cn/t/x,a.exe\n",
+        encoding="utf-8-sig",
+    )
+    catalog = GameCatalog(
+        str(csv_path),
+        json_path="https://example.com/all.json",
+        json_cache_path=str(tmp_path / "none.json"),
+    )
+    catalog.load()
+    assert catalog.source == "csv"
+    assert [entry.game_id for entry in catalog.entries] == ["1"]

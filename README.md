@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.6.1**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.6.2**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,7 +21,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.6.1**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.6.2**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -47,7 +47,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **诊断与更新**：一键导出脱敏诊断 zip；检查 GitHub 最新 Release
 - **全量资源目录**：内置 7084 条资源（来自 v0.6），合并封面索引后 6823 条有封面（96.3%；原始自带 3473 条，索引命中 3311）；分类已清洗（不含平台名），可用 `scripts/merge_v06_catalog.py` 复现/更新
 - **无作者服务器依赖**：目录/封面/模拟器运行时均为本地或官方源；NewFreedeck 的 `panyiwei.xyz` 硬依赖已逆向并记录替代方案（[docs/UPSTREAM_SERVER.md](docs/UPSTREAM_SERVER.md)），兼容 JSON 快照在 [catalog-json/](catalog-json/)
-- **可选 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 可让运行时直接读 `catalog-json/all.json`（默认 CSV，失败自动回退）
+- **可选 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 支持本地路径或 `https://` URL（远程缓存 6 小时，失败回退 CSV）
 - **数据体检**：`make validate-catalog` 检查重复 ID / 非法链接 / 空标题 / 分类混平台名，并统计封面覆盖率、平台分布与资源总大小（约 39 TB）；CI 每次都会跑
 - **封面索引与缓存**：内置 `cover_index.csv` 3470 行（可用 `FREEDECKCY_COVER_INDEX_CSV` 覆盖）；解析过的封面落盘缓存（正缓存 7 天 / 负缓存 30 分钟），重启后不再重复请求
 - **DroidDeck（Android/ARM64）适配**：ARM64 运行时、ARM Proton 工具自动解析、双 Steam 根、`make package-droiddeck` 出 arm64 包，详见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
@@ -70,7 +70,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
 make emulator-runtime   # 下载 mGBA AppImage（GBA 安装后启动用）
-make package     # 产出 dist-artifacts/freedeckCY-v0.6.1.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.6.2.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -93,8 +93,8 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.6.1.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.6.1-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.6.2.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.6.2-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
@@ -114,7 +114,7 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 271）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 275）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
@@ -132,7 +132,7 @@ make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 | `FREEDECKCY_NODE_BIN` | 指定 node 路径 |
 | `FREEDECKCY_PROTON_TOOL` | 覆盖 Proton 兼容工具名；`none` 表示不写映射（DroidDeck 默认 `droiddeck-proton-arm64`） |
 | `FREEDECKCY_MGBA_BIN` | 覆盖 mGBA 可执行文件/AppImage 路径（默认用内置 AppImage） |
-| `FREEDECKCY_CATALOG_JSON` | 运行时改读 NewFreedeck 兼容 JSON（如 `catalog-json/all.json`）；默认 CSV，失败自动回退 |
+| `FREEDECKCY_CATALOG_JSON` | 运行时改读 NewFreedeck 兼容 JSON：本地路径或 `https://` URL；远程缓存 6 小时，失败回退旧缓存/CSV |
 | `FREEDECKCY_STEAM_ROOT` | 覆盖 Steam 根目录（Flatpak/自定义安装时用） |
 | `FREEDECKCY_STATE_FILE` | `clear_freedeckcy_tasks.sh` 使用的 state.json 路径 |
 | `FREEDECKCY_GAME_CATALOG_CSV` | 覆盖资源清单 CSV 路径 |
@@ -181,7 +181,7 @@ backend/*.js                Node 辅助脚本（分享解析兜底、云盘上�
 scripts/                    运行时获取（含 mGBA）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗 / 远程目录导出
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
 catalog-json/               NewFreedeck 兼容目录 JSON + schema（可直接读/自托管）
-tests/                      pytest 用例（271 个）
+tests/                      pytest 用例（275 个）
 CHANGELOG.md                版本变更记录
 Makefile                    构建入口：runtime / emulator-runtime / catalog-json / package / package-droiddeck / test / doctor / validate-catalog / normalize-catalog / clean
 ```

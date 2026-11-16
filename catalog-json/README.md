@@ -32,7 +32,11 @@ CI 中的 `tests/test_committed_catalog_json.py` 会校验 `manifest.json` 的�
 默认插件读 CSV；如需直接读这份 JSON（例如想验证导出一致性），设置环境变量后重启插件：
 
 ```bash
+# 本地路径
 export FREEDECKCY_CATALOG_JSON="$PWD/catalog-json/all.json"
+
+# 或者直接用 GitHub raw URL（会缓存到 ~/.local/share/freedeckCY/catalog-remote-cache.json，6 小时）
+export FREEDECKCY_CATALOG_JSON="https://raw.githubusercontent.com/hulong1989/freedeckCY/main/catalog-json/all.json"
 ```
 
 JSON 加载失败/为空时会自动回退 CSV（`FREEDECKCY_CATALOG_JSON` 指向的文件不存在时也会回退）。

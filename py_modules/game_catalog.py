@@ -8,6 +8,8 @@ import csv
 import json
 import os
 import re
+import time
+import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -18,6 +20,7 @@ import config
 
 DEFAULT_PLATFORM = "pc"
 CATEGORY_FILTER_LIMIT = 12
+REMOTE_CATALOG_TTL_SECONDS = 6 * 3600
 CATEGORY_EMULATOR_LABEL = "模拟器"
 PLATFORM_TOKENS = frozenset(
     {"pc", "fc", "nds", "psp", "gba", "3ds", "ps1", "ps2", "ps3", "md", "switch", "ns", "arcade", "psx"}
@@ -171,6 +174,8 @@ def resolve_default_catalog_json_path() -> str:
         env_path = (os.getenv(env_name) or "").strip()
         if not env_path:
             continue
+        if env_path.lower().startswith(("http://", "https://")):
+            return env_path
         try:
             resolved = Path(env_path).expanduser().resolve()
         except Exception:
@@ -237,14 +242,45 @@ def _entry_from_json_item(item: object) -> Optional[GameCatalogEntry]:
     )
 
 
+def _is_http_url(value: str) -> bool:
+    text = str(value or "").strip().lower()
+    return text.startswith("https://") or text.startswith("http://")
+
+
+def _download_json(url: str, *, timeout: float = 10.0, max_bytes: int = 64 * 1024 * 1024) -> object:
+    """下载 JSON（仅用于显式配置的目录 URL）。"""
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "freedeckCY/0.6 catalog-loader",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - 用户显式配置
+        data = response.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ValueError(f"目录 JSON 超过 {max_bytes // 1024 // 1024}MB 限制")
+    return json.loads(data.decode("utf-8"))
+
+
 class GameCatalog:
     """游戏目录仓库。"""
 
-    def __init__(self, csv_path: str, cover_index_path: str = "", json_path: str = ""):
+    def __init__(
+        self,
+        csv_path: str,
+        cover_index_path: str = "",
+        json_path: str = "",
+        json_cache_path: str = "",
+    ):
         self.csv_path = csv_path
         self.cover_index_path = cover_index_path
         self.json_path = json_path
+        self.json_cache_path = json_cache_path or os.path.join(
+            config.DECKY_SEND_DIR, "catalog-remote-cache.json"
+        )
         self.source = "csv"
+        self._json_loaded_from = ""
         self.entries: List[GameCatalogEntry] = []
         self._by_id: Dict[str, GameCatalogEntry] = {}
         self.invalid_rows = 0
@@ -259,10 +295,14 @@ class GameCatalog:
 
         json_path = str(self.json_path or "").strip()
         if json_path:
-            if os.path.isfile(json_path):
+            remote = _is_http_url(json_path)
+            if remote or os.path.isfile(json_path):
                 self._load_json(json_path)
                 if self.entries:
-                    self.source = "json"
+                    if remote:
+                        self.source = "json-url-cache" if self._json_loaded_from == "cache" else "json-url"
+                    else:
+                        self.source = "json"
                 else:
                     config.logger.warning("JSON 目录没有有效条目，回退 CSV: %s", json_path)
             else:
@@ -284,12 +324,37 @@ class GameCatalog:
         )
 
     def _load_json(self, path: str) -> None:
-        """加载 NewFreedeck 兼容 JSON（数组，或 {games|items|data: []}，支持 variants）。"""
-        try:
-            with open(path, "r", encoding="utf-8") as fh:
-                payload = json.load(fh)
-        except Exception as exc:
-            config.logger.warning("读取 JSON 目录失败 %s: %s", path, exc)
+        """加载 NewFreedeck 兼容 JSON（本地文件或 https URL，支持 variants）。"""
+        payload = None
+        if _is_http_url(path):
+            entry = self._read_remote_cache_entry(path)
+            cached = entry.get("payload") if isinstance(entry, dict) else None
+            fetched_at = int(entry.get("fetched_at", 0)) if isinstance(entry, dict) else 0
+            fresh = bool(cached is not None and time.time() - fetched_at < REMOTE_CATALOG_TTL_SECONDS)
+            if fresh:
+                payload = cached
+                self._json_loaded_from = "cache"
+            else:
+                try:
+                    payload = _download_json(path)
+                    self._json_loaded_from = "network"
+                    self._write_remote_cache(path, payload)
+                except Exception as exc:
+                    config.logger.warning("下载 JSON 目录失败 %s: %s", path, exc)
+                    if cached is not None:
+                        payload = cached
+                        self._json_loaded_from = "cache"
+                        config.logger.warning("已使用上次缓存的 JSON 目录: %s", self.json_cache_path)
+        else:
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    payload = json.load(fh)
+            except Exception as exc:
+                config.logger.warning("读取 JSON 目录失败 %s: %s", path, exc)
+                self.invalid_rows += 1
+                return
+
+        if payload is None:
             self.invalid_rows += 1
             return
 
@@ -327,6 +392,40 @@ class GameCatalog:
                     add_item(variant)
             else:
                 add_item(item)
+
+    def _write_remote_cache(self, url: str, payload: object) -> None:
+        path = str(self.json_cache_path or "").strip()
+        if not path:
+            return
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp_path = f"{path}.tmp"
+            with open(tmp_path, "w", encoding="utf-8") as fh:
+                json.dump(
+                    {"url": url, "fetched_at": int(time.time()), "payload": payload},
+                    fh,
+                    ensure_ascii=False,
+                )
+            os.replace(tmp_path, path)
+        except Exception as exc:
+            config.logger.warning("写入远程目录缓存失败: %s", exc)
+
+    def _read_remote_cache_entry(self, url: str) -> object:
+        path = str(self.json_cache_path or "").strip()
+        if not path or not os.path.isfile(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            if not isinstance(data, dict) or str(data.get("url", "")) != url:
+                return None
+            return data
+        except Exception:
+            return None
+
+    def _read_remote_cache(self, url: str) -> object:
+        entry = self._read_remote_cache_entry(url)
+        return entry.get("payload") if isinstance(entry, dict) else None
 
     def _load_csv(self) -> None:
         """加载 CSV 目录。"""

@@ -47,7 +47,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 | 层 | 选型 | 位置 |
 |---|---|---|
 | 插件运行时 | Decky Loader（Python 3 + asyncio） | `main.py`、`decky.pyi` |
-| 本地 Web 服务 | **aiohttp**，仅监听 `127.0.0.1:59271` | `py_modules/server_manager.py` |
+| 本地 Web 服务 | **aiohttp**，仅监听 `127.0.0.1:59275` | `py_modules/server_manager.py` |
 | 业务内核 | 单个巨型类 `TianyiService`（约 8000 行） | `py_modules/tianyi_service.py` |
 | 天翼 API 客户端 | aiohttp + 自写 MD5 签名 / XML/JSONP 兼容解析 | `py_modules/tianyi_client.py` |
 | 状态持久化 | 单个 JSON 全量重写；状态目录 0700 / 文件 0600 | `py_modules/tianyi_store.py` → `~/.local/share/freedeckCY/tianyi/state.json` |
@@ -166,7 +166,7 @@ Steam Deck (Game Mode)
 │        ├── TianyiClient        ──▶ cloud.189.cn / api.cloud.189.cn（Cookie + MD5/AES/RSA 签名）
 │        └── 封面缓存             ──▶ ~/.local/share/freedeckCY/tianyi/cover_cache.json（TTL 7 天）
 │
-├── aiohttp 本地服务（127.0.0.1:59271，只绑回环）
+├── aiohttp 本地服务（127.0.0.1:59275，只绑回环）
 │   ├── /                            服务首页
 │   ├── /_healthz                    健康检查
 │   ├── /tianyi/library              Vue 游戏库橱窗  ── 由 Steam 内置浏览器打开
@@ -647,7 +647,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | 环节 | 代码位置 |
 |---|---|
 | 多库 compatdata 定位 | [steam_shortcuts.py:184](../py_modules/steam_shortcuts.py) `find_compat_user_dir()` / [steam_shortcuts.py:130](../py_modules/steam_shortcuts.py) `_steam_library_paths()` |
-| 上传入口 | [tianyi_service.py:2718](../py_modules/tianyi_service.py) `start_cloud_save_upload()` |
+| 上传入口 | [tianyi_service.py:2758](../py_modules/tianyi_service.py) `start_cloud_save_upload()` |
 | 上传后台任务 | [tianyi_service.py:4432](../py_modules/tianyi_service.py) `_run_cloud_save_upload_task()` |
 | 候选目录扫描 | [tianyi_service.py:3910](../py_modules/tianyi_service.py) `_collect_cloud_save_candidates()` |
 | 打包 + manifest | [tianyi_service.py:4323](../py_modules/tianyi_service.py) `_archive_single_game_saves()` |
@@ -694,7 +694,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ## 10. 数据与状态
 
-`~/.local/share/freedeckCY/tianyi/state.json`（**每次全量重写**，原子替换临时文件；数据类与读写见 [tianyi_store.py:51](../py_modules/tianyi_store.py) 起、[tianyi_store.py:200](../py_modules/tianyi_store.py) `load()`、[tianyi_store.py:271](../py_modules/tianyi_store.py) `save()`）：
+`~/.local/share/freedeckCY/tianyi/state.json`（**每次全量重写**，原子替换临时文件；数据类与读写见 [tianyi_store.py:51](../py_modules/tianyi_store.py) 起、[tianyi_store.py:200](../py_modules/tianyi_store.py) `load()`、[tianyi_store.py:275](../py_modules/tianyi_store.py) `save()`）：
 
 ```jsonc
 {

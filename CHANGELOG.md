@@ -2,6 +2,18 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.6.2
+
+### 新增
+
+- **远程 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 现在支持 `https://` URL（例如 `raw.githubusercontent.com/.../catalog-json/all.json`），下载后缓存到 `~/.local/share/freedeckCY/catalog-remote-cache.json`，6 小时内直接读缓存；网络失败时用旧缓存，缓存也没有则回退 CSV。
+- 目录来源 `source` 新增 `json-url` / `json-url-cache`，诊断包可见。
+
+### 变更
+
+- 远程目录下载上限 64MB、超时 10s；实测 7084 条 4.9MB。
+- 测试 271 → 275。
+
 ## v0.6.1
 
 ### 新增
