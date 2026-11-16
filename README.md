@@ -1,5 +1,9 @@
 # freedeckCY
 
+[![CI](https://github.com/hulong1989/freedeckCY/actions/workflows/ci.yml/badge.svg)](https://github.com/hulong1989/freedeckCY/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/hulong1989/freedeckCY)](https://github.com/hulong1989/freedeckCY/releases)
+[![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
+
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
 > 版本号从 **0.1.0** 起步、当前 **0.4.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
