@@ -231,3 +231,30 @@ def test_web_share_url_is_accepted():
     code, pwd = parse_share_url(url)
     assert code == "3MzqU3YjMn6v"
     assert pwd == "lqe3"
+
+
+def test_normalize_categories():
+    from game_catalog import normalize_categories
+
+    assert normalize_categories("动作冒险", "pc") == "动作冒险"
+    # 平台名混入分类 → 剔除；模拟器行空分类补“模拟器”
+    assert normalize_categories("GBA", "gba") == "模拟器"
+    assert normalize_categories("Switch", "switch") == "模拟器"
+    assert normalize_categories("动作冒险,GBA", "gba") == "动作冒险"
+    # 分隔符统一 / 去重 / 去空白
+    assert normalize_categories("动作冒险， 角色扮演、动作冒险", "pc") == "动作冒险,角色扮演"
+    assert normalize_categories("", "pc") == ""
+    assert normalize_categories(None, "pc") == ""
+
+
+def test_default_catalog_categories_are_clean():
+    from game_catalog import PLATFORM_TOKENS, resolve_default_catalog_path
+
+    catalog = GameCatalog(resolve_default_catalog_path())
+    catalog.load()
+
+    assert catalog.entries
+    assert all(entry.categories.strip() for entry in catalog.entries)
+    for entry in catalog.entries:
+        tokens = [token.strip().lower() for token in entry.categories.split(",") if token.strip()]
+        assert not (set(tokens) & PLATFORM_TOKENS), entry.title

@@ -2,6 +2,18 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.3.1
+
+### 新增
+
+- **目录数据体检**：`scripts/validate_catalog.py` + `make validate-catalog`，检查重复 game_id / 非法链接 / 空标题 / 分类混入平台名 / 封面覆盖率；CI 增加 strict 校验步骤。
+- **分类清洗**：`scripts/normalize_catalog_categories.py` + `make normalize-catalog`，剔除分类里的平台名（GBA、Switch 等）、统一分隔符与去重；模拟器行清洗后为空时补“模拟器”。
+
+### 变更
+
+- 目录数据已清洗：606 行 categories 变更，分类里不再出现平台名（`GBA` 553 条、`Switch` 42 条已并入“模拟器”分类）。
+- 测试 231 → 233（新增分类清洗与数据洁净度用例）。
+
 ## v0.3.0
 
 ### 新增

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import csv
 import os
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -16,6 +17,11 @@ import config
 
 DEFAULT_PLATFORM = "pc"
 CATEGORY_FILTER_LIMIT = 12
+CATEGORY_EMULATOR_LABEL = "模拟器"
+PLATFORM_TOKENS = frozenset(
+    {"pc", "fc", "nds", "psp", "gba", "3ds", "ps1", "ps2", "ps3", "md", "switch", "ns", "arcade", "psx"}
+)
+_CATEGORY_SPLIT_RE = re.compile(r"[,，/、;；|]+")
 
 # 封面索引列名兼容多种写法
 _COVER_URL_FIELDS = ("cover_url", "landscape_cover_url", "cover")
@@ -74,6 +80,31 @@ def _normalize_platform(value: object, default: str = DEFAULT_PLATFORM) -> str:
         "ns": "switch",
     }
     return aliases.get(text, text)
+
+
+def normalize_categories(raw: object, platform: str = DEFAULT_PLATFORM) -> str:
+    """清洗分类字段：去掉平台名、去重、统一分隔符。
+
+    0.6 的目录里 FC/GBA 等模拟器资源的 categories 会错误地写成平台名（如 "GBA"），
+    这里统一剔除；模拟器行清洗后为空时补一个 "模拟器" 分类，方便筛选。
+    """
+    normalized_platform = _normalize_platform(platform)
+    tokens: List[str] = []
+    seen = set()
+    for part in _CATEGORY_SPLIT_RE.split(str(raw or "")):
+        name = part.strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in PLATFORM_TOKENS or key == normalized_platform:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        tokens.append(name)
+    if not tokens and normalized_platform != DEFAULT_PLATFORM:
+        return CATEGORY_EMULATOR_LABEL
+    return ",".join(tokens)
 
 
 def _first_value(row: Dict[str, object], fields: tuple, default: str = "") -> str:
@@ -188,6 +219,7 @@ class GameCatalog:
                     continue
 
                 game_id = str(row.get("game_id", "")).strip()
+                platform = _normalize_platform(row.get("platform"))
                 size_bytes = _safe_int(row.get("filesize_z", "0"))
                 size_text = (row.get("list_filesize") or "").strip()
                 if not size_text and size_bytes > 0:
@@ -197,13 +229,13 @@ class GameCatalog:
                     game_id=game_id or title,
                     title=title,
                     category_parent=str(row.get("category_parent", "")).strip(),
-                    categories=str(row.get("categories", "")).strip(),
+                    categories=normalize_categories(row.get("categories"), platform),
                     down_url=down_url,
                     pwd=str(row.get("pwd", "")).strip(),
                     openpath=str(row.get("openpath", "")).strip(),
                     size_bytes=size_bytes,
                     size_text=size_text,
-                    platform=_normalize_platform(row.get("platform")),
+                    platform=platform,
                     cover_url=str(row.get("cover_url", "") or "").strip(),
                     cover_portrait_url=str(row.get("cover_portrait_url", "") or "").strip(),
                     steam_appid=_safe_int(row.get("steam_appid", "0")),
@@ -294,7 +326,7 @@ class GameCatalog:
         """分类条目数（取前 N 个，按数量降序）。"""
         counter: Dict[str, int] = {}
         for entry in self.entries:
-            for name in str(entry.categories or "").replace("，", ",").split(","):
+            for name in _CATEGORY_SPLIT_RE.split(str(entry.categories or "")):
                 text = name.strip()
                 if text:
                     counter[text] = counter.get(text, 0) + 1

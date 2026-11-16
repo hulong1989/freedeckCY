@@ -21,7 +21,14 @@ import argparse
 import csv
 import os
 import sys
+import types
 from typing import Dict, List
+
+# game_catalog 顶部 import decky；脚本环境里给个最小桩
+sys.modules.setdefault("decky", types.ModuleType("decky"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "py_modules"))
+
+from game_catalog import normalize_categories  # noqa: E402
 
 OUT_COLUMNS = [
     "game_id",
@@ -84,7 +91,6 @@ def _from_v06(row: Dict[str, str]) -> Dict[str, str]:
         "game_id": _str(row, "game_id"),
         "title": _str(row, "title", "title_zh"),
         "category_parent": _str(row, "category_parent"),
-        "categories": _str(row, "categories"),
         "package_name": _str(row, "package_name"),
         "server": _str(row, "server", default="t"),
         "down_url": _str(row, "down_url"),
@@ -94,6 +100,7 @@ def _from_v06(row: Dict[str, str]) -> Dict[str, str]:
         "filesize_z": _str(row, "filesize_z", "size_bytes", default="0"),
         "list_filesize": _str(row, "list_filesize", "size_text"),
         "platform": _norm_platform(row.get("platform")),
+        "categories": normalize_categories(row.get("categories"), _norm_platform(row.get("platform"))),
         "cover_url": _str(row, "cover_url"),
         "cover_portrait_url": _str(row, "square_cover_url", "cover_portrait_url"),
         "steam_appid": _str(row, "steam_appid", "app_id", default="0"),
@@ -105,7 +112,6 @@ def _from_base(row: Dict[str, str]) -> Dict[str, str]:
         "game_id": _str(row, "game_id"),
         "title": _str(row, "title"),
         "category_parent": _str(row, "category_parent"),
-        "categories": _str(row, "categories"),
         "package_name": _str(row, "package_name"),
         "server": _str(row, "server", default="t"),
         "down_url": _str(row, "down_url"),
@@ -115,6 +121,7 @@ def _from_base(row: Dict[str, str]) -> Dict[str, str]:
         "filesize_z": _str(row, "filesize_z", default="0"),
         "list_filesize": _str(row, "list_filesize"),
         "platform": _norm_platform(row.get("platform")),
+        "categories": normalize_categories(row.get("categories"), _norm_platform(row.get("platform"))),
         "cover_url": _str(row, "cover_url"),
         "cover_portrait_url": _str(row, "cover_portrait_url"),
         "steam_appid": _str(row, "steam_appid", default="0"),

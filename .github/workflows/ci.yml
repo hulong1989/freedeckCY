@@ -41,6 +41,11 @@ jobs:
         # 测试全部离线（conftest 注入假 decky），不依赖 Steam / 网络 / Decky 运行时
         run: python -m pytest -q
 
+      - name: Validate catalog data
+        # 重复 game_id / 非法链接 / 分类混入平台名 会直接失败
+        run: |
+          python scripts/validate_catalog.py defaults/tianyi_catalog/freedeckcy_catalog.csv             --cover-index defaults/tianyi_catalog/cover_index.csv --strict
+
   ui:
     name: UI build (pnpm)
     runs-on: ubuntu-latest

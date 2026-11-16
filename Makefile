@@ -24,7 +24,7 @@ PYTEST := $(ROOT)/.venv/bin/pytest
 REQUIREMENTS_DEV := requirements-dev.txt
 
 .DEFAULT_GOAL := help
-.PHONY: runtime package test doctor clean help
+.PHONY: runtime package test doctor validate-catalog normalize-catalog clean help
 
 help:
 	@echo "freedeckCY 构建入口"
@@ -36,6 +36,8 @@ help:
 	@echo "  package    组装 Decky 插件 zip 到 dist-artifacts/freedeckCY-v<version>.zip"
 	@echo "  test       使用 .venv/bin/pytest 运行测试（未安装则提示安装 dev 依赖）"
 	@echo "  doctor     环境诊断：运行时/Steam/state/日志/端口/网络（只读）"
+	@echo "  validate-catalog  目录 CSV 体检（重复/非法链接/分类混平台名等）"
+	@echo "  normalize-catalog 清洗目录 categories 字段"
 	@echo "  clean      删除 dist-artifacts/ 与 __pycache__/*.pyc（默认保留 defaults/runtime）"
 	@echo "  help       显示本帮助"
 	@echo ""
@@ -61,6 +63,12 @@ package:
 
 doctor:
 	@cd "$(ROOT)" && bash scripts/doctor.sh
+
+validate-catalog:
+	@cd "$(ROOT)" && python3 scripts/validate_catalog.py defaults/tianyi_catalog/freedeckcy_catalog.csv --cover-index defaults/tianyi_catalog/cover_index.csv --strict
+
+normalize-catalog:
+	@cd "$(ROOT)" && python3 scripts/normalize_catalog_categories.py defaults/tianyi_catalog/freedeckcy_catalog.csv
 
 test:
 	@cd "$(ROOT)" || exit 1; \
