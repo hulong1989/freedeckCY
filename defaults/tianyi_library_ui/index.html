@@ -26,6 +26,19 @@
     </section>
 
     <section class="results" v-if="showResults">
+      <div class="filter-bar" v-if="filterChips.length > 1">
+        <button
+          v-for="(chip, cidx) in filterChips"
+          :key="'chip-' + (chip.value || 'all')"
+          :class="['filter-chip', { active: activeCategory === chip.value, 'focus-ring': focusedIndex === cidx + 2 }]"
+          :data-chip-index="cidx"
+          tabindex="0"
+          @click="selectCategory(chip.value)"
+        >
+          {{ chip.label }}<span class="chip-count" v-if="chip.count">{{ chip.count }}</span>
+        </button>
+      </div>
+
       <div class="card-grid" v-if="list.items.length > 0">
         <article
           :class="['game-card', { 'focus-ring': focusedIndex === idx + 2 }]"
@@ -46,6 +59,7 @@
           <div class="card-info">
             <h3 class="card-title">{{ item.title }}</h3>
             <div class="card-meta">
+              <span v-if="item.platform && item.platform !== 'pc'" class="platform-tag">{{ item.platform.toUpperCase() }}</span>
               <span>{{ item.categories || "未分类" }}</span>
               <span>{{ item.size_text || "-" }}</span>
             </div>

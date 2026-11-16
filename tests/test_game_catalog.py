@@ -162,6 +162,10 @@ def test_to_dict_contains_frontend_fields(catalog: GameCatalog) -> None:
         "openpath",
         "size_bytes",
         "size_text",
+        "platform",
+        "cover_url",
+        "cover_portrait_url",
+        "steam_appid",
     }
     assert payload["game_id"] == "1001"
 

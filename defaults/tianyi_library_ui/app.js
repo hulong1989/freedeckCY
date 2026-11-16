@@ -36,6 +36,8 @@ createApp({
         page_size: 50,
       },
       list: { total: 0, page: 1, page_size: 50, items: [] },
+      categories: [],
+      activeCategory: "",
       query: "",
       activeQuery: "",
       showResults: false,
@@ -65,6 +67,19 @@ createApp({
       const pageSize = Number(this.list.page_size || 50);
       if (total <= 0 || pageSize <= 0) return 1;
       return Math.max(1, Math.ceil(total / pageSize));
+    },
+    filterChips() {
+      const chips = [{ value: "", label: "全部", count: 0 }];
+      for (const item of this.categories || []) {
+        const value = String(item && item.value ? item.value : "").trim();
+        if (!value) continue;
+        chips.push({
+          value,
+          label: String((item && item.label) || value),
+          count: Number((item && item.count) || 0),
+        });
+      }
+      return chips;
     },
     modalCanConfirm() {
       if (!this.installDialog.plan) return false;
@@ -290,12 +305,28 @@ createApp({
         // 状态读取失败不阻断搜索流程。
       }
     },
+    filterChipCount() {
+      if (!this.showResults) return 0;
+      return this.filterChips.length > 1 ? this.filterChips.length : 0;
+    },
+    cardStartIndex() {
+      return 2 + this.filterChipCount();
+    },
+    selectCategory(value) {
+      const next = String(value || "").trim();
+      if (next === this.activeCategory) {
+        void this.reloadList(1);
+        return;
+      }
+      this.activeCategory = next;
+      void this.reloadList(1);
+    },
     getFocusableCount() {
       if (this.installDialog.visible) {
         return 2;
       }
       const cardCount = this.showResults ? Number(this.list.items.length || 0) : 0;
-      return 2 + Math.max(0, cardCount);
+      return 2 + this.filterChipCount() + Math.max(0, cardCount);
     },
     getCardColumns() {
       const cards = Array.from(document.querySelectorAll(".game-card"));
@@ -319,9 +350,14 @@ createApp({
         el = document.getElementById("search-input");
       } else if (index === 1) {
         el = document.getElementById("search-button");
-      } else if (index >= 2) {
-        const cardIndex = index - 2;
-        el = document.querySelector(`.game-card[data-card-index="${cardIndex}"]`);
+      } else {
+        const chipCount = this.filterChipCount();
+        if (chipCount > 0 && index < 2 + chipCount) {
+          el = document.querySelector(`.filter-chip[data-chip-index="${index - 2}"]`);
+        } else {
+          const cardIndex = index - this.cardStartIndex();
+          el = document.querySelector(`.game-card[data-card-index="${cardIndex}"]`);
+        }
       }
       if (!el || typeof el.focus !== "function") return;
       try {
@@ -350,13 +386,21 @@ createApp({
       const total = this.getFocusableCount();
       if (total <= 0) return;
 
-      const cardStart = 2;
+      const chipStart = 2;
+      const chipCount = this.filterChipCount();
+      const chipEnd = chipStart + chipCount - 1;
+      const cardStart = this.cardStartIndex();
       const hasCards = total > cardStart;
+      const hasChips = chipCount > 0;
       const columns = this.getCardColumns();
       let next = this.focusedIndex;
 
       if (direction === "left") {
-        if (next > cardStart) {
+        if (hasChips && next > chipStart && next <= chipEnd) {
+          next -= 1;
+        } else if (hasChips && next === chipStart) {
+          next = 1;
+        } else if (next > cardStart) {
           next -= 1;
         } else if (next === 1) {
           next = 0;
@@ -364,21 +408,33 @@ createApp({
       } else if (direction === "right") {
         if (next === 0) {
           next = 1;
+        } else if (hasChips && next >= chipStart && next < chipEnd) {
+          next += 1;
+        } else if (hasChips && next === chipEnd) {
+          next = hasCards ? cardStart : next;
         } else if (next >= cardStart && next < total - 1) {
           next += 1;
         }
       } else if (direction === "up") {
         if (next >= cardStart) {
           const up = next - columns;
-          next = up >= cardStart ? up : 0;
+          if (up >= cardStart) {
+            next = up;
+          } else {
+            next = hasChips ? chipStart : 0;
+          }
+        } else if (hasChips && next >= chipStart && next <= chipEnd) {
+          next = 0;
         } else if (next === 1) {
           next = 0;
         }
       } else if (direction === "down") {
         if (next === 0) {
           next = 1;
-        } else if (next === 1 && hasCards) {
-          next = cardStart;
+        } else if (next === 1) {
+          next = hasChips ? chipStart : hasCards ? cardStart : 1;
+        } else if (hasChips && next >= chipStart && next <= chipEnd) {
+          next = hasCards ? cardStart : next;
         } else if (next >= cardStart) {
           next = Math.min(total - 1, next + columns);
         }
@@ -400,7 +456,13 @@ createApp({
         await this.reloadList(1);
         return;
       }
-      const cardIndex = index - 2;
+      const chipCount = this.filterChipCount();
+      if (chipCount > 0 && index < 2 + chipCount) {
+        const chip = this.filterChips[index - 2];
+        this.selectCategory(chip ? chip.value : "");
+        return;
+      }
+      const cardIndex = index - this.cardStartIndex();
       const item = this.list.items[cardIndex];
       if (item) {
         await this.openInstallConfirm(item);
@@ -539,6 +601,7 @@ createApp({
         q,
         page,
         page_size: this.settings.page_size,
+        category: this.activeCategory || "",
       });
       if (result.status !== "success") {
         this.flash(result.message || "搜索失败");
@@ -548,11 +611,13 @@ createApp({
       }
 
       this.list = Object.assign({ total: 0, page: 1, page_size: 50, items: [] }, result.data || {});
-      this.hintText = `已显示“${q}”的搜索结果`;
+      this.categories = Array.isArray(this.list.categories) ? this.list.categories : this.categories;
+      const categoryLabel = this.activeCategory ? `，分类「${this.activeCategory}」` : "";
+      this.hintText = `已显示“${q}”的搜索结果${categoryLabel}`;
       if (!this.list.items || this.list.items.length === 0) {
         this.setFocusIndex(0, { scroll: false });
       } else {
-        this.setFocusIndex(2, { scroll: true });
+        this.setFocusIndex(this.cardStartIndex(), { scroll: true });
         void this.prefetchCovers(this.list.items);
       }
     },
@@ -605,8 +670,12 @@ createApp({
       const meta = (cacheKey && this.coverMetaCache[cacheKey] && typeof this.coverMetaCache[cacheKey] === "object")
         ? this.coverMetaCache[cacheKey]
         : null;
-      const appId = Number((meta && meta.app_id) || (item && item.app_id) || 0);
+      const appId = Number(
+        (meta && meta.app_id) || (item && item.steam_appid) || (item && item.app_id) || 0,
+      );
 
+      push(item && item.cover_portrait_url);
+      push(item && item.cover_url);
       push(meta && meta.square_cover_url);
       this.buildSteamCoverCandidates(appId).forEach((url) => push(url));
       push(meta && meta.cover_url);

@@ -1,12 +1,12 @@
 # freedeckCY 后续路线图（ROADMAP）
 
-> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套之后**（第三轮参考作者 v0.6 发行版对齐了部分下载/Steam 集成能力；v0.1.1 落地了 compatdata 清理与 `7z t` 校验）值得继续做、以及明确不建议做的方向。当前版本 **v0.1.1**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
+> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面之后**（第三轮参考作者 v0.6 发行版对齐了部分下载/Steam 集成能力；v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 落地平台字段、封面索引与分类筛选）值得继续做、以及明确不建议做的方向。当前版本 **v0.2.0**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
 >
 > 背景：上游作者已停止维护，`main` 只是早期版本，Releases 里的百度网盘 / 模拟器 / 资源池代码**不在本仓库**（见 [ARCHITECTURE.md](ARCHITECTURE.md) §2）。
 >
 > ⚠️ 合规提示：本项目分发的资源链接来自互联网，属于盗版资源分发，违反云盘服务条款并涉及版权风险。本路线图只讨论**工程改进**，不建议部署使用，更不建议扩大资源分发能力。
 >
-> **v0.1.1 已落地（本文件不再列为候选）**：卸载可选回收 Proton 前缀（§9.2）、解压前 `7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」按钮（`retry_task`）、`make doctor` 环境诊断。
+> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0 —— 目录平台字段 + 可选 `cover_index.csv` + 封面磁盘缓存 + 库页分类筛选（§9.6）。
 
 ---
 
@@ -14,7 +14,7 @@
 
 | # | 事项 | 优先级 | 预估 | 一句话收益 |
 |---|---|---|---|---|
-| 1 | 拆分 `tianyi_service.py` | P0（工程健康） | 大 | 让 7400 行巨型类可维护、可测试 |
+| 1 | 拆分 `tianyi_service.py` | P0（工程健康） | 大 | 让 7500 行巨型类可维护、可测试 |
 | 2 | CI 增加 `ruff` / `mypy` | P0（工程健康） | 中 | 拦住低级错误与类型漂移 |
 | 3 | 云存档 plan/apply 与 HTTP handler 测试 | P1（数据安全） | 中 | 覆盖最容易丢存档的路径 |
 | 4 | 去掉 node 依赖（纯 Python 实现） | P1（可部署性） | 中 | 去掉约 90 MB 的 node 运行时与跨架构问题 |
@@ -28,9 +28,9 @@
 
 ---
 
-## 1. 拆分 `tianyi_service.py`（P0，当前约 7400 行）
+## 1. 拆分 `tianyi_service.py`（P0，当前约 7500 行）
 
-**现状**：`py_modules/tianyi_service.py` 约 7400 行、单个 `TianyiService` 类 100+ 方法，覆盖安装、云存档、登录采集、时长、面板缓存等互相独立的职责；此外 `_post_process_completed_task` / `_collect_cloud_save_candidates` 等长函数仍在膨胀。
+**现状**：`py_modules/tianyi_service.py` 约 7500 行、单个 `TianyiService` 类 100+ 方法，覆盖安装、云存档、登录采集、时长、面板缓存等互相独立的职责；此外 `_post_process_completed_task` / `_collect_cloud_save_candidates` 等长函数仍在膨胀。
 
 **为什么**：巨型类导致改动风险高、review 困难、测试只能整体起实例；第二轮的"分组安装 / 重启恢复"是在这个文件里继续叠加的，再拖延拆分成本只会更高。
 
@@ -40,7 +40,7 @@
 
 - 拆出至少 4 个模块（建议：`install_flow.py`、`cloud_save_flow.py`、`login_flow.py`、`playtime.py`），`TianyiService` 只做编排与状态持有；
 - `main.py` / `tianyi_http.py` 的调用面不变（RPC 与 HTTP 契约不动）；
-- `make test`（当前 220 个用例）保持全绿，新增用例覆盖搬迁后的模块；
+- `make test`（当前 227 个用例）保持全绿，新增用例覆盖搬迁后的模块；
 - 单个 Python 文件 < 1500 行；`docs/ARCHITECTURE.md` 的引用与模块图同步更新。
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_http.py`、`docs/ARCHITECTURE.md`。
@@ -144,7 +144,7 @@
 
 ## 7. 诊断页（P2）
 
-**现状**：只有 `/_healthz` 与 `/tmp/freedeckcy.log`；排障需要用户会 `curl`、会看日志，常见问题（缺运行时、Steam 路径不对、state 权限异常）都要来回问答。
+**现状**：`/_healthz`、`/tmp/freedeckcy.log`，以及 v0.1.1 起提供的**只读 CLI** `make doctor`（运行时/Steam/state/日志/端口/网络）；但没有可视化诊断页，排障仍需用户会跑命令、发输出。
 
 **为什么**：把"环境自检"可视化能显著降低支持成本，也方便开发者在 Steam Deck 上快速确认部署是否正确。
 
@@ -180,9 +180,9 @@
 
 ---
 
-## 9. v0.6 对齐候选（9.2 / 9.4 已在 v0.1.1 落地，其余未做）
+## 9. v0.6 对齐候选（9.2 / 9.4 已在 v0.1.1 落地；9.6 已在 v0.2.0 落地；其余未做）
 
-作者 v0.6 发行版（本地只读参考 `0.6/freedeck-plugin`，不随本仓库分发）在下载管线、模拟器与资源池上完整得多。三轮补全只采纳了下载/Steam 写入相关的少数能力（见 [ARCHITECTURE.md](ARCHITECTURE.md) §13）；**v0.1.1 又落地了 9.2（compatdata 清理）与 9.4（`7z t` best-effort 校验）**，其余按 **性价比 + 工作量** 从高到低排列，供后续认领。
+作者 v0.6 发行版（本地只读参考 `0.6/freedeck-plugin`，不随本仓库分发）在下载管线、模拟器与资源池上完整得多。三轮补全只采纳了下载/Steam 写入相关的少数能力（见 [ARCHITECTURE.md](ARCHITECTURE.md) §13）；**v0.1.1 落地 9.2（compatdata 清理）与 9.4（`7z t` best-effort 校验），v0.2.0 落地 9.6 的简化版（平台字段 + 可选封面索引 + 封面缓存 + 分类筛选，未做多平台数据与封面生成流水线）**，其余按 **性价比 + 工作量** 从高到低排列，供后续认领。
 
 | # | 候选 | 优先级 | 工作量 | v0.6 出处 | 一句话收益 |
 |---|---|---|---|---|---|
@@ -191,7 +191,7 @@
 | 9.3 | 自动重启 Steam | P1 | 小 | `main.py::restart_steam` | 写完快捷方式即可生效，不用手动重启 |
 | 9.4 | ~~`7z t` 全量归档校验~~ ✅ | ~~P1~~ | ~~中~~ | `archive_validator.test_archive` | **已在 v0.1.1 落地（best-effort）**：解压前发现坏包并自动重下 |
 | 9.5 | SQLite 任务库 | P2 | 大 | `archive_task_db.py` | 任务持久化/查询与崩溃恢复更可靠 |
-| 9.6 | 平台目录 + 封面索引 | P2 | 大 | `gba_catalog.py` 等 + `generate_*_cover_urls.py` | 多平台资源目录与封面本地化 |
+| 9.6 | ~~平台目录 + 封面索引~~ ✅（简化版） | ~~P2~~ | ~~大~~ | `gba_catalog.py` 等 + `generate_*_cover_urls.py` | **v0.2.0 已落地加载端/封面缓存；多平台数据与封面生成流水线仍未做** |
 | 9.7 | 资源池只读 | P2 | 中 | 腾讯文档 smartsheet 读取 | 扩充资源，但不引入投稿/点赞 |
 | 9.8 | 单平台模拟器闭环 | P2 | 大 | `emulator_adapters.py` | 打通一个模拟器平台的下载→安装→启动 |
 | 9.9 | 百度 OpenAPI | P3 | 大 | `baidu_openapi_client.py` | 新增一个"干净"的网盘来源 |
@@ -269,22 +269,17 @@
 
 **涉及文件**：`py_modules/tianyi_store.py`（或新增 `task_store.py`）、`py_modules/tianyi_service.py`、`tests/`、`docs/`。
 
-### 9.6 平台目录 + 封面索引（P2，工作量：大）
+### 9.6 ~~平台目录 + 封面索引~~（✅ 简化版已在 v0.2.0 落地）
 
-**v0.6 参考**：`gba_catalog.py` / `ps1_catalog.py` / `ps3_catalog.py` 等平台目录 + `generate_*_catalog_cover_urls.py` / `emulator_cover_pipeline.py` 封面生成。
+**落地实现（v0.2.0）**：
 
-**为什么**：当前只有一份 PC 资源 CSV + 在线封面解析；多平台目录与离线封面索引能减少网络依赖、提升库页加载。
+- 目录 CSV 新增 4 个可选列：`platform` / `cover_url` / `cover_portrait_url` / `steam_appid`；`platform` 缺省归一到 `pc`；
+- 可选封面索引 `defaults/tianyi_catalog/cover_index.csv`（环境变量 `FREEDECKCY_COVER_INDEX_CSV`，兼容旧 `FRIENDECK_COVER_INDEX_CSV`）：按 `game_id`/标题匹配、只补空值不覆盖，列名兼容多种写法；**仓库默认不内置该文件**；
+- 封面解析优先级：目录/索引静态封面（有 appid 时合成 Steam CDN 图）→ 内存/磁盘缓存（`cover_cache.json`，0600、正缓存 7 天/负缓存 30 分钟）→ Steam 商店搜索 → ProtonDB；
+- `list()` 支持 `platform`/`category` 过滤并返回 `platforms` 与 Top12 `categories`；库页搜索后显示分类筛选条（手柄焦点序列已接入），卡片显示非 PC 平台标签；
+- 测试：新增 `tests/test_catalog_platform.py`；`make test` 227 用例。
 
-**代价**：要定义多平台 CSV schema、生成流程（脚本/CI）与数据体积控制；封面版权与 CDN 失效问题需要处理。
-
-**验收标准**：
-
-- 先落地**一个平台**（建议 PS1/GBA 之一）的目录格式 + 封面索引生成脚本，生成物可复现（固定输入 → 固定输出）；
-- 加载端按 `platform` 字段分流，不影响现有 PC 目录；
-- 无网络时库页仍能显示本地封面索引；单测覆盖索引读取与回退；
-- 数据来源/版权说明写入文档，不内置 ROM/镜像。
-
-**涉及文件**：`defaults/tianyi_catalog/`、`py_modules/game_catalog.py`、新增脚本（`scripts/`）、`tests/`。
+**仍未做**：多平台**数据**（当前内置目录 2685 条有效、全为 PC）、模拟器目录、封面索引生成流水线（`generate_*_cover_urls.py` 类脚本）、前端平台筛选 chip（后端参数/计数已具备）、无网络时纯离线封面库。
 
 ### 9.7 资源池只读（P2，工作量：中，**合规风险高**）
 
@@ -381,4 +376,4 @@
 - 架构与问题清单：[ARCHITECTURE.md](ARCHITECTURE.md)
 - 与作者 v0.6 的能力对照：[ARCHITECTURE.md](ARCHITECTURE.md) §13
 - 本地开发、调试、故障排查：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 当前测试基线：`make test` → 220 passed（2026-11 v0.1.1）
+- 当前测试基线：`make test` → 227 passed（2026-11 v0.2.0）

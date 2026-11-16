@@ -26,7 +26,11 @@ from yarl import URL
 import config
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
-from game_catalog import GameCatalog, resolve_default_catalog_path
+from game_catalog import (
+    GameCatalog,
+    resolve_default_catalog_path,
+    resolve_default_cover_index_path,
+)
 from seven_zip_manager import SevenZipError, SevenZipManager
 from steam_shortcuts import (
     add_or_update_tianyi_shortcut,
@@ -328,7 +332,11 @@ class TianyiService:
         state_dir = os.path.join(state_root, "tianyi")
         state_file = os.path.join(state_dir, "state.json")
         self.store = TianyiStateStore(state_file)
-        self.catalog = GameCatalog(resolve_default_catalog_path())
+        self.catalog = GameCatalog(
+            resolve_default_catalog_path(),
+            cover_index_path=resolve_default_cover_index_path(),
+        )
+        self._cover_cache_path = os.path.join(state_dir, "cover_cache.json")
         self.aria2 = Aria2Manager(plugin_dir=plugin_dir, work_dir=os.path.join(state_dir, "aria2"))
         self.seven_zip = SevenZipManager(plugin_dir=plugin_dir)
         self._lock = asyncio.Lock()
@@ -433,6 +441,7 @@ class TianyiService:
         """初始化状态与目录。"""
         os.makedirs(os.path.dirname(self.store.state_file), exist_ok=True)
         await asyncio.to_thread(self.store.load)
+        await asyncio.to_thread(self._load_cover_cache)
         await asyncio.to_thread(self.catalog.load)
         if not self.store.settings.download_dir:
             default_dir = getattr(self.plugin, "downloads_dir", config.DOWNLOADS_DIR)
@@ -1693,12 +1702,105 @@ class TianyiService:
         """读取当前自动采集状态。"""
         return dict(self._capture_state)
 
-    async def list_catalog(self, query: str, page: int, page_size: int) -> Dict[str, Any]:
-        """查询游戏目录。"""
+    async def list_catalog(
+        self,
+        query: str,
+        page: int,
+        page_size: int,
+        platform: str = "",
+        category: str = "",
+    ) -> Dict[str, Any]:
+        """查询游戏目录（支持平台/分类筛选）。"""
         # page_size 默认跟随设置，但允许前端覆盖。
         if page_size <= 0:
             page_size = self.store.settings.page_size
-        return self.catalog.list(query=query, page=page, page_size=page_size)
+        return self.catalog.list(
+            query=query,
+            page=page,
+            page_size=page_size,
+            platform=platform,
+            category=category,
+        )
+
+    def _load_cover_cache(self) -> None:
+        """加载封面磁盘缓存（仅保留未过期项）。"""
+        path = str(getattr(self, "_cover_cache_path", "") or "").strip()
+        if not path or not os.path.isfile(path):
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+        except Exception as exc:
+            config.logger.warning("读取封面缓存失败: %s", exc)
+            return
+        if not isinstance(payload, dict):
+            return
+        now_ts = _now_wall_ts()
+        loaded = 0
+        for key, value in payload.items():
+            if not isinstance(value, dict):
+                continue
+            try:
+                expires_at = int(value.get("expires_at", 0) or 0)
+            except Exception:
+                expires_at = 0
+            if expires_at <= now_ts:
+                continue
+            self._catalog_cover_cache[str(key)] = value
+            loaded += 1
+        if loaded:
+            config.logger.info("已加载封面缓存: %s 条", loaded)
+
+    def _save_cover_cache(self) -> None:
+        """把封面缓存原子写回磁盘。"""
+        path = str(getattr(self, "_cover_cache_path", "") or "").strip()
+        if not path:
+            return
+        try:
+            payload = {
+                key: value
+                for key, value in self._catalog_cover_cache.items()
+                if isinstance(value, dict)
+            }
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp_path = f"{path}.tmp"
+            with open(tmp_path, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, ensure_ascii=False)
+            try:
+                os.chmod(tmp_path, 0o600)
+            except Exception:
+                pass
+            os.replace(tmp_path, path)
+        except Exception as exc:
+            config.logger.warning("写入封面缓存失败: %s", exc)
+
+    def _catalog_entry_cover(self, game_id: str) -> Dict[str, Any]:
+        """目录/封面索引里自带的封面（无需联网）。"""
+        target = str(game_id or "").strip()
+        if not target:
+            return {}
+        entry = self.catalog.get_by_game_id(target)
+        if entry is None:
+            return {}
+        app_id = max(0, _safe_int(entry.steam_appid, 0))
+        cover_url = str(entry.cover_url or "").strip()
+        square_url = str(entry.cover_portrait_url or "").strip()
+        if app_id > 0 and (not cover_url or not square_url):
+            if not square_url:
+                square_url = self._build_store_square_cover_url(app_id)
+            if not cover_url:
+                cover_url = f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg"
+        if not cover_url and not square_url:
+            return {}
+        return {
+            "cover_url": cover_url,
+            "square_cover_url": square_url,
+            "source": "catalog",
+            "matched_title": str(entry.title or ""),
+            "app_id": app_id,
+            "protondb_tier": "",
+            "cached": True,
+        }
 
     async def resolve_catalog_cover(
         self,
@@ -1708,6 +1810,10 @@ class TianyiService:
         categories: str = "",
     ) -> Dict[str, Any]:
         """按游戏标题解析封面 URL（优先 Steam 商店），并做内存缓存。"""
+        static_cover = self._catalog_entry_cover(game_id)
+        if static_cover:
+            return static_cover
+
         cache_key = str(game_id or title or "").strip().lower()
         now_ts = _now_wall_ts()
         if not cache_key:
@@ -1799,6 +1905,10 @@ class TianyiService:
         }
         async with self._catalog_cover_lock:
             self._catalog_cover_cache[cache_key] = cache_value
+        try:
+            await asyncio.to_thread(self._save_cover_cache)
+        except Exception as exc:
+            config.logger.warning("保存封面缓存失败: %s", exc)
 
         return {
             "cover_url": cover_url,

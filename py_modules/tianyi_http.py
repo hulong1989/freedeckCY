@@ -273,7 +273,15 @@ async def handle_catalog(request: web.Request, plugin: Any) -> web.Response:
         query = str(request.query.get("q", "")).strip()
         page = int(request.query.get("page", "1"))
         page_size = int(request.query.get("page_size", request.query.get("pageSize", "0")))
-        data = await _service(plugin).list_catalog(query, page, page_size)
+        platform = str(request.query.get("platform", "")).strip()
+        category = str(request.query.get("category", "")).strip()
+        data = await _service(plugin).list_catalog(
+            query,
+            page,
+            page_size,
+            platform=platform,
+            category=category,
+        )
         return _json_ok({"data": data})
     except Exception as exc:
         return _json_error_from_exception(exc)

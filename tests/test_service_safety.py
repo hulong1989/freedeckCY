@@ -120,3 +120,37 @@ async def test_get_has_no_wildcard_cors():
     response = await server_manager.cors_middleware(request, _ok_handler)
     assert response.status == 200
     assert "Access-Control-Allow-Origin" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_catalog_handler_passes_platform_and_category(monkeypatch):
+    import tianyi_http
+
+    captured = {}
+
+    class _FakeService:
+        async def list_catalog(self, query, page, page_size, platform="", category=""):
+            captured.update(
+                {
+                    "query": query,
+                    "page": page,
+                    "page_size": page_size,
+                    "platform": platform,
+                    "category": category,
+                }
+            )
+            return {"total": 0, "page": 1, "page_size": 50, "items": [], "platforms": [], "categories": []}
+
+    monkeypatch.setattr(tianyi_http, "_service", lambda plugin: _FakeService())
+    request = make_mocked_request(
+        "GET",
+        "/api/tianyi/catalog?q=zelda&platform=switch&category=%E5%8A%A8%E4%BD%9C%E5%86%92%E9%99%A9&page=2&page_size=30",
+    )
+    response = await tianyi_http.handle_catalog(request, object())
+
+    assert response.status == 200
+    assert captured["query"] == "zelda"
+    assert captured["platform"] == "switch"
+    assert captured["category"] == "动作冒险"
+    assert captured["page"] == 2
+    assert captured["page_size"] == 30
