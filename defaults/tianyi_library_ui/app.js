@@ -884,6 +884,14 @@ createApp({
         this.flash("诊断包已开始下载");
       }, 1500);
     },
+    submitGame() {
+      const base = "https://github.com/hulong1989/freedeckCY/issues/new";
+      const params = new URLSearchParams({
+        template: "submit-game.yml",
+        title: "【游戏提交】",
+      });
+      window.open(`${base}?${params.toString()}`, "_blank");
+    },
     async checkUpdate() {
       if (this.updateBusy) return;
       this.updateBusy = true;

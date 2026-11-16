@@ -1,0 +1,108 @@
+name: 提交游戏
+description: 通过 Issue 提交天翼云盘游戏资源（也可用 submissions/*.json 发 PR）
+title: "[游戏提交] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢提交！请只填写**分享链接**，不要上传游戏文件、破解补丁或账号信息。
+        提交前请确认链接可访问、提取码正确，并阅读 [submissions/README.md](https://github.com/hulong1989/freedeckCY/blob/main/submissions/README.md)。
+  - type: input
+    id: name
+    attributes:
+      label: 游戏名称（中文）
+      placeholder: 例如：星露谷物语
+    validations:
+      required: true
+  - type: input
+    id: english_name
+    attributes:
+      label: 英文名 / 原名
+      placeholder: 例如：Stardew Valley
+    validations:
+      required: false
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - pc
+        - gba
+        - psp
+        - nds
+        - ps1
+        - fc
+        - md
+        - 3ds
+        - ps2
+        - ps3
+        - switch
+    validations:
+      required: true
+  - type: input
+    id: share_url
+    attributes:
+      label: 天翼云盘分享链接
+      description: 仅支持 cloud.189.cn 分享链接
+      placeholder: https://cloud.189.cn/t/xxxxxxxx
+    validations:
+      required: true
+  - type: input
+    id: access_code
+    attributes:
+      label: 提取码
+      placeholder: 4 位字母/数字，没有可留空
+    validations:
+      required: false
+  - type: input
+    id: share_user_version
+    attributes:
+      label: 分享用户版本（可选）
+      description: 原版资源池字段，例如资源整理者/整合包版本
+    validations:
+      required: false
+  - type: input
+    id: executable_name
+    attributes:
+      label: 可执行文件名（仅 PC）
+      placeholder: 例如：Stardew Valley.exe
+    validations:
+      required: false
+  - type: input
+    id: openpath
+    attributes:
+      label: 网盘内路径
+      description: 分享根目录下游戏文件或压缩包的相对路径，安装时用它匹配文件
+      placeholder: 例如：Stardew Valley/Stardew Valley.7z
+    validations:
+      required: true
+  - type: input
+    id: categories
+    attributes:
+      label: 分类（可选）
+      description: 用逗号分隔，例如：模拟经营,休闲益智
+    validations:
+      required: false
+  - type: input
+    id: filesize_z
+    attributes:
+      label: 压缩包大小（字节，可选）
+      placeholder: "例如：2674349793"
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: 备注
+      description: 多分卷、语言、版本、已知问题等
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 链接可访问，提取码正确，且不包含游戏本体文件之外的敏感内容
+          required: true
+        - label: 我了解维护者会按仓库规则审核，可能要求改用 PR / 补充路径
+          required: true

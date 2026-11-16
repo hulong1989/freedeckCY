@@ -46,6 +46,10 @@ jobs:
         run: |
           python scripts/validate_catalog.py defaults/tianyi_catalog/freedeckcy_catalog.csv             --cover-index defaults/tianyi_catalog/cover_index.csv --strict
 
+      - name: Validate game submissions
+        # submissions/*.json 的字段/平台/分享链接/重复 shareCode 校验
+        run: python scripts/validate_submissions.py --catalog defaults/tianyi_catalog/freedeckcy_catalog.csv
+
   ui:
     name: UI build (pnpm)
     runs-on: ubuntu-latest

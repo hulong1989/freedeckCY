@@ -47,6 +47,12 @@
         <button class="toolbar-btn" tabindex="-1" :disabled="updateBusy" @click="checkUpdate">
           {{ updateBusy ? "检查中..." : "检查更新" }}
         </button>
+        <button
+          class="toolbar-btn"
+          tabindex="-1"
+          title="通过 GitHub Issue/PR 提交游戏（仅分享链接）"
+          @click="submitGame"
+        >提交游戏</button>
       </div>
     </section>
 

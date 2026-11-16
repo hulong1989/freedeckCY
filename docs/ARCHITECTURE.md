@@ -1,6 +1,6 @@
 # freedeckCY 架构说明
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.12.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.13.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -18,11 +18,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 这是阅读本仓库最容易踩的坑：**GitHub Releases 里的成品功能远多于仓库代码**。
 
-> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.12.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
+> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.13.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.12.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置 |
+| 本仓库 `main` | `package.json` 版本 `0.13.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录） |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -31,6 +31,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 - **仓库代码只是早期版本**：releases 里的百度网盘、模拟器、资源池等模块在 `main` 上完全不存在。不要在本仓库里寻找它们。
 - **仓库缺运行时二进制**：`aria2_manager.py` / `seven_zip_manager.py` / `tianyi_client.py` 会优先查找 `defaults/runtime/` 下的 `aria2c`、`7zz`、`node`，但仓库本身不提交这些文件（已在 `.gitignore` 中）。插件可以不带它们启动，但要完整跑通下载/安装/云存档，克隆后必须先执行 `make runtime` 补齐，否则会分别报"下载组件不可用 / 解压组件不可用 / 未找到 node 运行时"。release zip 约 50 MB 与源码约 1 MB 的差值，主要就是这些二进制。
 - **作者已停止维护**：NewFreedeck v0.1 的发布说明原文是"目前我没有精力与时间继续维护，抱歉，所以可以根据我整理的 skill 自行修改，最后可以给我推 pr"。
+- **v0.13.0 仓库游戏提交**：新增 `.github/ISSUE_TEMPLATE/submit-game.yml`（Issue 表单）与 `submissions/`（JSON + schema + 示例），`py_modules/submission.py` 做字段/平台别名/分享链接/openpath/重复 shareCode 校验，`merge_submissions()` 合并进目录 CSV 并归档到 `submissions/merged/`；网页库新增「提交游戏」按钮；CI 校验、`make validate-submissions`（见 5.12 / [submissions/README.md](../submissions/README.md)）。
 - **v0.12.0 模拟器 BIOS/固件部署 + portable 配置**：新增 `py_modules/emulator_setup.py`——安装后把 `~/.local/share/freedeckCY/bios/<platform>/` 里的 BIOS/固件/keys 部署到模拟器实际读取的位置（压缩包用 7zz 解压并持久缓存），并写最小 portable 配置（DuckStation/PCSX2 的 INI、mGBA/PPSSPP 全屏）；PS3 固件在 `dev_flash` 为空时自动 `rpcs3 --installfw`；部署消息并入安装完成消息（见 5.10 - 模拟器 BIOS/固件部署）。
 - **v0.11.0 补齐 10 平台 + 架构能力矩阵**：模拟器注册表新增 **3DS（Azahar）/ PS2（PCSX2）/ PS3（RPCS3）/ Switch（Eden）**，合计 **10 个平台**；3DS/PS2/PS3 官方包**仅 x86_64**，在 aarch64（含 DroidDeck）上目录查询按 `available_platforms()` 白名单**自动隐藏平台条目与筛选条**，Switch 有 x64/arm64 双包；3DS/PS3/Switch 需要 system files/固件/keys（`setup_hint` 提示），PS2 需要 BIOS（`bios/ps2/*.bin` 复制到 PCSX2 目录）（见 5.10）。
 - **v0.10.0 模拟器全部在线下载**：插件包**不再集成任何模拟器**（删除 `scripts/fetch_emulator.sh` 与 `make emulator-runtime`，包体积从约 68 MB 降到约 45 MB）；6 个平台（含 GBA）的官方包都在首次安装时从 GitHub release 下载到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`，离线环境可手动预置缓存或设 `FREEDECKCY_*_BIN`（见 5.10 / 5.7）。
@@ -68,6 +69,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 | 环境诊断 | 只读 bash 脚本（运行时/Steam/state/日志/端口/网络）；另有 HTTP 诊断 JSON/zip 导出与 GitHub 更新检查（v0.5.0） | `scripts/doctor.sh`（`make doctor`）、`tianyi_service.get_diagnostics()` |
 | 运行平台 | Steam Deck（x86_64）/ **DroidDeck（aarch64）**；运行时目录按 `platform.machine()` 选择 | `defaults/runtime/<arch>/`、`scripts/package.sh`、[DROIDDECK.md](DROIDDECK.md) |
 | 自动云存档（v0.8.0） | **Ludusavi 清单**（本地 JSON，53,549 游戏，MIT）+ **gamewatch** 进程检测；退出后只上传该游戏，指纹去重 | `py_modules/save_manifest.py`、`py_modules/gamewatch.py`、`defaults/ludusavi/` |
+| 仓库游戏提交（v0.13.0） | GitHub Issue 表单 / `submissions/*.json` PR → `submission.py` 校验 → `merge_submissions.py` 写入目录 CSV → `submissions/merged/` 归档；纯标准库 CLI，无运行时依赖 | `py_modules/submission.py`、`submissions/`、`.github/ISSUE_TEMPLATE/submit-game.yml`、`scripts/{validate,merge}_submissions.py` |
 | 模拟器运行时（v0.6.0 起，v0.7.0 注册表，v0.9.0 六平台，v0.10.0 全部在线下载，v0.11.0 十平台，v0.12.0 部署 BIOS/固件） | **GBA=mGBA / PSP=PPSSPP / NDS=melonDS / PS1=DuckStation / FC、MD=Mesen2 / 3DS=Azahar / PS2=PCSX2 / PS3=RPCS3 / Switch=Eden**；**插件包不集成模拟器**，首次安装按需从官方 release 下载并解包；安装后 `emulator_setup.setup_emulator()` 部署 BIOS/固件/keys 并写 portable 配置；3DS/PS2/PS3 官方包仅 x86_64，aarch64 上自动隐藏 | `py_modules/emulator_manager.py`（注册表/下载）、`py_modules/emulator_setup.py`（部署/portable 配置）、`~/.local/share/freedeckCY/{emulators,bios}/<...>/` |
 
 运行时一共会拉起 **4 类进程**：Decky 的 Python 进程、`aria2c`、`7zz`、偶尔的 `node`。
@@ -96,9 +98,9 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 repo/
 ├── main.py                     # 插件入口：Plugin 类，24 个可调用 RPC，大部分薄转发给 TianyiService / server_manager
 ├── plugin.json                 # Decky 元信息（api_version=1, flags=[]，publish 描述已更新）
-├── package.json                # 版本 0.12.0；build=rollup；前端依赖
+├── package.json                # 版本 0.13.0；build=rollup；前端依赖
 ├── decky.pyi                   # Decky Python API 类型存根
-├── Makefile                    # runtime / package / test / doctor / clean / help 目标（见 DEVELOPMENT.md）
+├── Makefile                    # runtime / package / test / doctor / validate-catalog / validate-submissions / clean / help 目标（见 DEVELOPMENT.md）
 ├── requirements-dev.txt        # 开发与 CI 依赖（pytest 等，运行期依赖由 Decky 自带）
 ├── .gitignore                  # 忽略 __pycache__、defaults/runtime/、node_modules、dist-artifacts 等
 ├── .gitattributes              # 行尾统一为 LF，二进制资源按原样处理
@@ -125,6 +127,7 @@ repo/
 │   ├── seven_zip_manager.py    # 7z 解压 / 压缩 / `7z t` 校验（test_archive）
 │   ├── emulator_manager.py      # 通用模拟器注册表（10 平台：官方资产、架构白名单 available_platforms、按需下载、解包、ROM 查找、启动参数、setup 提示）
 │   ├── emulator_setup.py        # 安装后部署 BIOS/固件/keys（压缩包 7zz 解压缓存）+ portable 配置（DuckStation/PCSX2 INI、mGBA/PPSSPP 全屏、RPCS3 --installfw）
+│   ├── submission.py            # 仓库游戏提交：平台别名/字段校验/JSON Schema 对应/merge 进目录 CSV（纯标准库）
 │   ├── save_manifest.py         # Ludusavi 存档清单加载/标题与 SteamID 匹配/占位符 → Proton 前缀路径解析
 │   ├── gamewatch.py             # /proc 或 pgrep 的游戏进程检测（退出事件触发自动云存档）
 │   ├── steam_shortcuts.py      # shortcuts.vdf / config.vdf / grid 封面；多库/Flatpak/DroidDeck、ARM Proton 解析、写前备份、DevkitGameID 去重、find_compatdata_dirs
@@ -140,12 +143,14 @@ repo/
 ├── scripts/
 │   ├── fetch_runtime.sh        # 下载 aria2c / 7zz / node 到 defaults/runtime/
 │   ├── fetch_ludusavi_manifest.py  # 从上游 YAML 转换 Ludusavi 清单到 defaults/ludusavi/manifest.json.gz（需 PyYAML，仅构建时）
+│   ├── validate_submissions.py  # 校验 submissions/*.json（CI，无提交也通过）
+│   ├── merge_submissions.py     # 合并 submissions/*.json 到目录 CSV（--dry-run 默认 / --apply）
 │   ├── package.sh              # 组装 Decky 插件 zip 到 dist-artifacts/（PACKAGE_ARCH=x86_64|aarch64|all）
 │   ├── doctor.sh               # 环境诊断（只读）：运行时/Steam/state/日志/端口/网络
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（308 个用例，不联网、不碰 Steam 目录；模拟器下载/部署走 mock）
+├── tests/                      # pytest 单测（314 个用例，不联网、不碰 Steam 目录；模拟器下载/部署走 mock；提交校验用临时 CSV）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -413,21 +418,21 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **模拟器 BIOS / 固件部署（v0.12.0，`py_modules/emulator_setup.py`）**：
 
-- 安装完成后由 [emulator_setup.py:351](../py_modules/emulator_setup.py) `setup_emulator(platform, command, seven_zip=...)` 统一部署：先调 [emulator_setup.py:161](../py_modules/emulator_setup.py) `_source_files()` 递归扫描 `~/.local/share/freedeckCY/bios/<platform>/`，收集 `.bin/.rom/.bios/.keys/.pup/.nca`；zip/7z/rar/tar/gz/tgz/xz/bz2 等压缩包用 [emulator_setup.py:136](../py_modules/emulator_setup.py) `_extract_archives()` 调 7zz 解压，产物复制到 `bios/<platform>/_extracted/` 作**持久缓存**（下次不再解压）；
+- 安装完成后由 [emulator_setup.py:378](../py_modules/emulator_setup.py) `setup_emulator(platform, command, seven_zip=...)` 统一部署：先调 [emulator_setup.py:177](../py_modules/emulator_setup.py) `_source_files()` 递归扫描 `~/.local/share/freedeckCY/bios/<platform>/`，收集 `.bin/.rom/.bios/.keys/.pup/.nca`；zip/7z/rar/tar/gz/tgz/xz/bz2 等压缩包用 [emulator_setup.py:152](../py_modules/emulator_setup.py) `_extract_archives()` 调 7zz 解压，产物复制到 `bios/<platform>/_extracted/` 作**持久缓存**（下次不再解压）；
 - **只创建缺失项/只改单个键**：[emulator_setup.py:61](../py_modules/emulator_setup.py) `_set_ini_value()` 在已有 INI 里只修复目标键并保留其它配置；配置文件已存在时不覆盖；
 - **不自动下载** BIOS/固件/keys（版权原因），缺失时返回面向用户的提示；`bios_required` 平台还会追加"未检测到 BIOS"消息；
 - 各平台目标路径与 portable 配置：
 
 | 平台 | 部署内容 | 目标路径 / portable 配置 |
 |---|---|---|
-| PS1 | BIOS（`scph*.bin`） | [emulator_setup.py:197](../py_modules/emulator_setup.py) `_write_duckstation()`：`<AppDir>/portable.txt` + `portable_data/settings/settings.ini`（`[BIOS] SearchDirectory=./bios`、`[Display] Fullscreen=true`，已存在则用 `_set_ini_value` 修复这两个键）；BIOS 复制到 `<AppDir>/bios`，同时旧 `prepare_bios()` 仍复制到 `~/.local/share/duckstation/bios` |
-| PS2 | BIOS（`*.bin`） | [emulator_setup.py:226](../py_modules/emulator_setup.py) `_write_pcsx2()`：`<AppDir>/portable.ini` + `inis/PCSX2.ini`（`[Folders] Bios=<AppDir>/bios`、`[UI] Fullscreen=true`）；BIOS 复制到 `<AppDir>/bios`、`~/.local/share/PCSX2/bios`、`~/.config/PCSX2/bios` 三处 |
-| NDS | `bios7.bin/bios9.bin/firmware.bin/dsi_firmware.bin` 等 | [emulator_setup.py:276](../py_modules/emulator_setup.py) `_deploy_nds()`：复制到 `<AppDir>` 与 `~/.local/share/melonDS` |
-| Switch | `prod.keys`/`title.keys` + 固件 `.nca` | [emulator_setup.py:285](../py_modules/emulator_setup.py) `_deploy_switch()`：keys → `~/.local/share/eden/keys/`；固件压缩包解出的 `.nca` 目录 → `~/.local/share/eden/nand/system/Contents/registered/` |
-| PS3 | `PS3UPDAT.PUP` | [emulator_setup.py:318](../py_modules/emulator_setup.py) `_install_rpcs3_firmware()`：若 `~/.config/rpcs3/dev_flash` 为空且 RPCS3 可执行，执行 `rpcs3 --installfw <pup>`（600s 超时，失败原因写进消息） |
-| 3DS | system files（`sysdata`） | [emulator_setup.py:343](../py_modules/emulator_setup.py) `_deploy_3ds()`：复制到 `~/.local/share/azahar/sysdata` 与 `~/.local/share/citra/sysdata` |
-| GBA | portable 配置 | [emulator_setup.py:253](../py_modules/emulator_setup.py) `_write_mgba_config()`：`portable.ini` + `qt.ini`（`[General] fullScreen=true`） |
-| PSP | portable 配置 | [emulator_setup.py:266](../py_modules/emulator_setup.py) `_write_ppsspp_config()`：`portable.txt` + `memstick/PSP/SYSTEM/ppsspp.ini`（`[General] FullScreen=True`） |
+| PS1 | BIOS（`scph*.bin`） | [emulator_setup.py:216](../py_modules/emulator_setup.py) `_write_duckstation()`：`<AppDir>/portable.txt` + `portable_data/settings/settings.ini`（`[BIOS] SearchDirectory=./bios`、`[Display] Fullscreen=true`，已存在则用 `_set_ini_value` 修复这两个键）；BIOS 复制到 `<AppDir>/bios`，同时旧 `prepare_bios()` 仍复制到 `~/.local/share/duckstation/bios` |
+| PS2 | BIOS（`*.bin`） | [emulator_setup.py:245](../py_modules/emulator_setup.py) `_write_pcsx2()`：`<AppDir>/portable.ini` + `inis/PCSX2.ini`（`[Folders] Bios=<AppDir>/bios`、`[UI] Fullscreen=true`）；BIOS 复制到 `<AppDir>/bios`、`~/.local/share/PCSX2/bios`、`~/.config/PCSX2/bios` 三处 |
+| NDS | `bios7.bin/bios9.bin/firmware.bin/dsi_firmware.bin` 等 | [emulator_setup.py:295](../py_modules/emulator_setup.py) `_deploy_nds()`：复制到 `<AppDir>` 与 `~/.local/share/melonDS` |
+| Switch | `prod.keys`/`title.keys` + 固件 `.nca` | [emulator_setup.py:304](../py_modules/emulator_setup.py) `_deploy_switch()`：keys → `~/.local/share/eden/keys/`；固件压缩包解出的 `.nca` 目录 → `~/.local/share/eden/nand/system/Contents/registered/` |
+| PS3 | `PS3UPDAT.PUP` | [emulator_setup.py:337](../py_modules/emulator_setup.py) `_install_rpcs3_firmware()`：若 `~/.config/rpcs3/dev_flash` 为空且 RPCS3 可执行，执行 `rpcs3 --installfw <pup>`（600s 超时，失败原因写进消息） |
+| 3DS | system files（`sysdata`） | [emulator_setup.py:362](../py_modules/emulator_setup.py) `_deploy_3ds()`：复制到 `~/.local/share/azahar/sysdata` 与 `~/.local/share/citra/sysdata` |
+| GBA | portable 配置 | [emulator_setup.py:272](../py_modules/emulator_setup.py) `_write_mgba_config()`：`portable.ini` + `qt.ini`（`[General] fullScreen=true`） |
+| PSP | portable 配置 | [emulator_setup.py:285](../py_modules/emulator_setup.py) `_write_ppsspp_config()`：`portable.txt` + `memstick/PSP/SYSTEM/ppsspp.ini`（`[General] FullScreen=True`） |
 
 - `<AppDir>` 是 `ensure_emulator()` 返回的可执行文件所在目录（AppImage 解包后是 `squashfs-root/`）；目录不可写时只写用户数据目录并提示；
 - 部署消息由 `setup_emulator()` 返回，服务层把它并入**安装完成消息**（不再单独发 `warning` 字段）；`emulator_status()`/plan 仍返回 `bios_required/bios_present/bios_dir` 与 `setup_required/setup_hint`；（BIOS 缺失不阻断安装，装完不能直接玩通常是没有放对文件/没走到部署）
@@ -467,6 +472,42 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 **设置与 UI**：设置项 `cloud_save_auto_upload` 默认 true，贯穿 `tianyi_store`（默认/加载/set_settings）、`main.set_tianyi_settings`、`tianyi_http.handle_settings_set` 与 QAM 设置页「云存档上传 → 游戏退出后自动上传」开关（`src/index.tsx` 的 `ToggleField`）。
 
 **边界**：只做"退出后自动上传"，**没有自动恢复/冲突策略**（恢复仍需手动在 QAM 操作、覆盖前备份）；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档写在模拟器自身配置目录（如 `~/.local/share/PPSSPP`），目前不在 Ludusavi/Proton 扫描范围内；指纹只覆盖大小/mtime，不读文件内容；gamewatch 依赖进程命令行包含 install_path（Steam 直接启动脚本通常满足，自定义包装可能漏检）。
+
+### 5.12 游戏提交（仓库，v0.13.0）
+
+**定位**：给仓库补目录条目（对应原版资源池投稿字段），**不要求天翼云账号登录**，也不上传游戏文件；只收集分享链接与网盘内路径，合并进 `defaults/tianyi_catalog/freedeckcy_catalog.csv` 后走现有"目录 → 安装"链路。主文档见 [submissions/README.md](../submissions/README.md)（字段表/规则/命令），本节只讲实现与数据流。
+
+**两种入口**：
+
+| 入口 | 文件 / 位置 | 适用 |
+|---|---|---|
+| GitHub Issue 表单 | [.github/ISSUE_TEMPLATE/submit-game.yml](../.github/ISSUE_TEMPLATE/submit-game.yml)（字段 name/english_name/platform/share_url/access_code/share_user_version/executable_name/openpath/categories/filesize_z/notes；平台下拉 11 个） | 单条、不想开 PR |
+| JSON PR | `submissions/*.json`（复制 `submissions/examples/example-pc.json` / `example-switch.json`，按 [schema.json](../submissions/schema.json) 填） | 批量/长期/可校验 |
+
+- 网页库工具栏「提交游戏」按钮（`defaults/tianyi_library_ui/app.js` 的 `submitGame()`）直接打开上述 Issue 模板（`https://github.com/hulong1989/freedeckCY/issues/new?template=submit-game.yml`）；
+- 字段与原版资源池投稿的对应：`name/english_name/platform/share_url/access_code/share_user_version/executable_name` 原样保留，额外要求 `openpath`（安装器定位文件必需），`categories/filesize_z/category_parent/list_filesize/notes` 为目录补充。
+
+**校验链路**（[submission.py:152](../py_modules/submission.py) `validate_submission()`；批量为 [submission.py:255](../py_modules/submission.py) `validate_submission_files()`）：
+
+1. [submission.py:66](../py_modules/submission.py) `normalize_platform()`：平台别名归一（windows/win→pc、ns→switch、3d→3ds、psx/playstation→ps1、genesis→md 等），只接受 11 个平台；
+2. 必填 `name/platform/share_url/openpath`；[submission.py:72](../py_modules/submission.py) `normalize_categories()` 清洗分类（去平台名、去重、模拟器补「模拟器」）；
+3. 分享链接必须是 `https://cloud.189.cn/...`（[submission.py:108](../py_modules/submission.py) `_parse_share_url()` 解析 `/t/<shareCode>` 或 `/web/share?code=`，提取 `pwd`）；[submission.py:135](../py_modules/submission.py) `_with_access_code()` 在合并时补 `pwd=`；
+4. `openpath` 不能含 `..`、不能是绝对路径；`filesize_z` 必须是非负整数；`access_code` 4–8 位字母/数字（缺失且链接无 `pwd` 只是警告）；`executable_name` 仅 PC 需要（模拟器留空时警告）；
+5. 重复 shareCode：同时对比**目录已有行**与**本批其它提交**，重复即 ERROR；
+6. 无提交文件时 `ok=True`（CI 不红）。
+
+**合并链路**（[submission.py:305](../py_modules/submission.py) `build_catalog_row()` / [submission.py:342](../py_modules/submission.py) `merge_submissions()`）：
+
+- dry-run（默认）只返回待写入行；`--apply` 先确认全部提交无 ERROR，否则整批拒绝；
+- 生成行：`title = 中文/英文`（英文已在中文名里则只留中文）、`server="t"`、`down_url` 补 `pwd`、`shorturl=shareCode`、`pwd`、`platform`、`category_parent` 默认 `5`、`categories` 清洗后为空则 `未分类`、`openpath/filesize_z/list_filesize` 原样；
+- game_id：[submission.py:295](../py_modules/submission.py) `_next_game_id()` 取目录现有最大数字 +1，逐条递增；
+- 写入：先写临时 CSV 再 `os.replace` 原子替换，成功后把 JSON 移到 `submissions/merged/`，并追加 `submissions/merged/index.json`（file/game_id/title/merged_at）；`submissions/merged/` 运行时创建，不提交合并产物也行。
+
+**CI / 命令 / 与安装的关系**：
+
+- CI `.github/workflows/ci.yml` 的 `Validate game submissions` 步骤执行 `python scripts/validate_submissions.py`（无提交也通过）；
+- 本地：`make validate-submissions`、`python scripts/merge_submissions.py --dry-run` / `--apply`（支持 `--json`）；
+- 合并后的行与手工目录条目完全同构，库页/安装器按 `platform/openpath/share_url` 解析——即"提交 → 审核 → 合并 CSV → 库页出现 → 安装"。
 
 ---
 
@@ -856,7 +897,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### P2：工程性
 
-21. `tianyi_service.py` 约 8200 行、单类 100+ 方法；`src/index.tsx` 约 100 KB / 3000 行单文件。已补 `tests/`（308 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+21. `tianyi_service.py` 约 8200 行、单类 100+ 方法；`src/index.tsx` 约 100 KB / 3000 行单文件。已补 `tests/`（314 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
 22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
 23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
 24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）
@@ -874,6 +915,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 36. **模拟器闭环的边界（v0.12.0）**：插件包**不集成任何模拟器**，**所有平台（含 GBA）首次安装都需要联网**从 GitHub release 下载（失败写进安装消息，可重试；离线可手动预置 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/` 或用 `FREEDECKCY_*_BIN`）；PS1/PS2 **必须用户自备 BIOS**（分别放 `bios/ps1`、`bios/ps2`，缺失不阻断安装但会警告/可能导致黑屏；PS2 会复制到 PCSX2 的两个默认目录）；3DS 需要 system files、PS3 需要固件、Switch 需要 prod.keys+固件（v0.12.0 起安装后会自动部署到模拟器目录并写 portable 配置；缺失仍不阻断安装，但装完不能直接玩）；FC/MD 共用 Mesen2 缓存（`emulators/mesen/<arch>/`），zip 内是可执行文件而非 AppImage；只识别注册表内 ROM 扩展名，**不含 BIOS/存档管理**（BIOS/固件只做"从 bios/<platform>/ 部署到模拟器目录"，不下载、不校验版本）；下载/解包会多占一份磁盘空间；ARM64/DroidDeck 上这些平台尚未真机验证。（已知限制）
 37. **自动云存档的边界（v0.8.0）**：只对 gamewatch 检测到"退出"的游戏自动上传，且 gamewatch 依赖进程命令行包含 install_path（自定义 wrapper 可能漏检）；没有自动恢复/冲突策略；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档在模拟器配置目录，暂未纳入；上传前指纹只看相对路径+size+mtime（最多 5000 文件），不读内容；`cloud_save_auto_upload` 默认开启（可在 QAM 关闭）。（已知限制）
 38. **模拟器架构矩阵差异（v0.11.0）**：3DS/PS2/PS3 官方包仅 x86_64，aarch64（含 DroidDeck）上目录查询按 `available_platforms()` 白名单隐藏这些平台的条目/筛选条，`emulator_status` 也会提示"已隐藏该平台"——这是**预期行为**，不是 bug；Switch 有 x86_64 + aarch64 双包但需要 keys/固件，首次安装仍需联网下载。（已知限制）
+39. **仓库提交的边界（v0.13.0）**：Issue 表单只是人工审核入口，暂不自动转 JSON（维护者手工/脚本处理）；没有审核标签、自动评论、自动 PR、自动 git commit；校验只做静态字段/重复 shareCode，**不联网验证分享链接是否可访问、提取码是否有效**；提交不包含封面/Steam AppID（合并行留空，后续由封面解析/目录维护补）；`submissions/merged/` 的归档文件不自动提交回仓库。（已知限制）
 
 ---
 
@@ -942,6 +984,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | 模拟器注册表 / 闭环 | v0.11.0：`EmulatorSpec` 注册表接入 10 平台（GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch）；**全部首次安装在线下载、插件包不集成**；下载 ROM → 生成启动脚本 → Steam 原生快捷方式（不经 Proton） |
 | 架构能力矩阵 / available_platforms | 按当前架构是否有官方资产决定可用平台：x86_64 全部 10 个；aarch64 仅 GBA/PSP/NDS/PS1/FC/MD/Switch（3DS/PS2/PS3 无 arm64 包 → 目录白名单隐藏条目与筛选条） |
 | EmulatorSpec | 平台注册表条目：官方资产（repo/版本/各 arch 文件名）、archive（appimage/zip）、launch_args、rom_extensions、env_var、min_bytes、state_key（缓存目录名，FC/MD 共用 mesen）、executables（zip 内可执行文件名）、bios_required |
+| 仓库提交 / submission | v0.13.0 的投稿通道：Issue 表单或 `submissions/*.json` PR，字段对应原版资源池投稿；`submission.py` 校验后由维护者合并进目录 CSV，文件归档到 `submissions/merged/` |
 | emulator_setup / portable 配置 | v0.12.0 新增的部署模块：把 `bios/<platform>/` 下的 BIOS/固件/keys（含压缩包）复制到模拟器实际读取目录，并写最小 portable 配置（DuckStation/PCSX2 INI、mGBA/PPSSPP 全屏）；只补缺失/只改单个键，不下载、不覆盖用户配置 |
 | BIOS / setup 文件 | PS1 需要 DuckStation BIOS（`bios/ps1/`）、PS2 需要 PCSX2 BIOS（`bios/ps2/`，复制到 `~/.local/share/PCSX2/bios` 与 `~/.config/PCSX2/bios`）；3DS 需要 system files、PS3 需要固件、Switch 需要 prod.keys+固件（`setup_hint` 提示）；插件不内置这些文件，缺失只提示不阻断安装 |
 | 按需下载 | **10 个平台（含 GBA）首次安装时**都从 GitHub release 下载官方包到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`（FC/MD 共用 `mesen/`）；插件包不集成模拟器，离线可手动预置缓存或用 `FREEDECKCY_*_BIN` |

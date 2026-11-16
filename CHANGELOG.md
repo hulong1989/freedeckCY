@@ -2,6 +2,22 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.13.0
+
+### 新增
+
+- **仓库游戏提交**（对应原版资源池投稿字段）：
+  - GitHub Issue 表单 `.github/ISSUE_TEMPLATE/submit-game.yml`：名称/英文名/平台/分享链接/提取码/分享用户版本/可执行文件名/网盘路径。
+  - PR 流程 `submissions/*.json`（schema + 示例），支持批量提交。
+  - `scripts/validate_submissions.py`：平台、分享链接、`openpath`、重复 shareCode 校验；已接入 CI。
+  - `scripts/merge_submissions.py`：dry-run / `--apply` 合并进目录 CSV，自动分配 `game_id`，已合并文件移到 `submissions/merged/`。
+  - 网页库工具栏新增「提交游戏」按钮，直接打开 GitHub Issue 表单。
+- 新文档 `submissions/README.md`，字段表、规则、维护者命令。
+
+### 变更
+
+- 测试 308 → 314。
+
 ## v0.12.0
 
 ### 新增

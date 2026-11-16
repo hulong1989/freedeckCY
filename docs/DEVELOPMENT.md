@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.12.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.13.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -23,6 +23,7 @@
 | `py_modules/gamewatch.py` | **游戏进程检测（v0.8.0）**：后台每 8 s 扫 `/proc/*/cmdline`（无 `/proc` 回退 `pgrep -f`），状态切换产出 start/end 事件（自动云存档只在 end 触发） |
 | `py_modules/emulator_manager.py` | **通用模拟器注册表（v0.12.0，10 平台全部在线下载）**：`EmulatorSpec`/`EMULATORS` 描述 GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch；`available_platforms(arch)` 做架构白名单（3DS/PS2/PS3 仅 x86_64）；官方资产解析、首次安装按需下载、AppImage/zip 解包、`find_rom_file()`、`create_launch_wrapper()`、`emulator_status()`；旧 `prepare_bios()` 保留兼容 |
 | `py_modules/emulator_setup.py` | **安装后 BIOS/固件部署（v0.12.0）**：`setup_emulator(platform, command, seven_zip)` 把 `bios/<platform>/` 下文件/压缩包部署到模拟器目录并写 portable 配置（DuckStation/PCSX2 INI、mGBA/PPSSPP 全屏、RPCS3 `--installfw`）；只补缺失/只改单个键，不下载 |
+| `py_modules/submission.py` | **仓库游戏提交（v0.13.0）**：`normalize_platform()` 平台别名、`validate_submission()`/`validate_submission_files()` 校验、`build_catalog_row()` 生成目录行、`merge_submissions()` 合并（dry-run/`--apply`）；纯标准库，可被 CLI 直接 import |
 | `py_modules/steam_shortcuts.py` | 写 `shortcuts.vdf`（`DevkitGameID` token 去重、无变化不重写、写前备份 12 份、写后回读）、改 `config.vdf` 的 Proton 映射、下载 `grid` 封面、解析 appid；Steam 多库 / Flatpak / **DroidDeck** 识别（`is_droiddeck` / `_steam_root_candidates` / `detect_proton_tool`）、自定义用户名打分；`find_compatdata_dirs()` 跨库定位待清理的 Proton 前缀 |
 | `py_modules/game_catalog.py` | 读 CSV 资源清单（16 列 / 7084 条 / 11 平台，新目录优先、旧目录回退）：校验、搜索、分页、按 `game_id` 查找；`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底）；支持 `cover_index.csv` 合并（不覆盖已有值）；`list()` 支持 platform/category 过滤并返回 `platforms`/Top12 `categories`；`_is_valid_tianyi_url()` 兼容 `/t/` 与 `/web/share?code=` |
 | `py_modules/archive_bundle.py` | 多分卷归档识别（`.7z.001`/`.partN.rar`/`.z01+zip`/`.r00+rar` 等 6 类）：`detect_archive_sets` / `build_bundle_index` / `looks_like_multi_volume_name` |
@@ -40,7 +41,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（308 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（314 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -326,7 +327,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **308 个用例**（`make test` 实测 `308 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **314 个用例**（`make test` 实测 `314 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -620,6 +621,37 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 
 **指纹与重置**：指纹 = `sha256(相对路径|size|mtime_ns …)`（每个游戏最多 5000 个文件），持久化在 `state.json` 的 `cloud_save_fingerprints`。上传前相同则跳过，结果 `reason=unchanged`。想强制重新上传：退出插件后编辑 `state.json` 删除对应 `game_key` 的指纹（或删除整个 `cloud_save_fingerprints` 字段），再重载插件。
 
+### 6.10 游戏提交校验与合并（v0.13.0）
+
+**主文档**：[submissions/README.md](../submissions/README.md)（字段表、规则、Issue/PR 两种方式）；本节只列开发/维护者命令与排查。
+
+**入口**：GitHub Issue 表单 [.github/ISSUE_TEMPLATE/submit-game.yml](../.github/ISSUE_TEMPLATE/submit-game.yml)，或 `submissions/*.json`（复制 `submissions/examples/example-pc.json` / `example-switch.json`，按 [schema.json](../submissions/schema.json) 填）；网页库工具栏「提交游戏」按钮直接打开 Issue 模板。
+
+**命令**：
+
+```bash
+make validate-submissions                  # 等价 python3 scripts/validate_submissions.py
+python scripts/validate_submissions.py --json
+python scripts/merge_submissions.py --dry-run          # 默认就是 dry-run，不写文件
+python scripts/merge_submissions.py --apply            # 写 CSV + 移动 JSON 到 submissions/merged/
+python scripts/merge_submissions.py --apply --json
+python -m pytest tests/test_submissions.py -q
+make validate-catalog                      # 合并后再跑目录体检
+```
+
+**校验规则**（`py_modules/submission.py`，详见源码/README）：
+
+- 平台别名：`windows/win→pc`、`ns→switch`、`3d→3ds`、`psx/playstation→ps1`、`genesis→md` 等；最终只接受 11 个平台；
+- 必填 `name/platform/share_url/openpath`；`openpath` 必须是分享内相对路径、不能含 `..`；
+- `share_url` 必须是 `https://cloud.189.cn/...`，能解析出 `/t/<shareCode>` 或 `/web/share?code=`；`access_code` 4–8 位字母/数字（链接已有 `pwd=` 可空）；
+- `filesize_z` 非负整数；`executable_name` 仅 PC（模拟器留空只会 warning）；
+- 重复 shareCode：同时对比目录 CSV 已有行与本批其它提交；重复是 ERROR；
+- 没有 `submissions/*.json` 时校验通过（CI 不红）。
+
+**合并行为**：只有整批无 ERROR 才写；`--apply` 用临时文件 + `os.replace` 原子替换 CSV，`game_id` 取当前最大 +1，标题为 `中文/英文`，`server="t"`、`down_url` 补 `pwd`、`category_parent` 默认 5；成功后 JSON 移到 `submissions/merged/`，并追加 `submissions/merged/index.json`。
+
+**CI**：`.github/workflows/ci.yml` 的 `Validate game submissions` 步骤跑 `python scripts/validate_submissions.py --catalog ...`，无提交也通过。
+
 ---
 
 ## 7. 常见故障排查
@@ -654,6 +686,10 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 | **自动云存档没触发** | ① 确认设置 `cloud_save_auto_upload` 为 true（QAM 开关/设置接口）；② 需要已登录天翼账号且当前无进行中的上传任务；③ gamewatch 需要进程命令行包含 install_path（自定义 wrapper 可能不满足；容器无 `/proc` 时回退 `pgrep -f`，需系统有 pgrep）；④ 自动上传有 30 s 防抖，连续退出多个游戏只有第一个会立即上传；⑤ 看日志 `auto cloud save upload after exit` / `gamewatch poll failed` |
 | **上传被跳过（reason=unchanged）** | 存档指纹和上次上传相同（相对路径+大小+mtime 未变）。确属未变化是预期；想强制上传：退出插件后删除 `state.json` 里对应游戏的 `cloud_save_fingerprints` 条目，或删除整个字段后重载插件 |
 | **Ludusavi 清单未命中（退回 proton_prefix/install_fallback）** | ① 确认 `defaults/ludusavi/manifest.json.gz` 存在（`make ludusavi-manifest`，发布包自带）；② 上传状态 `diagnostics.collect` 里看 `ludusavi.matched/path_count` 与 `source_strategy`；③ 标题差异大时只能靠 Steam AppID 匹配（先看快捷方式是否解析出 appid）；④ 封面/标题含特殊字符时 `normalize_title()` 会去掉非字母数字/CJK 字符 |
+| **提交校验报 platform 不支持** | 平台只支持 `pc/gba/psp/nds/ps1/fc/md/3ds/ps2/ps3/switch`；别名只认常见写法（windows→pc、ns→switch、3d→3ds、psx→ps1 等），其它拼写会直接报错。改 JSON 里的 `platform` 后重跑 `make validate-submissions` |
+| **提交校验报链接不是 cloud.189.cn** | `share_url` 必须是 `https://cloud.189.cn/...`；支持 `/t/<shareCode>` 与 `/web/share?code=<shareCode>`，其它域名/短链先展开成天翼云盘原始分享链接 |
+| **openpath 缺失/包含 ..** | `openpath` 是分享根目录下游戏文件或压缩包的相对路径（如 `Stardew Valley/Stardew Valley.7z`），不能以 `/` 开头、不能含 `..`；安装器靠它分页定位文件 |
+| **提交报重复 shareCode** | 同一分享链接已在目录 CSV 或本批其它 JSON 里；用 `python scripts/validate_submissions.py --json` 看具体 shareCode，换链接或删除重复文件 |
 | **导出诊断没反应/下载失败** | 诊断 zip 由浏览器直接 `GET /api/tianyi/diagnostics/export` 下载；若浏览器拦截下载，用 `curl -s -OJ http://127.0.0.1:59271/api/tianyi/diagnostics/export` 手工保存；接口本身失败时看 `/tmp/freedeckcy.log` 的 traceback |
 | **检查更新失败** | `update-check` 依赖 `api.github.com`：无网络、代理不通或 GitHub API 未认证限流（60 次/小时/IP）都会返回 `ok:false` + message；等一会儿或手工打开 Release 页；成功结果会缓存 1 小时，不必连续点 |
 | **GBA 计划报「未找到 mGBA」** | v0.10.0 起 GBA 也首次安装**自动下载**；失败先看网络/代理，或 `FREEDECKCY_MGBA_BIN=/path/to/mgba` 指向系统/手工预置的 mGBA，或安装 Flatpak `io.mgba.mGBA`；诊断接口 `emulators.gba` 会显示 available/source/message |
@@ -734,6 +770,7 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 | 改 Proton 工具解析 / 设置 | `py_modules/steam_shortcuts.py` 的 `detect_proton_tool` / `add_or_update_tianyi_shortcut(proton_tool=)`；设置项 `proton_tool` 贯穿 `tianyi_store` / `tianyi_service.update_settings` / `main.set_tianyi_settings` / `tianyi_http.handle_settings_*` |
 | 改打包架构 / ARM64 产物 | `scripts/package.sh` 的 `PACKAGE_ARCH`；`Makefile` 的 `package-droiddeck` / `runtime ARCH=`（模拟器不在包内，与打包无关） |
 | 改模拟器支持 / 新增平台 | `py_modules/emulator_manager.py` 的 `EmulatorSpec` / `EMULATORS`（官方资产、launch_args、rom_extensions、env_var、state_key、executables、bios_required、setup_required/setup_hint）；`available_platforms(arch)` 决定架构白名单；`tianyi_service.list_catalog` 传 `allowed_platforms`；`_build_install_plan`/`_auto_register_emulator_to_steam` 的模拟器字段；BIOS 见 `bios_dir`/`bios_present`/`prepare_bios` |
+| 改仓库提交校验/合并 | `py_modules/submission.py`（`normalize_platform`/`validate_submission`/`build_catalog_row`/`merge_submissions`）、`submissions/schema.json`、`scripts/validate_submissions.py` / `merge_submissions.py`、`.github/workflows/ci.yml` 的提交校验步骤 |
 | 改 BIOS/固件部署 | `py_modules/emulator_setup.py`：`setup_emulator`、`_source_files`/`_extract_archives`（压缩包）、`_set_ini_value`（只修单键）、各平台 `_write_*`/`_deploy_*`；`tianyi_service._auto_register_emulator_to_steam` 调用并消费 `setup_messages` |
 | 改模拟器下载/缓存 | `py_modules/emulator_manager.py` 的 `_download_asset` / `_extract_zip_emulator` / `_ensure_extracted`（缓存目录 `~/.local/share/freedeckCY/emulators/<state_key>/<arch>/`）；插件包已不集成模拟器 |
 | 改 QAM 面板 UI | `src/index.tsx`（`Content` / `SettingsPage`） |
@@ -748,12 +785,13 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 308 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 314 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
 - [ ] 改动打包/运行时时验证两种架构：`make package`（x86_64）与 `make package-droiddeck`（aarch64），确认产物后缀与包内 `defaults/runtime/<arch>/` 只有 aria2c/7zz/node（**不含任何模拟器**）；模拟器首次安装联网下载，PS1/PS2 BIOS、3DS/PS3/Switch 系统文件由用户自备；
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
+- [ ] 改提交校验/合并后跑 `make validate-submissions`、`python scripts/merge_submissions.py --dry-run`，确认无 JSON 时 CI 也通过；`make validate-catalog` 确认合并后的 CSV 合法；
 - [ ] 改动模拟器注册表后验证 `available_platforms()`：x86_64 应有 10 个平台、aarch64 只有 7 个（3DS/PS2/PS3 无包），并确认 `/api/tianyi/catalog` 的 `platforms` 计数同步裁剪；
 - [ ] 改了 `src/` → `pnpm build` 并提交 `dist/index.js(.map)`；
 - [ ] 没有新增 `__pycache__` / `*.pyc` / `.DS_Store` / `node_modules` 等产物；

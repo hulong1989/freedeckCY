@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.12.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.13.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,7 +21,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.12.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.13.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -45,6 +45,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **已安装管理**：已安装页签可启动游戏、打开目录、卸载（`steam://rungameid`）
 - **模拟器闭环（10 平台）**：GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC/MD（Mesen2）/ 3DS（Azahar）/ PS2（PCSX2）/ PS3（RPCS3）/ Switch（Eden）；全部首次安装在线下载官方包（不集成进插件包），启动脚本走原生 Linux、不写 Proton
 - **自动云存档**：Ludusavi 清单（53k+ 游戏）+ gamewatch 进程检测；游戏退出后只上传该游戏，存档未变化自动跳过；QAM 可关闭
+- **游戏提交**：网页库「提交游戏」打开 GitHub Issue 表单；也支持 `submissions/*.json` PR，CI 校验后一键合并进目录
 - **诊断与更新**：一键导出脱敏诊断 zip；检查 GitHub 最新 Release
 - **全量资源目录**：内置 7084 条资源（来自 v0.6），合并封面索引后 6823 条有封面（96.3%；原始自带 3473 条，索引命中 3311）；分类已清洗（不含平台名），可用 `scripts/merge_v06_catalog.py` 复现/更新
 - **无作者服务器依赖**：目录/封面/模拟器运行时均为本地或官方源；NewFreedeck 的 `panyiwei.xyz` 硬依赖已逆向并记录替代方案（[docs/UPSTREAM_SERVER.md](docs/UPSTREAM_SERVER.md)），兼容 JSON 快照在 [catalog-json/](catalog-json/)
@@ -70,7 +71,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
-make package     # 产出 dist-artifacts/freedeckCY-v0.12.0.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.13.0.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -92,8 +93,8 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.12.0.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.12.0-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.13.0.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.13.0-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
@@ -113,7 +114,7 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 308）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 314）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
@@ -189,13 +190,14 @@ src/index.tsx               QAM 面板（React，构建产物在 dist/）
 defaults/tianyi_library_ui  本地游戏库页面（Vue 3，免构建：浏览/分页/排序/已安装/诊断）
 defaults/tianyi_catalog     资源清单（freedeckcy_catalog.csv 7084 条 + 旧目录回退）与封面索引
 defaults/ludusavi           存档清单（53,549 游戏，MIT，gzip）
+submissions/                仓库游戏提交（JSON 示例/schema/合并说明）
 backend/*.js                Node 辅助脚本（分享解析兜底、云盘上传）
 scripts/                    运行时获取（aria2/7zz/node）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗 / 远程目录 / 清单转换
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
 catalog-json/               NewFreedeck 兼容目录 JSON + schema（可直接读/自托管）
-tests/                      pytest 用例（308 个）
+tests/                      pytest 用例（314 个）
 CHANGELOG.md                版本变更记录
-Makefile                    构建入口：runtime / catalog-json / ludusavi-manifest / package / package-droiddeck / test / doctor / validate-catalog / normalize-catalog / clean
+Makefile                    构建入口：runtime / catalog-json / ludusavi-manifest / package / package-droiddeck / test / doctor / validate-catalog / validate-submissions / normalize-catalog / clean
 ```
 
 ## 安全说明
@@ -209,6 +211,15 @@ Makefile                    构建入口：runtime / catalog-json / ludusavi-man
 - `state.json` 含登录 cookie，落盘后目录 0700、文件 0600
 
 云存档恢复覆盖同名文件前，会把原文件/目录就地改名为 `*.freedeckcy-bak-<YYYYmmdd_HHMMSS>`，失败可手工找回。
+
+## 游戏提交（仓库）
+
+两种方式，字段与原版资源池投稿一致：
+
+1. **Issue 表单**：网页库右上角「提交游戏」，或直接打开 [Issue 表单](https://github.com/hulong1989/freedeckCY/issues/new?template=submit-game.yml)。
+2. **PR**：复制 `submissions/examples/example-pc.json` 到 `submissions/<平台>-<游戏名>.json`，本地跑 `python scripts/validate_submissions.py`，然后提 PR。CI 通过后维护者执行 `python scripts/merge_submissions.py --apply` 合并。
+
+只提交分享链接，不要上传游戏文件；规则/字段/命令见 [submissions/README.md](https://github.com/hulong1989/freedeckCY/blob/main/submissions/README.md)。
 
 ## 已知问题
 
