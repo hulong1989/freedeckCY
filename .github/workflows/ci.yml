@@ -1,0 +1,72 @@
+# freedeckCY CI
+#
+# 两个独立 job：
+#   - python：在 Python 3.12 上跑 pytest（依赖 requirements-dev.txt）
+#   - ui：pnpm 9 + Node 20 构建 Decky 前端产物 dist/index.js
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# 只读权限，够用且最小化
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python tests (3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        # 测试全部离线（conftest 注入假 decky），不依赖 Steam / 网络 / Decky 运行时
+        run: python -m pytest -q
+
+  ui:
+    name: UI build (pnpm)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm-lock.yaml 是 lockfileVersion '9.0'，需要用 pnpm 9 才能通过 --frozen-lockfile；
+      # package.json 没有 packageManager 字段，因此在 action 里显式钉 version: 9。
+      - name: Set up pnpm 9
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install UI dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build UI bundle
+        run: pnpm build
+
+      - name: Verify build output
+        run: test -f dist/index.js

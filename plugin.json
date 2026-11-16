@@ -1,0 +1,15 @@
+{
+    "name": "freedeckCY",
+    "author": "Panyiwei",
+    "flags": [],
+    "api_version": 1,
+    "publish": {
+        "tags": [
+            "downloader",
+            "cloud",
+            "utility"
+        ],
+        "description": "通过天翼云盘下载、安装游戏并同步云存档到 Steam Deck",
+        "image": ""
+    }
+}

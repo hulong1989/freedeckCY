@@ -1,0 +1,13 @@
+# freedeckCY 开发/测试依赖（本地与 CI 共用）
+#
+# 安装：python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+# 运行：.venv/bin/python -m pytest -q
+#
+# 运行期依赖以插件运行时（Decky 自带 Python）为准，这里只补测试所需：
+# - pytest / pytest-asyncio：测试框架（tests/ 下使用 asyncio 标记）
+# - aiohttp：py_modules/tianyi_service.py、tianyi_client.py、aria2_manager.py 顶层 import
+# - yarl：py_modules/tianyi_service.py 顶层直接 import（aiohttp 的传递依赖，显式声明更稳）
+pytest>=8.0,<9
+pytest-asyncio>=0.24,<2
+aiohttp>=3.9
+yarl>=1.9
