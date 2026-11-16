@@ -341,8 +341,9 @@ class GameCatalog:
         page_size: int = 50,
         platform: str = "",
         category: str = "",
+        sort: str = "",
     ) -> Dict[str, object]:
-        """按关键词/平台/分类分页检索。"""
+        """按关键词/平台/分类分页检索，支持排序。"""
         q = (query or "").strip().lower()
         platform_filter = _normalize_platform(platform, default="") if str(platform or "").strip() else ""
         category_filter = str(category or "").strip().lower()
@@ -364,6 +365,18 @@ class GameCatalog:
                 continue
             matched.append(item)
 
+        sort_key = str(sort or "").strip().lower()
+        if sort_key == "title":
+            matched = sorted(matched, key=lambda item: (item.title.lower(), item.game_id))
+        elif sort_key in {"size_desc", "size_asc"}:
+            matched = sorted(
+                matched,
+                key=lambda item: int(item.size_bytes or 0),
+                reverse=sort_key == "size_desc",
+            )
+        elif sort_key == "platform":
+            matched = sorted(matched, key=lambda item: (item.platform, item.title.lower()))
+
         start = (normalized_page - 1) * normalized_size
         end = start + normalized_size
 
@@ -373,6 +386,7 @@ class GameCatalog:
             "page_size": normalized_size,
             "platform": platform_filter,
             "category": str(category or "").strip(),
+            "sort": sort_key,
             "platforms": self.platform_counts(),
             "categories": self.category_counts(),
             "items": [e.to_dict() for e in matched[start:end]],

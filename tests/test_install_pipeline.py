@@ -8,6 +8,8 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import json
 import os
 import zipfile
 from pathlib import Path
@@ -729,3 +731,107 @@ def test_non_pc_platform_install_is_rejected(service, tmp_path, monkeypatch):
         assert "模拟器" in str(exc)
     else:
         raise AssertionError("非 PC 资源不应生成安装计划")
+
+
+def test_list_installed_games_includes_catalog_metadata(service, tmp_path):
+    entry = service.catalog.entries[0]
+    install_dir = tmp_path / "installed" / "LibraryGame"
+    install_dir.mkdir(parents=True)
+    (install_dir / "game.bin").write_bytes(b"x" * 128)
+    service.store.upsert_installed_game(
+        TianyiInstalledGame(
+            game_id=entry.game_id,
+            game_title=entry.title,
+            install_path=str(install_dir),
+            source_path="",
+            steam_app_id=424242,
+        )
+    )
+
+    data = asyncio.run(service.list_installed_games())
+    assert data["total"] == 1
+    item = data["items"][0]
+    assert item["exists"] is True
+    assert item["platform"] == entry.platform
+    assert item["steam_app_id"] == 424242
+
+
+def test_launch_installed_game_uses_steam_url(service, tmp_path, monkeypatch):
+    install_dir = tmp_path / "installed" / "LaunchMe"
+    install_dir.mkdir(parents=True)
+    service.store.upsert_installed_game(
+        TianyiInstalledGame(
+            game_id="launch-1",
+            game_title="LaunchMe",
+            install_path=str(install_dir),
+            source_path="",
+            steam_app_id=123456,
+        )
+    )
+    captured = {}
+    monkeypatch.setattr(svc_module, "_launch_external", lambda target: captured.update(target=target))
+
+    result = asyncio.run(service.launch_installed_game("launch-1"))
+    assert result["steam_app_id"] == 123456
+    assert captured["target"] == "steam://rungameid/123456"
+
+
+def test_launch_installed_game_requires_app_id(service, tmp_path, monkeypatch):
+    install_dir = tmp_path / "installed" / "NoAppId"
+    install_dir.mkdir(parents=True)
+    service.store.upsert_installed_game(
+        TianyiInstalledGame(
+            game_id="no-appid",
+            game_title="NoAppId",
+            install_path=str(install_dir),
+            source_path="",
+            steam_app_id=0,
+        )
+    )
+    monkeypatch.setattr(svc_module, "resolve_tianyi_shortcut_sync", lambda game_id: {})
+
+    with pytest.raises(ValueError):
+        asyncio.run(service.launch_installed_game("no-appid"))
+
+
+def test_open_installed_folder_launches_path(service, tmp_path, monkeypatch):
+    install_dir = tmp_path / "installed" / "FolderGame"
+    install_dir.mkdir(parents=True)
+    service.store.upsert_installed_game(
+        TianyiInstalledGame(
+            game_id="folder-1",
+            game_title="FolderGame",
+            install_path=str(install_dir),
+            source_path="",
+        )
+    )
+    captured = {}
+    monkeypatch.setattr(svc_module, "_launch_external", lambda target: captured.update(target=target))
+
+    result = asyncio.run(service.open_installed_folder("folder-1"))
+    assert result["opened"] is True
+    assert captured["target"] == os.path.realpath(str(install_dir))
+
+
+def test_diagnostics_redacts_home_and_tokens(service):
+    service.store.login.cookie = "UID=12345; accessToken=supersecret"
+    service.store.set_settings(download_dir=os.path.expanduser("~/Games"))
+
+    diagnostics = asyncio.run(service.get_diagnostics())
+    text = json.dumps(diagnostics, ensure_ascii=False)
+
+    assert "supersecret" not in text
+    assert "UID=12345" not in text
+    assert "~/Games" in text
+    assert diagnostics["catalog"]["total"] > 0
+    assert set(diagnostics["runtime"]) == {"aria2", "7z", "node"}
+    assert "log_tail" in diagnostics
+
+
+def test_export_diagnostics_zip(service):
+    payload = asyncio.run(service.export_diagnostics())
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        names = set(archive.namelist())
+        assert {"diagnostics.json", "log-tail.txt", "README.txt"} <= names
+        content = archive.read("diagnostics.json").decode("utf-8")
+        assert "version" in content

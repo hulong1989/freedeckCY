@@ -39,10 +39,11 @@ def _row(
     cover_url: str = "",
     portrait: str = "",
     appid: str = "0",
+    size: str = "1000",
 ) -> str:
     return (
         f"{game_id},{title},5,{categories},,t,https://cloud.189.cn/t/abc{game_id},abc{game_id},pwd,"
-        f"{title}/game.exe,1000,1 KB,{platform},{cover_url},{portrait},{appid}"
+        f"{title}/game.exe,{size},1 KB,{platform},{cover_url},{portrait},{appid}"
     )
 
 
@@ -258,3 +259,29 @@ def test_default_catalog_categories_are_clean():
     for entry in catalog.entries:
         tokens = [token.strip().lower() for token in entry.categories.split(",") if token.strip()]
         assert not (set(tokens) & PLATFORM_TOKENS), entry.title
+
+
+def test_list_sorting_by_title_and_size(tmp_path):
+    csv_path = _write_catalog(
+        tmp_path,
+        [
+            _row("1", "Bravo", size="300"),
+            _row("2", "Alpha", size="100"),
+            _row("3", "Charlie", size="200"),
+        ],
+    )
+    catalog = GameCatalog(csv_path)
+    catalog.load()
+
+    by_title = catalog.list(query="", page=1, page_size=10, sort="title")
+    assert [item["title"] for item in by_title["items"]] == ["Alpha", "Bravo", "Charlie"]
+    assert by_title["sort"] == "title"
+
+    desc = catalog.list(query="", page=1, page_size=10, sort="size_desc")
+    assert [int(item["size_bytes"]) for item in desc["items"]] == [300, 200, 100]
+
+    asc = catalog.list(query="", page=1, page_size=10, sort="size_asc")
+    assert [int(item["size_bytes"]) for item in asc["items"]] == [100, 200, 300]
+
+    unknown = catalog.list(query="", page=1, page_size=10, sort="bogus")
+    assert [item["game_id"] for item in unknown["items"]] == ["1", "2", "3"]

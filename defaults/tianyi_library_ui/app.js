@@ -40,6 +40,15 @@ createApp({
       activeCategory: "",
       platforms: [],
       activePlatform: "",
+      mode: "catalog",
+      installed: { total: 0, items: [] },
+      sort: "",
+      sortOptions: ["", "title", "size_desc", "size_asc"],
+      sortLabels: { "": "默认", title: "名称", size_desc: "大小↓", size_asc: "大小↑" },
+      diagnosticsBusy: false,
+      updateBusy: false,
+      confirmDialog: { visible: false, title: "", message: "", action: null },
+      confirmReturnIndex: 0,
       query: "",
       activeQuery: "",
       showResults: false,
@@ -95,6 +104,9 @@ createApp({
         });
       }
       return chips;
+    },
+    sortLabel() {
+      return this.sortLabels[this.sort] || "默认";
     },
     modalCanConfirm() {
       if (!this.installDialog.plan) return false;
@@ -317,15 +329,17 @@ createApp({
         if (!this.settings.split_count) this.settings.split_count = 16;
         if (!this.settings.install_dir) this.settings.install_dir = this.settings.download_dir || "";
       } catch (_error) {
-        // 状态读取失败不阻断搜索流程。
+        // 状态读取失败不阻断浏览流程。
       }
+      await this.reloadList(1);
+      await this.reloadInstalled();
     },
     platformChipCount() {
-      if (!this.showResults) return 0;
+      if (!this.showResults || this.mode !== "catalog") return 0;
       return this.platformChips.length > 1 ? this.platformChips.length : 0;
     },
     categoryChipCount() {
-      if (!this.showResults) return 0;
+      if (!this.showResults || this.mode !== "catalog") return 0;
       return this.filterChips.length > 1 ? this.filterChips.length : 0;
     },
     filterChipCount() {
@@ -349,6 +363,9 @@ createApp({
       void this.reloadList(1);
     },
     getFocusableCount() {
+      if (this.confirmDialog.visible) {
+        return 2;
+      }
       if (this.installDialog.visible) {
         return 2;
       }
@@ -371,7 +388,9 @@ createApp({
     focusElementByIndex(index, options = {}) {
       const scroll = options.scroll !== false;
       let el = null;
-      if (this.installDialog.visible) {
+      if (this.confirmDialog.visible) {
+        el = index <= 0 ? document.getElementById("confirm-cancel") : document.getElementById("confirm-ok");
+      } else if (this.installDialog.visible) {
         el = index <= 0 ? document.getElementById("install-cancel") : document.getElementById("install-confirm");
       } else if (index === 0) {
         el = document.getElementById("search-input");
@@ -407,6 +426,11 @@ createApp({
       this.$nextTick(() => this.focusElementByIndex(next, options));
     },
     moveFocus(direction) {
+      if (this.confirmDialog.visible) {
+        if (["left", "up"].includes(direction)) this.setFocusIndex(0, { scroll: false });
+        if (["right", "down"].includes(direction)) this.setFocusIndex(1, { scroll: false });
+        return;
+      }
       if (this.installDialog.visible) {
         if (["left", "up"].includes(direction)) this.setFocusIndex(0, { scroll: false });
         if (["right", "down"].includes(direction)) this.setFocusIndex(1, { scroll: false });
@@ -489,12 +513,25 @@ createApp({
       this.setFocusIndex(next);
     },
     async activateFocused() {
+      if (this.confirmDialog.visible) {
+        if (this.focusedIndex <= 0) {
+          this.closeConfirm();
+        } else {
+          this.confirmAction();
+        }
+        return;
+      }
       if (this.installDialog.visible) {
         if (this.focusedIndex <= 0) {
           this.closeInstallDialog();
           return;
         }
         await this.confirmInstall();
+        return;
+      }
+      if (this.mode === "installed") {
+        const item = this.focusedInstalledItem();
+        if (item) await this.launchInstalled(item);
         return;
       }
       const index = this.focusedIndex;
@@ -521,23 +558,32 @@ createApp({
       }
     },
     handleBackAction() {
+      if (this.confirmDialog.visible) {
+        this.closeConfirm();
+        return;
+      }
       if (this.installDialog.visible) {
         this.closeInstallDialog();
         return;
       }
-      if (this.focusedIndex !== 0) {
-        this.setFocusIndex(0, { scroll: false });
+      if (this.mode === "installed") {
+        void this.switchMode("catalog");
         return;
-      }
-      if (this.showResults) {
-        this.showResults = false;
-        this.hintText = "";
       }
       this.setFocusIndex(0, { scroll: false });
     },
     onGlobalKeyDown(event) {
       const key = String(event.key || "");
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape"].includes(key)) {
+      const target = event.target;
+      const typing = Boolean(
+        target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable),
+      );
+      if (typing) {
+        if (key === "Escape") this.handleBackAction();
+        return;
+      }
+
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape", "PageUp", "PageDown"].includes(key)) {
         event.preventDefault();
       }
 
@@ -547,6 +593,15 @@ createApp({
       if (key === "ArrowRight") this.moveFocus("right");
       if (key === "Enter") this.activateFocused();
       if (key === "Escape") this.handleBackAction();
+      if (key === "x" || key === "X") this.toggleMode();
+      if (key === "y" || key === "Y") {
+        if (this.mode === "installed") this.openFocusedInstalledFolder();
+        else this.cycleSort();
+      }
+      if ((key === "o" || key === "O") && this.mode === "installed") this.openFocusedInstalledFolder();
+      if (key === "Delete" && this.mode === "installed") this.askFocusedUninstall();
+      if (key === "PageUp") this.gotoPage(this.list.page - 1);
+      if (key === "PageDown") this.gotoPage(this.list.page + 1);
     },
     pressEdge(name, pressed, callback) {
       const wasPressed = Boolean(this.gamepadPressed[name]);
@@ -604,6 +659,10 @@ createApp({
       const right = Boolean(buttons[15] && buttons[15].pressed) || axisX >= deadzone;
       const a = Boolean(buttons[0] && buttons[0].pressed);
       const b = Boolean(buttons[1] && buttons[1].pressed);
+      const x = Boolean(buttons[2] && buttons[2].pressed);
+      const y = Boolean(buttons[3] && buttons[3].pressed);
+      const l1 = Boolean(buttons[4] && buttons[4].pressed);
+      const r1 = Boolean(buttons[5] && buttons[5].pressed);
 
       this.repeatDirectional("up", up, () => this.moveFocus("up"), nowTs);
       this.repeatDirectional("down", down, () => this.moveFocus("down"), nowTs);
@@ -611,6 +670,14 @@ createApp({
       this.repeatDirectional("right", right, () => this.moveFocus("right"), nowTs);
       this.pressEdge("a", a, () => this.activateFocused());
       this.pressEdge("b", b, () => this.handleBackAction());
+      this.pressEdge("x", x, () => this.toggleMode());
+      this.pressEdge("y", y, () => {
+        if (this.confirmDialog.visible || this.installDialog.visible) return;
+        if (this.mode === "installed") this.openFocusedInstalledFolder();
+        else this.cycleSort();
+      });
+      this.pressEdge("l1", l1, () => this.gotoPage(this.list.page - 1));
+      this.pressEdge("r1", r1, () => this.gotoPage(this.list.page + 1));
     },
     startGamepadPolling() {
       if (this.gamepadTimer) return;
@@ -636,18 +703,9 @@ createApp({
     },
     async reloadList(page = 1) {
       const q = this.query.trim();
-      if (!q) {
-        this.showResults = false;
-        this.activeQuery = "";
-        this.list = { total: 0, page: 1, page_size: this.settings.page_size || 50, items: [] };
-        this.hintText = "";
-        this.setFocusIndex(0, { scroll: false });
-        return;
-      }
-
       this.showResults = true;
       this.activeQuery = q;
-      this.hintText = "";
+      this.hintText = q ? "" : "浏览全部资源（可按平台/分类筛选）";
 
       const result = await apiGet("/api/tianyi/catalog", {
         q,
@@ -655,10 +713,10 @@ createApp({
         page_size: this.settings.page_size,
         category: this.activeCategory || "",
         platform: this.activePlatform || "",
+        sort: this.sort || "",
       });
       if (result.status !== "success") {
-        this.flash(result.message || "搜索失败");
-        this.hintText = "";
+        this.flash(result.message || "加载失败");
         this.setFocusIndex(0, { scroll: false });
         return;
       }
@@ -666,14 +724,189 @@ createApp({
       this.list = Object.assign({ total: 0, page: 1, page_size: 50, items: [] }, result.data || {});
       this.categories = Array.isArray(this.list.categories) ? this.list.categories : this.categories;
       this.platforms = Array.isArray(this.list.platforms) ? this.list.platforms : this.platforms;
-      const categoryLabel = this.activeCategory ? `，分类「${this.activeCategory}」` : "";
-      const platformLabel = this.activePlatform ? `，平台「${this.activePlatform.toUpperCase()}」` : "";
-      this.hintText = `已显示“${q}”的搜索结果${platformLabel}${categoryLabel}`;
+      const pages = this.totalPages;
+      if (Number(this.list.page || 1) > pages) {
+        await this.reloadList(pages);
+        return;
+      }
+      const scope = [];
+      if (this.activePlatform) scope.push(`平台「${this.activePlatform.toUpperCase()}」`);
+      if (this.activeCategory) scope.push(`分类「${this.activeCategory}」`);
+      const prefix = scope.length ? `（${scope.join("，")}）` : "";
+      if (q) {
+        this.hintText = `已显示“${q}”的搜索结果${prefix}`;
+      } else {
+        this.hintText = `共 ${this.list.total} 条资源${prefix}，第 ${this.list.page} / ${pages} 页`;
+      }
       if (!this.list.items || this.list.items.length === 0) {
         this.setFocusIndex(0, { scroll: false });
       } else {
         this.setFocusIndex(this.cardStartIndex(), { scroll: true });
         void this.prefetchCovers(this.list.items);
+      }
+    },
+    async reloadInstalled() {
+      const result = await apiGet("/api/tianyi/installed");
+      if (result.status !== "success") {
+        this.flash(result.message || "读取已安装列表失败");
+        return;
+      }
+      this.installed = Object.assign({ total: 0, items: [] }, result.data || {});
+      this.showResults = true;
+      if (this.mode === "installed") {
+        if (this.installed.items.length) {
+          this.setFocusIndex(2, { scroll: true });
+          void this.prefetchCovers(this.installed.items);
+        } else {
+          this.setFocusIndex(0, { scroll: false });
+        }
+      }
+    },
+    async switchMode(mode) {
+      const next = mode === "installed" ? "installed" : "catalog";
+      if (this.mode === next) return;
+      this.mode = next;
+      this.focusedIndex = 0;
+      if (next === "installed") {
+        await this.reloadInstalled();
+      } else {
+        await this.reloadList(1);
+      }
+    },
+    toggleMode() {
+      if (this.confirmDialog.visible || this.installDialog.visible) return;
+      void this.switchMode(this.mode === "catalog" ? "installed" : "catalog");
+    },
+    async gotoPage(page) {
+      if (this.mode !== "catalog") return;
+      if (this.installDialog.visible || this.confirmDialog.visible) return;
+      const target = Math.max(1, Math.min(this.totalPages, Number(page || 1)));
+      if (target === Number(this.list.page || 1)) return;
+      await this.reloadList(target);
+    },
+    cycleSort() {
+      if (this.mode !== "catalog" || this.confirmDialog.visible || this.installDialog.visible) return;
+      const current = this.sortOptions.indexOf(this.sort);
+      this.sort = this.sortOptions[(current + 1) % this.sortOptions.length];
+      void this.reloadList(1);
+    },
+    async launchInstalled(item) {
+      if (!item || !item.game_id) return;
+      try {
+        const result = await apiPost("/api/tianyi/installed/launch", { game_id: item.game_id });
+        if (result.status !== "success") throw new Error(result.message || "启动失败");
+        this.flash(`已请求 Steam 启动：${item.title || item.game_id}`);
+      } catch (error) {
+        this.flash(String((error && error.message) || error));
+      }
+    },
+    async openInstalledFolder(item) {
+      if (!item || !item.game_id) return;
+      try {
+        const result = await apiPost("/api/tianyi/installed/open-folder", { game_id: item.game_id });
+        if (result.status !== "success") throw new Error(result.message || "打开目录失败");
+        this.flash("已请求打开安装目录");
+      } catch (error) {
+        this.flash(String((error && error.message) || error));
+      }
+    },
+    askUninstallInstalled(item) {
+      if (!item) return;
+      const title = item.title || item.game_id || "该游戏";
+      this.showConfirm(
+        "卸载游戏",
+        `确定卸载「${title}」吗？\n\n将删除安装目录：\n${item.install_path}\n\n如需同时回收 Proton 前缀，请到 QAM 面板卸载。`,
+        () => this.performUninstallInstalled(item),
+      );
+    },
+    async performUninstallInstalled(item) {
+      try {
+        const result = await apiPost("/api/tianyi/installed/uninstall", {
+          game_id: item.game_id,
+          install_path: item.install_path,
+          delete_files: true,
+        });
+        if (result.status !== "success") throw new Error(result.message || "卸载失败");
+        this.flash(`已卸载：${item.title || item.game_id}`);
+        await this.reloadInstalled();
+        await this.reloadList(this.list.page || 1);
+      } catch (error) {
+        this.flash(String((error && error.message) || error));
+      }
+    },
+    focusedInstalledItem() {
+      if (this.mode !== "installed") return null;
+      const index = this.focusedIndex - this.cardStartIndex();
+      return this.installed.items[index] || null;
+    },
+    openFocusedInstalledFolder() {
+      if (this.confirmDialog.visible || this.installDialog.visible) return;
+      const item = this.focusedInstalledItem();
+      if (item) void this.openInstalledFolder(item);
+    },
+    askFocusedUninstall() {
+      if (this.confirmDialog.visible || this.installDialog.visible) return;
+      const item = this.focusedInstalledItem();
+      if (item) this.askUninstallInstalled(item);
+    },
+    showConfirm(title, message, action) {
+      this.confirmReturnIndex = this.focusedIndex;
+      this.confirmDialog = {
+        visible: true,
+        title: String(title || ""),
+        message: String(message || ""),
+        action: typeof action === "function" ? action : null,
+      };
+      this.setFocusIndex(1, { scroll: false });
+    },
+    closeConfirm() {
+      this.confirmDialog = { visible: false, title: "", message: "", action: null };
+      this.setFocusIndex(this.confirmReturnIndex || 0, { scroll: false });
+    },
+    confirmAction() {
+      const action = this.confirmDialog.action;
+      const returnIndex = this.confirmReturnIndex || 0;
+      this.confirmDialog = { visible: false, title: "", message: "", action: null };
+      if (typeof action === "function") void action();
+      this.setFocusIndex(returnIndex, { scroll: false });
+    },
+    openDiagnostics() {
+      if (this.diagnosticsBusy) return;
+      this.diagnosticsBusy = true;
+      const link = document.createElement("a");
+      link.href = "/api/tianyi/diagnostics/export";
+      link.download = "freedeckcy-diagnostics.zip";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => {
+        this.diagnosticsBusy = false;
+        this.flash("诊断包已开始下载");
+      }, 1500);
+    },
+    async checkUpdate() {
+      if (this.updateBusy) return;
+      this.updateBusy = true;
+      try {
+        const result = await apiGet("/api/tianyi/update-check");
+        const info = result && result.data ? result.data : {};
+        if (result.status !== "success" || info.ok === false) {
+          this.flash(info.message || result.message || "检查更新失败");
+          return;
+        }
+        if (info.has_update) {
+          this.showConfirm(
+            "发现新版本",
+            `当前 v${info.current}，最新 v${info.latest}。是否打开 Release 页面？`,
+            () => window.open(info.url, "_blank"),
+          );
+        } else {
+          this.flash(`已是最新版本（v${info.current}）`);
+        }
+      } catch (error) {
+        this.flash(String(error));
+      } finally {
+        this.updateBusy = false;
       }
     },
     getCoverCacheKey(item) {

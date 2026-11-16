@@ -129,7 +129,7 @@ async def test_catalog_handler_passes_platform_and_category(monkeypatch):
     captured = {}
 
     class _FakeService:
-        async def list_catalog(self, query, page, page_size, platform="", category=""):
+        async def list_catalog(self, query, page, page_size, platform="", category="", sort=""):
             captured.update(
                 {
                     "query": query,
@@ -137,6 +137,7 @@ async def test_catalog_handler_passes_platform_and_category(monkeypatch):
                     "page_size": page_size,
                     "platform": platform,
                     "category": category,
+                    "sort": sort,
                 }
             )
             return {"total": 0, "page": 1, "page_size": 50, "items": [], "platforms": [], "categories": []}
@@ -154,3 +155,98 @@ async def test_catalog_handler_passes_platform_and_category(monkeypatch):
     assert captured["category"] == "动作冒险"
     assert captured["page"] == 2
     assert captured["page_size"] == 30
+
+
+def _json_request(path: str, body: dict):
+    """构造带 JSON body 的 mock request（aiohttp 需要 StreamReader）。"""
+    import json
+    from unittest.mock import Mock
+
+    from aiohttp.streams import StreamReader
+
+    reader = StreamReader(Mock(), 2**16)
+    reader.feed_data(json.dumps(body).encode("utf-8"))
+    reader.feed_eof()
+    return make_mocked_request(
+        "POST",
+        path,
+        headers={"Content-Type": "application/json"},
+        payload=reader,
+    )
+
+
+@pytest.mark.asyncio
+async def test_installed_handlers_call_service(monkeypatch):
+    import json
+    import tianyi_http
+
+    captured = {}
+
+    class _FakeService:
+        async def list_installed_games(self):
+            return {"total": 0, "items": []}
+
+        async def launch_installed_game(self, game_id):
+            captured["launch"] = game_id
+            return {"launched": True}
+
+        async def open_installed_folder(self, game_id):
+            captured["open"] = game_id
+            return {"opened": True}
+
+        async def uninstall_installed_game(self, **kwargs):
+            captured["uninstall"] = kwargs
+            return {"removed": True}
+
+        async def get_diagnostics(self):
+            return {"version": "0.5.0"}
+
+        async def export_diagnostics(self):
+            return b"PKfake"
+
+        async def check_update(self):
+            return {"ok": True, "current": "0.5.0", "latest": "0.5.0", "has_update": False}
+
+    monkeypatch.setattr(tianyi_http, "_service", lambda plugin: _FakeService())
+
+    list_response = await tianyi_http.handle_installed_games(
+        make_mocked_request("GET", "/api/tianyi/installed"), object()
+    )
+    assert list_response.status == 200
+
+    launch_request = _json_request("/api/tianyi/installed/launch", {"game_id": "g-1"})
+    launch_response = await tianyi_http.handle_installed_launch(launch_request, object())
+    assert launch_response.status == 200
+    assert captured["launch"] == "g-1"
+
+    uninstall_request = _json_request(
+        "/api/tianyi/installed/uninstall",
+        {"game_id": "g-1", "install_path": "/tmp/g", "delete_compatdata": True},
+    )
+    uninstall_response = await tianyi_http.handle_installed_uninstall(uninstall_request, object())
+    assert uninstall_response.status == 200
+    assert captured["uninstall"]["delete_compatdata"] is True
+
+    diagnostics_response = await tianyi_http.handle_diagnostics(
+        make_mocked_request("GET", "/api/tianyi/diagnostics"), object()
+    )
+    assert diagnostics_response.status == 200
+
+    export_response = await tianyi_http.handle_diagnostics_export(
+        make_mocked_request("GET", "/api/tianyi/diagnostics/export"), object()
+    )
+    assert export_response.status == 200
+    assert export_response.content_type == "application/zip"
+
+    update_response = await tianyi_http.handle_update_check(
+        make_mocked_request("GET", "/api/tianyi/update-check"), object()
+    )
+    assert update_response.status == 200
+
+
+def test_parse_version_compare():
+    assert svc._parse_version("v0.5.0") == (0, 5, 0)
+    assert svc._parse_version("0.4.0") == (0, 4, 0)
+    assert svc._parse_version("v0.5.0-pre") == (0, 5, 0)
+    assert svc._parse_version("") == (0,)
+    assert svc._parse_version("0.5.0") > svc._parse_version("0.4.9")

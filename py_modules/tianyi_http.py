@@ -275,12 +275,14 @@ async def handle_catalog(request: web.Request, plugin: Any) -> web.Response:
         page_size = int(request.query.get("page_size", request.query.get("pageSize", "0")))
         platform = str(request.query.get("platform", "")).strip()
         category = str(request.query.get("category", "")).strip()
+        sort = str(request.query.get("sort", "")).strip()
         data = await _service(plugin).list_catalog(
             query,
             page,
             page_size,
             platform=platform,
             category=category,
+            sort=sort,
         )
         return _json_ok({"data": data})
     except Exception as exc:
@@ -294,6 +296,81 @@ async def handle_catalog_cover(request: web.Request, plugin: Any) -> web.Respons
         title = str(request.query.get("title", "")).strip()
         categories = str(request.query.get("categories", "")).strip()
         data = await _service(plugin).resolve_catalog_cover(game_id=game_id, title=title, categories=categories)
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
+async def handle_installed_games(request: web.Request, plugin: Any) -> web.Response:
+    """已安装游戏列表。"""
+    try:
+        data = await _service(plugin).list_installed_games()
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
+async def handle_installed_launch(request: web.Request, plugin: Any) -> web.Response:
+    """通过 Steam 启动已安装游戏。"""
+    try:
+        body = await request.json()
+        data = await _service(plugin).launch_installed_game(str(body.get("game_id", "")))
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
+async def handle_installed_open_folder(request: web.Request, plugin: Any) -> web.Response:
+    """打开已安装游戏目录。"""
+    try:
+        body = await request.json()
+        data = await _service(plugin).open_installed_folder(str(body.get("game_id", "")))
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
+async def handle_installed_uninstall(request: web.Request, plugin: Any) -> web.Response:
+    """卸载已安装游戏（可选回收 Proton 前缀）。"""
+    try:
+        body = await request.json()
+        data = await _service(plugin).uninstall_installed_game(
+            game_id=str(body.get("game_id", "")),
+            install_path=str(body.get("install_path", "")),
+            delete_files=bool(body.get("delete_files", True)),
+            delete_compatdata=bool(body.get("delete_compatdata", False)),
+        )
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
+async def handle_diagnostics(request: web.Request, plugin: Any) -> web.Response:
+    """诊断信息（JSON）。"""
+    try:
+        data = await _service(plugin).get_diagnostics()
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc, 500)
+
+
+async def handle_diagnostics_export(request: web.Request, plugin: Any) -> web.Response:
+    """诊断包（zip 下载）。"""
+    try:
+        payload = await _service(plugin).export_diagnostics()
+        return web.Response(
+            body=payload,
+            content_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="freedeckcy-diagnostics.zip"'},
+        )
+    except Exception as exc:
+        return _json_error_from_exception(exc, 500)
+
+
+async def handle_update_check(request: web.Request, plugin: Any) -> web.Response:
+    """检查 GitHub 最新 release。"""
+    try:
+        data = await _service(plugin).check_update()
         return _json_ok({"data": data})
     except Exception as exc:
         return _json_error_from_exception(exc)
@@ -553,6 +630,13 @@ def setup_routes(app: web.Application, plugin: Any) -> None:
 
     app.router.add_get("/api/tianyi/catalog", lambda request: handle_catalog(request, plugin))
     app.router.add_get("/api/tianyi/catalog/cover", lambda request: handle_catalog_cover(request, plugin))
+    app.router.add_get("/api/tianyi/installed", lambda request: handle_installed_games(request, plugin))
+    app.router.add_post("/api/tianyi/installed/launch", lambda request: handle_installed_launch(request, plugin))
+    app.router.add_post("/api/tianyi/installed/open-folder", lambda request: handle_installed_open_folder(request, plugin))
+    app.router.add_post("/api/tianyi/installed/uninstall", lambda request: handle_installed_uninstall(request, plugin))
+    app.router.add_get("/api/tianyi/diagnostics", lambda request: handle_diagnostics(request, plugin))
+    app.router.add_get("/api/tianyi/diagnostics/export", lambda request: handle_diagnostics_export(request, plugin))
+    app.router.add_get("/api/tianyi/update-check", lambda request: handle_update_check(request, plugin))
     app.router.add_get("/api/tianyi/settings", lambda request: handle_settings_get(request, plugin))
     app.router.add_post("/api/tianyi/settings", lambda request: handle_settings_set(request, plugin))
     app.router.add_post("/api/tianyi/cloud-save/upload/start", lambda request: handle_cloud_save_upload_start(request, plugin))

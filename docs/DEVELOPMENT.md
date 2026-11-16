@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.4.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.5.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -14,7 +14,7 @@
 | `py_modules/config.py` | 路径常量（下载目录、`~/.local/share/freedeckCY`）、后台维护间隔与日志器（`/tmp/freedeckcy.log`，`RotatingFileHandler` 5 MB × 3） |
 | `py_modules/tianyi_service.py` | **业务内核**：安装计划、下载任务、后台安装、云存档、登录、游玩时长、面板状态缓存、封面解析与缓存；关键函数 `maintenance_tick`（后台维护）、`refresh_tasks`（状态同步）、`_try_recover_task` / `_readd_task_download`（重启恢复 + `changeUri` 原地换链）、`_maybe_schedule_group_post_process` / `_finalize_group_install`（分卷分组）、`_verify_downloaded_file` / `_quarantine_download_file`（完整性校验与自愈）、`_wait_payload_settled` / `_precheck_archive_payload` / `_schedule_archive_repair`（解压前收紧与 `7z t` 失败自动重下）、`retry_task`（失败任务重试）、`preview_uninstall` / `uninstall_installed_game`（卸载预览与 Proton 前缀回收）、`resolve_catalog_cover`（封面优先级链）、`_load_cover_cache` / `_save_cover_cache`（磁盘缓存） |
 | `py_modules/tianyi_client.py` | **天翼云盘协议客户端**：分享解析、accessToken、下载直链、上传（调 Node）、sessionKey |
-| `py_modules/tianyi_http.py` | 本地 HTTP 路由与 handler：Vue 页面、REST API、统一 JSON 响应 |
+| `py_modules/tianyi_http.py` | 本地 HTTP 路由与 handler（**41 条路由 / 38 条 REST**）：Vue 页面、REST API、诊断 zip、更新检查、统一 JSON 响应 |
 | `py_modules/server_manager.py` | aiohttp 生命周期、本地 API 安全边界（Host/Origin 校验）、设置备份、`/_healthz` |
 | `py_modules/tianyi_store.py` | 数据类（登录/设置/任务/已装游戏，含 `file_size` / `group_id` / `group_total`）+ `state.json` 原子读写；写入时目录 0700 / 文件 0600 |
 | `py_modules/aria2_manager.py` | aria2 子进程管理（运行时元数据 `aria2-runtime.json` + `flock` 让插件重载可附着存活实例）+ JSON-RPC（`addUri` / `changeUri` / `tellStatus` / `listDownloads` …） |
@@ -28,14 +28,14 @@
 | `backend/tianyi_cloud_upload.js` | 云盘上传（`upload`）、列版本（`list_versions`）、下载（`download_file`）的 ESM 实现 |
 | `backend/tianyi_cloud_upload.cjs` | 同一逻辑的 CommonJS 版，**只实现 `upload`**；仅在 `.js` 不存在时启用 |
 | `src/index.tsx` | 全部 React 代码：QAM 主面板、设置页、Steam 库页时长注入、全局游戏事件监听 |
-| `defaults/tianyi_library_ui/` | 本地 Vue 游戏库（**平台 + 分类双筛选条**、平台标签、非 PC 只提示不安装、手柄焦点序列）与二维码登录桥（免构建，直接改） |
+| `defaults/tianyi_library_ui/` | 本地 Vue 游戏库（打开即浏览、平台/分类筛选、**分页/排序**、**已安装页签**、诊断导出/更新检查工具条、手柄焦点序列、非 PC 只提示不安装）与二维码登录桥（免构建，直接改） |
 | `defaults/tianyi_catalog/gamebox_all_links_*.csv` | 随插件分发的资源清单（`game_id,title,categories,down_url,pwd,openpath,filesize_z` 等） |
 | `scripts/fetch_runtime.sh` | 下载 aria2c / 7zz / node 到 `defaults/runtime/`（`make runtime` 调用它） |
 | `scripts/package.sh` | 组装 Decky 插件 zip 到 `dist-artifacts/`（`make package` 调用它）；`PACKAGE_ARCH=x86_64|aarch64|all` 控制目标架构与产物后缀 |
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（242 个用例）：目录解析/平台筛选/全量目录/分类清洗、**DroidDeck 检测/Proton 解析/双 Steam 根**、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（251 个用例）：目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -222,7 +222,7 @@ make package PACKAGE_ARGS="--out-dir /tmp/freedeckcy-build"
 bash scripts/package.sh --help          # 查看全部参数
 ```
 
-- 版本号取自 `package.json` 的 `version` 字段（当前为 `0.4.0`）；
+- 版本号取自 `package.json` 的 `version` 字段（当前为 `0.5.0`）；
 - zip 根目录直接是插件结构（不额外套目录）：`main.py`、`plugin.json`、`package.json`、`LICENSE`、`README.md`，以及 `dist/`、`py_modules/`、`backend/`、`defaults/`；
 - 打包脚本会排除 `__pycache__`、`*.pyc`、`.DS_Store`、`node_modules`、`.git`、`tests`、`scripts`、`.github`、`docs`、`gl`、`dist-artifacts`（白名单之外的一律不打包）；
 - 默认复用已提交的 `dist/index.js`，不会强制跑 `pnpm build`；需要重新构建前端时用 `bash scripts/package.sh --build-ui`（要求 PATH 里有 pnpm）；
@@ -271,7 +271,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **242 个用例**（`make test` 实测 `242 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **251 个用例**（`make test` 实测 `251 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -373,6 +373,53 @@ bash scripts/doctor.sh --help             # 查看参数
 
 说明：脚本**只读**，不改任何文件；支持 `FREEDECKCY_STATE_FILE` / `FREEDECKCY_STEAM_ROOT` / `FREEDECKCY_PORT` / `DECKY_PLUGIN_DIR` 覆盖默认路径。排障流程建议先让用户附上 `make doctor` 输出，再要日志。
 
+### 6.7 库页、已安装与诊断调试（v0.5.0）
+
+库页是免构建 Vue 页面，所有数据都走本地 HTTP API；用 curl 可以脱离浏览器单独验证。
+
+**新接口调试示例**：
+
+```bash
+# 浏览全部资源（空 q）+ 排序（"" / title / size_desc / size_asc / platform）
+curl -s 'http://127.0.0.1:59271/api/tianyi/catalog?q=&page=1&page_size=5&sort=size_desc' | python3 -m json.tool
+# 同时可按 platform/category 过滤
+curl -s 'http://127.0.0.1:59271/api/tianyi/catalog?q=&platform=fc&category=%E6%A8%A1%E6%8B%9F%E5%99%A8&page=1&page_size=5' | python3 -m json.tool
+
+# 已安装列表（含 exists/platform/cover/steam_appid）
+curl -s http://127.0.0.1:59271/api/tianyi/installed | python3 -m json.tool
+# 启动 / 打开目录 / 卸载（POST JSON）
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/installed/launch      -H 'Content-Type: application/json' -d '{"game_id":"18194"}'
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/installed/open-folder -H 'Content-Type: application/json' -d '{"game_id":"18194"}'
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/installed/uninstall   -H 'Content-Type: application/json' -d '{"game_id":"18194","delete_files":true}'
+
+# 诊断 JSON / 诊断 zip / 更新检查
+curl -s http://127.0.0.1:59271/api/tianyi/diagnostics | python3 -m json.tool
+curl -s -OJ http://127.0.0.1:59271/api/tianyi/diagnostics/export   # 保存 freedeckcy-diagnostics.zip
+curl -s http://127.0.0.1:59271/api/tianyi/update-check | python3 -m json.tool
+```
+
+**库页快捷键**（浏览器/Steam Deck 手柄等价）：
+
+| 输入 | 游戏库页签 | 已安装页签 |
+|---|---|---|
+| 方向键 / 摇杆 | 搜索框→搜索按钮→平台条→分类条→卡片，2D 移动 | 搜索框/按钮→卡片（无筛选条） |
+| Enter / A | 搜索/筛选/打开安装确认 | 页面提示"启动"，但当前实现仍走游戏库逻辑（见已知限制） |
+| B / Esc | 关弹窗 / 回到搜索框 | 关弹窗 / 返回游戏库页签 |
+| X | 切到已安装 | 切回游戏库 |
+| Y | 循环排序 | 打开当前卡片安装目录 |
+| O | — | 打开安装目录 |
+| Delete | — | 卸载当前卡片（confirm 弹窗） |
+| PageUp / PageDown、L1 / R1 | 上一页 / 下一页 | — |
+| 鼠标点击卡片 | 打开安装确认 | 通过 Steam 启动游戏 |
+
+**诊断包怎么读**：`freedeckcy-diagnostics.zip` 解压后：
+
+- `diagnostics.json`：`version/python/system/arch/paths/runtime/steam/catalog/tasks/installed/settings/recent_errors`（`log_tail` 已移到单独文件）；
+- `log-tail.txt`：`/tmp/freedeckcy.log` 末尾 300 行；
+- `README.txt`：说明与提交 issue 指引。
+
+所有文本已脱敏：HOME 替换为 `~`，`cookie/authorization/token/sessionkey/accesstoken/uid/pwd` 的值替换为 `<redacted>`；日志关键字筛出的最近 20 条错误在 `recent_errors`。先看 `runtime.*.exists`、`steam.proton_tool`、`droiddeck`、`installed.missing_paths`，再对照 `log-tail.txt`。
+
 ---
 
 ## 7. 常见故障排查
@@ -403,6 +450,9 @@ bash scripts/doctor.sh --help             # 查看参数
 | 库页 **看不到平台筛选条** | 平台条只在 `platforms` 数量 > 1 时显示；确认加载的是 `freedeckcy_catalog.csv`（7084 条 / 11 平台）而不是回退的旧目录（全 PC）。可在日志看"已加载游戏目录 total=… platforms=…"或用 `curl '127.0.0.1:59271/api/tianyi/catalog?q=&page=1'` 看 `platforms` 字段 |
 | **点了非 PC 卡片只弹提示、装不了** | 预期行为：模拟器未集成，非 PC 资源当前只可浏览（前端提示 + 后端 `_build_install_plan` 拒绝）。模拟器支持见 ROADMAP 9.8 |
 | 目录里 **`/web/share?code=` 链接没被加载** | v0.3.0 起 `_is_valid_tianyi_url()` 与 `tianyi_client.parse_share_url()` 都支持该形式；检查链接是否带 `code=`、域名是否 `cloud.189.cn`。旧版本目录需重载插件生效 |
+| **已安装页签点卡片启动失败** | ① 看 flash 提示：`该游戏缺少 Steam AppID` 说明记录里没有 appid，去 Steam 库手动启动；② `当前环境没有 xdg-open/gio` 说明后端无法拉起外部程序（DroidDeck 桌面需有 xdg-open）；③ 用 `curl /api/tianyi/installed` 确认 `steam_appid` 与 `exists` |
+| **导出诊断没反应/下载失败** | 诊断 zip 由浏览器直接 `GET /api/tianyi/diagnostics/export` 下载；若浏览器拦截下载，用 `curl -s -OJ http://127.0.0.1:59271/api/tianyi/diagnostics/export` 手工保存；接口本身失败时看 `/tmp/freedeckcy.log` 的 traceback |
+| **检查更新失败** | `update-check` 依赖 `api.github.com`：无网络、代理不通或 GitHub API 未认证限流（60 次/小时/IP）都会返回 `ok:false` + message；等一会儿或手工打开 Release 页；成功结果会缓存 1 小时，不必连续点 |
 | **DroidDeck 里装完游戏，Steam 里看不到快捷方式** | DroidDeck 可能同时运行两个 Steam 客户端：`~/.droiddeck-x64/.local/share/Steam`（x64）与 `~/.local/share/Steam`（标准/ARM）。插件会优先写正在运行的那个（其 `steam.pid` 存在），但若判断错，可用 `FREEDECKCY_STEAM_ROOT` 锁定目标根，重装一次游戏并重启 Steam；`GET /api/tianyi/settings` 可确认 `droiddeck_detected` |
 | **游戏启动不了 / 提示兼容工具缺失（DroidDeck）** | 需要 ARM Proton：确认 Steam 里已装 `droiddeck-proton-arm64`（或 11 版）。插件默认写 `droiddeck-proton-arm64`；版本不匹配时用 `FREEDECKCY_PROTON_TOOL=droiddeck-proton-11-arm64`，或设成 `none` 后在 Steam 里手动选兼容工具；`settings` 接口的 `proton_tool_resolved` 是实际写入值 |
 | **下载/解压报“找不到二进制”（ARM 设备）** | `ls -l defaults/runtime/{aria2,7z,node}/aarch64/…` 检查 arm64 运行时是否打进包；缺则 `make runtime ARCH=aarch64` 后重新 `make package-droiddeck`；也可用 `FREEDECKCY_ARIA2_BIN` / `FREEDECKCY_7Z_BIN` / `FREEDECKCY_NODE_BIN` 指向系统 arm64 版本 |
@@ -429,6 +479,7 @@ bash scripts/doctor.sh --help             # 查看参数
 - **Steam 运行中写入仍可能被覆盖**：写前有备份且写后回读，但无法阻止运行中的 Steam 覆盖 `shortcuts.vdf`/`config.vdf`；装完建议重启 Steam（自动重启 Steam 在 ROADMAP §9）。
 - **compatdata 清理默认关闭**：卸载默认只删游戏文件；"连 Proton 前缀一起删"需要显式选择，避免误删存档。
 - **隔离文件与备份不会自动清理**：`*.freedeckcy-archive-invalid-*`、`*.freedeckcy-size-mismatch-*`、`*.freedeckcy-bak-*` 会留在原目录，需要手工清理（或后续 ROADMAP 项）。
+- **更新检查/诊断的能力边界**：`update-check` 未走 GitHub 认证（限流 60 次/小时/IP），失败只返回 message 不缓存失败；诊断包只脱敏常见键值（cookie/token/HOME），提交 issue 前仍建议自己过目一遍。
 - **无 i18n**：界面全硬编码中文，文案散落在 `src/index.tsx`、`defaults/tianyi_library_ui/` 与 Python 返回值里。
 - **无 Python 类型检查**：只有 pytest 单测 + CI，没有 mypy/ruff 之类的门禁。
 - **天翼接口未公开**：签名、接口、风控随时可能变，失败时优先看 `/tmp/freedeckcy.log` 里的协议诊断。
@@ -461,7 +512,9 @@ bash scripts/doctor.sh --help             # 查看参数
 | 改打包架构 / ARM64 产物 | `scripts/package.sh` 的 `PACKAGE_ARCH`；`Makefile` 的 `package-droiddeck` / `runtime ARCH=` |
 | 改 QAM 面板 UI | `src/index.tsx`（`Content` / `SettingsPage`） |
 | 改游戏库橱窗 / 登录桥 | `defaults/tianyi_library_ui/{index.html,app.js,app.css,login_bridge.*}` |
-| 改本地 HTTP 接口 | `py_modules/tianyi_http.py`（`setup_routes` 与各 `handle_*`） |
+| 改本地 HTTP 接口 | `py_modules/tianyi_http.py`（`setup_routes` 与各 `handle_*`；新接口：installed / diagnostics / update-check） |
+| 改库页浏览/分页/排序/已安装页签 | `defaults/tianyi_library_ui/{app.js,index.html,app.css}` 的 `reloadList` / `gotoPage` / `cycleSort` / `switchMode` / `reloadInstalled` / `showConfirm`；后端 `game_catalog.list(sort=...)`、`tianyi_service.list_installed_games/launch_installed_game/open_installed_folder` |
+| 改诊断导出 / 更新检查 | `py_modules/tianyi_service.py` 的 `get_diagnostics` / `export_diagnostics` / `check_update` / `_redact_text` / `_parse_version` / `_tail_text` / `_launch_external`；路由在 `tianyi_http.py` |
 | 加后台任务 / 定时逻辑 | `py_modules/tianyi_service.py` 的 `maintenance_tick` + `main.py` 主循环 |
 | 新增单测 | `tests/`（用 `tests/conftest.py` 注入的假 `decky` 模块） |
 
@@ -469,7 +522,7 @@ bash scripts/doctor.sh --help             # 查看参数
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 242 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 251 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改动打包/运行时时验证两种架构：`make package`（x86_64）与 `make package-droiddeck`（aarch64），确认产物后缀与包内 `defaults/runtime/<arch>/` 正确；

@@ -23,9 +23,34 @@
         <button id="search-button" :class="{ 'focus-ring': focusedIndex === 1 }" type="submit">搜索</button>
       </form>
       <p class="hint">{{ hintText }}</p>
+      <div class="library-toolbar">
+        <button
+          :class="['toolbar-btn', { active: mode === 'catalog' }]"
+          tabindex="-1"
+          @click="switchMode('catalog')"
+        >游戏库</button>
+        <button
+          :class="['toolbar-btn', { active: mode === 'installed' }]"
+          tabindex="-1"
+          @click="switchMode('installed')"
+        >已安装<span class="toolbar-count" v-if="installed.total">{{ installed.total }}</span></button>
+        <button
+          v-if="mode === 'catalog'"
+          class="toolbar-btn"
+          tabindex="-1"
+          title="手柄 Y 键也可切换"
+          @click="cycleSort"
+        >排序：{{ sortLabel }}</button>
+        <button class="toolbar-btn" tabindex="-1" :disabled="diagnosticsBusy" @click="openDiagnostics">
+          {{ diagnosticsBusy ? "打包中..." : "导出诊断" }}
+        </button>
+        <button class="toolbar-btn" tabindex="-1" :disabled="updateBusy" @click="checkUpdate">
+          {{ updateBusy ? "检查中..." : "检查更新" }}
+        </button>
+      </div>
     </section>
 
-    <section class="results" v-if="showResults">
+    <section class="results" v-if="showResults && mode === 'catalog'">
       <div class="filter-bar" v-if="platformChips.length > 1">
         <button
           v-for="(chip, pidx) in platformChips"
@@ -54,7 +79,7 @@
 
       <div class="card-grid" v-if="list.items.length > 0">
         <article
-          :class="['game-card', { 'focus-ring': focusedIndex === idx + 2 }]"
+          :class="['game-card', { 'focus-ring': focusedIndex === idx + cardStartIndex() }]"
           v-for="(item, idx) in list.items"
           :key="item.game_id + item.down_url"
           :data-card-index="idx"
@@ -81,9 +106,73 @@
       </div>
 
       <p class="empty" v-else>没有匹配结果</p>
+
+      <div class="pager" v-if="list.total > 0">
+        <button class="pager-btn" tabindex="-1" :disabled="list.page <= 1" @click="gotoPage(list.page - 1)">上一页</button>
+        <span class="pager-info">第 {{ list.page }} / {{ totalPages }} 页 · 共 {{ list.total }} 条</span>
+        <button class="pager-btn" tabindex="-1" :disabled="list.page >= totalPages" @click="gotoPage(list.page + 1)">下一页</button>
+      </div>
+      <p class="hint small" v-if="list.items.length">L1 / R1 或 PageUp / PageDown 翻页</p>
+    </section>
+
+    <section class="results" v-if="showResults && mode === 'installed'">
+      <div class="card-grid" v-if="installed.items.length > 0">
+        <article
+          :class="['game-card', { 'focus-ring': focusedIndex === idx + cardStartIndex() }]"
+          v-for="(item, idx) in installed.items"
+          :key="'installed-' + (item.game_id || item.install_path)"
+          :data-card-index="idx"
+          tabindex="0"
+          :title="item.install_path"
+          @click="launchInstalled(item)"
+        >
+          <div class="card-media">
+            <img
+              :src="coverFor(item)"
+              :alt="item.title"
+              loading="lazy"
+              @error="onCoverError($event, item)"
+            />
+          </div>
+          <div class="card-info">
+            <h3 class="card-title">{{ item.title }}</h3>
+            <div class="card-meta">
+              <span>{{ item.size_text || "-" }}</span>
+              <span v-if="item.playtime_text && item.playtime_text !== '0 分钟'">{{ item.playtime_text }}</span>
+            </div>
+            <div class="installed-actions">
+              <button class="card-action" tabindex="-1" @click.stop="openInstalledFolder(item)">打开目录</button>
+              <button class="card-action danger" tabindex="-1" @click.stop="askUninstallInstalled(item)">卸载</button>
+            </div>
+          </div>
+        </article>
+      </div>
+      <p class="empty" v-else>还没有安装记录</p>
+      <p class="hint small" v-if="installed.items.length">回车启动 · Y 打开目录 · Delete 卸载 · X 切换页签</p>
     </section>
 
     <p class="toast" v-if="message">{{ message }}</p>
+
+    <section class="modal-mask" v-if="confirmDialog.visible">
+      <div class="modal-card confirm-card">
+        <h2 class="confirm-title">{{ confirmDialog.title }}</h2>
+        <p class="confirm-message">{{ confirmDialog.message }}</p>
+        <div class="confirm-actions">
+          <button
+            id="confirm-cancel"
+            class="btn-secondary"
+            :class="{ 'focus-ring': focusedIndex === 0 }"
+            @click="closeConfirm"
+          >取消</button>
+          <button
+            id="confirm-ok"
+            class="btn-primary danger"
+            :class="{ 'focus-ring': focusedIndex === 1 }"
+            @click="confirmAction"
+          >确认</button>
+        </div>
+      </div>
+    </section>
 
     <section class="modal-mask" v-if="installDialog.visible">
       <div class="modal-card">

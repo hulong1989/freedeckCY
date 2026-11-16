@@ -2,6 +2,22 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.5.0
+
+### 新增
+
+- **目录浏览**：库页打开即浏览全部 7084 条资源（不再必须先搜索），支持平台/分类筛选、分页（L1/R1、PageUp/PageDown 或按钮）与排序（默认/名称/大小）。
+- **已安装页签**：库页可切换「游戏库 / 已安装」；已安装卡片支持启动（`steam://rungameid/<appid>`）、打开目录、卸载；手柄 A 启动、Y 打开目录、Delete 卸载、X 切换页签。
+- **诊断导出**：`GET /api/tianyi/diagnostics/export` 生成 zip（diagnostics.json + 日志末尾 300 行 + README），cookie/token 与 HOME 路径自动脱敏；库页「导出诊断」一键下载。
+- **更新检查**：`GET /api/tianyi/update-check` 对比 GitHub 最新 Release（1 小时缓存），库页「检查更新」提示并可打开 Release 页。
+
+### 变更
+
+- `GET /api/tianyi/catalog` 新增 `sort` 参数（`title` / `size_desc` / `size_asc` / `platform`）。
+- 新增接口：`GET /api/tianyi/installed`、`POST /api/tianyi/installed/launch|open-folder|uninstall`、`GET /api/tianyi/diagnostics[/export]`、`GET /api/tianyi/update-check`。
+- 修复库页卡片焦点环在平台/分类筛选条存在时偏移的问题。
+- 测试 242 → 251。
+
 ## v0.4.0
 
 ### 新增

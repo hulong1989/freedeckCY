@@ -5,15 +5,19 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import os
+import platform
 import re
 import shutil
 import sqlite3
 import ssl
+import subprocess
 import tempfile
 import time
 import uuid
+import zipfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -33,6 +37,7 @@ from game_catalog import (
 )
 from seven_zip_manager import SevenZipError, SevenZipManager
 from steam_shortcuts import (
+    _find_steam_root,
     add_or_update_tianyi_shortcut,
     detect_proton_tool,
     is_droiddeck,
@@ -318,6 +323,67 @@ class LocalWebNotReadyError(RuntimeError):
         self.diagnostics = diagnostics or {}
 
 
+def _runtime_arch_name() -> str:
+    """运行时目录使用的架构名。"""
+    machine = str(platform.machine() or "").strip().lower()
+    if machine in {"x86_64", "amd64"}:
+        return "x86_64"
+    if machine in {"aarch64", "arm64"}:
+        return "aarch64"
+    return machine
+
+
+def _tail_text(path: str, limit: int = 200) -> str:
+    """读取文本文件末尾若干行。"""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+    except Exception:
+        return ""
+    return "".join(lines[-max(1, int(limit)) :])
+
+
+_REDACT_PATTERN = re.compile(
+    r"(?i)\b(cookie|authorization|token|sessionkey|accesstoken|uid|pwd)\b(\s*[=:]\s*)([^\s;，,]+)"
+)
+
+
+def _redact_text(text: str) -> str:
+    """脱敏：替换 HOME 路径与 cookie/token 类键值。"""
+    value = str(text or "")
+    home = os.path.expanduser("~")
+    if home and home != "/":
+        value = value.replace(home, "~")
+    return _REDACT_PATTERN.sub(lambda m: f"{m.group(1)}{m.group(2)}<redacted>", value)
+
+
+def _parse_version(value: str) -> Tuple[int, ...]:
+    """把 v0.4.0 / 0.4.0-pre 解析成可比较元组。"""
+    parts = re.findall(r"\d+", str(value or ""))
+    return tuple(int(part) for part in parts[:4]) if parts else (0,)
+
+
+def _launch_external(target: str) -> None:
+    """用 xdg-open / gio 拉起 URL 或目录（后端与浏览器同一台机器）。"""
+    value = str(target or "").strip()
+    if not value:
+        raise ValueError("目标为空")
+    opener = shutil.which("xdg-open")
+    if opener:
+        command = [opener, value]
+    else:
+        gio = shutil.which("gio")
+        if not gio:
+            raise ValueError("当前环境没有 xdg-open/gio，无法拉起到外部程序")
+        command = [gio, "open", value]
+    subprocess.Popen(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
 class TianyiService:
     """天翼下载业务入口。"""
 
@@ -339,6 +405,8 @@ class TianyiService:
             cover_index_path=resolve_default_cover_index_path(),
         )
         self._cover_cache_path = os.path.join(state_dir, "cover_cache.json")
+        self._update_cache: Dict[str, Any] = {}
+        self._update_cache_at: float = 0.0
         self.aria2 = Aria2Manager(plugin_dir=plugin_dir, work_dir=os.path.join(state_dir, "aria2"))
         self.seven_zip = SevenZipManager(plugin_dir=plugin_dir)
         self._lock = asyncio.Lock()
@@ -1711,8 +1779,9 @@ class TianyiService:
         page_size: int,
         platform: str = "",
         category: str = "",
+        sort: str = "",
     ) -> Dict[str, Any]:
-        """查询游戏目录（支持平台/分类筛选）。"""
+        """查询游戏目录（支持平台/分类筛选与排序）。"""
         # page_size 默认跟随设置，但允许前端覆盖。
         if page_size <= 0:
             page_size = self.store.settings.page_size
@@ -1722,6 +1791,7 @@ class TianyiService:
             page_size=page_size,
             platform=platform,
             category=category,
+            sort=sort,
         )
 
     def _load_cover_cache(self) -> None:
@@ -5704,6 +5774,221 @@ class TianyiService:
             "playtime_active": bool(playtime.get("active")),
             "updated_at": int(record.updated_at or 0),
         }
+
+    async def list_installed_games(self) -> Dict[str, Any]:
+        """已安装游戏完整列表（含目录封面/平台信息）。"""
+        records = sorted(
+            list(self.store.installed_games),
+            key=lambda item: int(item.updated_at or 0),
+            reverse=True,
+        )
+        items: List[Dict[str, Any]] = []
+        for record in records:
+            view = self._installed_record_to_view(record)
+            install_path = str(record.install_path or "").strip()
+            view["exists"] = bool(install_path and os.path.isdir(install_path))
+            entry = self.catalog.get_by_game_id(record.game_id)
+            if entry is not None:
+                view["platform"] = entry.platform
+                view["cover_url"] = entry.cover_url
+                portrait = str(entry.cover_portrait_url or "")
+                if not portrait and entry.steam_appid > 0:
+                    portrait = self._build_store_square_cover_url(entry.steam_appid)
+                view["cover_portrait_url"] = portrait
+                if not view.get("steam_appid"):
+                    view["steam_appid"] = max(0, _safe_int(entry.steam_appid, 0))
+            items.append(view)
+        return {"total": len(items), "items": items}
+
+    async def launch_installed_game(self, game_id: str) -> Dict[str, Any]:
+        """通过 Steam 拉起已安装游戏。"""
+        record = self._find_installed_record(game_id=str(game_id or "").strip())
+        if record is None:
+            raise ValueError("未找到已安装游戏记录")
+        app_id = self._resolve_record_app_id(record)
+        if app_id <= 0:
+            raise ValueError("该游戏缺少 Steam AppID，请从 Steam 库手动启动")
+        await asyncio.to_thread(_launch_external, f"steam://rungameid/{app_id}")
+        return {
+            "game_id": str(record.game_id or ""),
+            "title": str(record.game_title or ""),
+            "steam_app_id": app_id,
+            "launched": True,
+        }
+
+    async def open_installed_folder(self, game_id: str) -> Dict[str, Any]:
+        """用系统文件管理器打开安装目录。"""
+        record = self._find_installed_record(game_id=str(game_id or "").strip())
+        if record is None:
+            raise ValueError("未找到已安装游戏记录")
+        path = os.path.realpath(os.path.expanduser(str(record.install_path or "").strip()))
+        if not path or not os.path.isdir(path):
+            raise ValueError("安装目录不存在")
+        await asyncio.to_thread(_launch_external, path)
+        return {"game_id": str(record.game_id or ""), "path": _redact_text(path), "opened": True}
+
+    def _plugin_version(self) -> str:
+        """读取插件版本（package.json）。"""
+        root = ""
+        try:
+            root = str(getattr(decky, "DECKY_PLUGIN_DIR", "") or "")
+        except Exception:
+            root = ""
+        if not root:
+            root = str(os.getenv("DECKY_PLUGIN_DIR", "") or "")
+        path = os.path.join(root, "package.json") if root else ""
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            return str(data.get("version") or "").strip()
+        except Exception:
+            return ""
+
+    async def get_diagnostics(self) -> Dict[str, Any]:
+        """收集诊断信息（日志与路径已脱敏，不含 cookie）。"""
+        root = ""
+        try:
+            root = str(getattr(decky, "DECKY_PLUGIN_DIR", "") or "")
+        except Exception:
+            root = ""
+        if not root:
+            root = str(os.getenv("DECKY_PLUGIN_DIR", "") or "")
+
+        arch = _runtime_arch_name()
+        runtime: Dict[str, Dict[str, Any]] = {}
+        for component, rel in (("aria2", "aria2c"), ("7z", "7zz"), ("node", os.path.join("bin", "node"))):
+            path = os.path.join(root, "defaults", "runtime", component, arch, rel)
+            exists = os.path.isfile(path)
+            runtime[component] = {
+                "path": _redact_text(path),
+                "exists": exists,
+                "size": os.path.getsize(path) if exists else 0,
+            }
+
+        log_file = "/tmp/freedeckcy.log"
+        log_tail = _redact_text(await asyncio.to_thread(_tail_text, log_file, 300))
+        recent_errors = [
+            line for line in log_tail.splitlines() if re.search(r"ERROR|Exception|失败", line)
+        ][-20:]
+
+        task_counts: Dict[str, int] = {}
+        for task in self.store.tasks:
+            status = str(task.status or "unknown")
+            task_counts[status] = task_counts.get(status, 0) + 1
+
+        installed_bytes = sum(max(0, int(record.size_bytes or 0)) for record in self.store.installed_games)
+        installed_missing = sum(
+            1
+            for record in self.store.installed_games
+            if not os.path.isdir(str(record.install_path or ""))
+        )
+
+        steam_root = ""
+        try:
+            steam_root = await asyncio.to_thread(_find_steam_root)
+        except Exception:
+            steam_root = ""
+
+        settings: Dict[str, Any] = {}
+        for key, value in asdict(self.store.settings).items():
+            settings[key] = _redact_text(value) if isinstance(value, str) else value
+
+        return {
+            "generated_at": int(time.time()),
+            "version": self._plugin_version(),
+            "python": platform.python_version(),
+            "system": platform.platform(),
+            "arch": arch,
+            "paths": {
+                "plugin_dir": _redact_text(root),
+                "state_file": _redact_text(self.store.state_file),
+                "log_file": log_file,
+                "steam_root": _redact_text(steam_root),
+            },
+            "runtime": runtime,
+            "steam": {
+                "root_exists": bool(steam_root and os.path.isdir(steam_root)),
+                "proton_tool": detect_proton_tool(steam_root),
+                "droiddeck": is_droiddeck(steam_root),
+            },
+            "catalog": {
+                "total": len(self.catalog.entries),
+                "platforms": self.catalog.platform_counts(),
+                "cover_index_total": self.catalog.cover_index_total,
+                "with_cover": sum(
+                    1 for entry in self.catalog.entries if entry.cover_url or entry.cover_portrait_url
+                ),
+            },
+            "tasks": {"counts": task_counts, "total": len(self.store.tasks)},
+            "installed": {
+                "total": len(self.store.installed_games),
+                "bytes": installed_bytes,
+                "missing_paths": installed_missing,
+            },
+            "settings": settings,
+            "recent_errors": recent_errors,
+            "log_tail": log_tail,
+        }
+
+    async def export_diagnostics(self) -> bytes:
+        """导出诊断 zip（diagnostics.json + log-tail.txt + README）。"""
+        diagnostics = await self.get_diagnostics()
+        log_tail = str(diagnostics.pop("log_tail", "") or "")
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(
+                "diagnostics.json",
+                json.dumps(diagnostics, ensure_ascii=False, indent=2),
+            )
+            archive.writestr("log-tail.txt", log_tail)
+            archive.writestr(
+                "README.txt",
+                "freedeckCY 诊断包\n\n"
+                "diagnostics.json：版本/路径/运行时/任务/已安装统计（cookie 与 token 已脱敏，HOME 替换为 ~）\n"
+                "log-tail.txt：/tmp/freedeckcy.log 末尾 300 行（同样脱敏）\n\n"
+                "提交 issue 时请附上本 zip；如需进一步排查，可在 Deck 桌面终端运行 make doctor。\n",
+            )
+        return buffer.getvalue()
+
+    async def check_update(self) -> Dict[str, Any]:
+        """检查 GitHub 最新 release（1 小时缓存）。"""
+        now = time.time()
+        if self._update_cache and now - self._update_cache_at < 3600:
+            return dict(self._update_cache)
+
+        current = self._plugin_version() or "0.0.0"
+        api_url = "https://api.github.com/repos/hulong1989/freedeckCY/releases/latest"
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "freedeckCY",
+        }
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(api_url, headers=headers) as response:
+                    if int(response.status) != 200:
+                        return {
+                            "ok": False,
+                            "current": current,
+                            "message": f"GitHub API HTTP {int(response.status)}",
+                        }
+                    payload = await response.json(content_type=None)
+        except Exception as exc:
+            return {"ok": False, "current": current, "message": f"检查更新失败: {exc}"}
+
+        latest = str(payload.get("tag_name") or "").strip().lstrip("vV")
+        result = {
+            "ok": True,
+            "current": current,
+            "latest": latest,
+            "has_update": _parse_version(latest) > _parse_version(current),
+            "url": str(payload.get("html_url") or ""),
+            "name": str(payload.get("name") or ""),
+            "published_at": str(payload.get("published_at") or ""),
+        }
+        self._update_cache = result
+        self._update_cache_at = now
+        return dict(result)
 
     def _install_lock_for(self, target_dir: str) -> asyncio.Lock:
         """获取某个安装目录的互斥锁（分卷/多包游戏会共用同一目标目录）。"""
