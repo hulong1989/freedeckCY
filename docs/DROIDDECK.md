@@ -1,6 +1,6 @@
 # 在 DroidDeck 上使用 freedeckCY
 
-[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）也可在 DroidDeck 上使用；本文是安装与排障说明。
+[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置也可在 DroidDeck 上使用；本文是安装与排障说明。
 
 > 适配基于 DroidDeck 的源码与 ARM64 运行时结构，**尚未在真机上完整验证**。遇到问题请按文末“排障”收集日志。
 
@@ -23,7 +23,14 @@ freedeckCY 的处理方式：
 - 自动云存档（v0.8.0）：内置 Ludusavi 清单（53,549 游戏）按标题/SteamID 匹配，并把 Windows 存档路径解析到 **ARM Proton 前缀**（`compatdata/.../pfx` 内布局与 x86_64 一致）；`gamewatch` 每 8 秒扫 `/proc/*/cmdline`（proot 下通常可用；没有 `/proc` 时回退 `pgrep -f`，需要系统有 pgrep），检测到游戏退出后只上传该游戏。自动上传**默认开启**，可在 QAM「云存档上传」里关闭。
 - 模拟器注册表（v0.11.0）共 **10 个平台**，但 DroidDeck/aarch64 上**只有 7 个可用**：GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC、MD（Mesen2）/ **Switch（Eden，有 arm64 官方包）**；**3DS（Azahar）/ PS2（PCSX2）/ PS3（RPCS3）官方包仅 x86_64**，`available_platforms("aarch64")` 不返回它们，目录查询按白名单过滤，**条目和平台筛选条都不会出现**（预期行为，不是缺数据）。
 - **插件包不集成任何模拟器**：上述 7 个平台首次安装都会从官方 release 下载 arm64 包（NDS 是 zip 内 AppImage；Mesen2 是 zip 内单文件 `Mesen`），AppImage 解包到 `~/.local/share/freedeckCY/emulators/<state_key>/aarch64/squashfs-root`，不依赖 FUSE；离线可手动预置缓存或用 `FREEDECKCY_*_BIN`。
-- **BIOS / setup 需要用户自备**：PS1 把 `scph*.bin` 放到 `~/.local/share/freedeckCY/bios/ps1/`（复制到 DuckStation 目录）；PS2 把 `*.bin` 放到 `bios/ps2/`（复制到 PCSX2 目录，**但 PS2 在 ARM 上不会出现**）；Switch 需要 `prod.keys` + 固件（`setup_hint` 提示）。缺失都不阻断安装，但会警告；BIOS 目录是 proot 内 HOME 路径。
+- **BIOS / 固件部署（v0.12.0）**：用户文件统一放 `~/.local/share/freedeckCY/bios/<platform>/`（proot 内 HOME 路径），**支持压缩包**（`.zip/.7z/.rar` 等，安装时用 7zz 解压到同目录 `_extracted/` 缓存）；安装后自动部署：
+  - PS1：BIOS → `<AppDir>/bios` + `~/.local/share/duckstation/bios`，并写 `portable.txt`/`portable_data/settings/settings.ini`（`SearchDirectory=./bios`、全屏）；
+  - PS2：仅 x86_64（DroidDeck 隐藏），BIOS → `<AppDir>/bios` + `~/.local/share/PCSX2/bios` + `~/.config/PCSX2/bios`；
+  - NDS：`bios7/bios9/firmware` → `<AppDir>` + `~/.local/share/melonDS`；
+  - Switch（Eden）：`prod.keys/title.keys` → `~/.local/share/eden/keys/`，固件 `.nca` → `~/.local/share/eden/nand/system/Contents/registered/`；
+  - PS3（RPCS3）：仅 x86_64（DroidDeck 隐藏），`PS3UPDAT.PUP` 在 `dev_flash` 为空时自动 `--installfw`；
+  - GBA/PSP：写 portable 全屏配置；3DS 仅 x86_64（隐藏）。
+  部署消息会并入安装完成消息；缺失文件不阻断安装，但装完不能直接玩。
 
 ## 2. 构建 ARM64 插件包
 
@@ -54,7 +61,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 - 登录天翼云盘（QAM 面板）；
 - 在下载设置里把下载目录/安装目录改到空间充足的路径（例如 `/root/Games`）；
 - 打开游戏库页面（QAM 里“游戏列表”或本地 Web UI），搜索/筛选后安装；
-- 模拟器：aarch64 上可看到 GBA/PSP/NDS/PS1/FC/MD/Switch（3DS/PS2/PS3 被隐藏），筛选后直接安装，插件会自动生成启动脚本并注册 Steam 快捷方式。**所有平台（含 GBA）首次安装都要联网下载 arm64 官方包**，耗时取决于网络；PS1 记得先放 BIOS，Switch 记得配 keys/固件。
+- 模拟器：aarch64 上可看到 GBA/PSP/NDS/PS1/FC/MD/Switch（3DS/PS2/PS3 被隐藏），筛选后直接安装，插件会自动生成启动脚本并注册 Steam 快捷方式。**所有平台（含 GBA）首次安装都要联网下载 arm64 官方包**，耗时取决于网络。**装前/装后都可把 BIOS/固件/keys（或压缩包）放到 `~/.local/share/freedeckCY/bios/<platform>/`**，重装/重新注册时会自动部署；PS1 需要 BIOS，Switch 需要 `prod.keys`+固件。
 
 ## 4. 功能支持情况
 
@@ -76,6 +83,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | MD 模拟器（Mesen2，v0.9.0） | ✅ 可安装/启动：与 FC 共用 Mesen2（`emulators/mesen/aarch64/`），ROM 扩展名不同 |
 | Switch 模拟器（Eden，v0.11.0） | ✅ 可安装/启动：有 **arm64 官方 AppImage**；需要 `prod.keys` + 固件（`setup_hint` 提示，缺失不阻断但装完不能直接玩） |
 | 3DS / PS2 / PS3（v0.11.0） | ⚠️ **仅 x86_64，DroidDeck 自动隐藏**：Azahar/PCSX2/RPCS3 官方包没有 arm64，目录白名单过滤后条目与平台筛选条都不出现（不是 bug） |
+| 模拟器 BIOS/固件部署（v0.12.0） | ✅ 安装后自动部署 `bios/<platform>/`（支持压缩包，7zz 解压缓存）；aarch64 可用 PS1/NDS/Switch 的部署与 GBA/PSP 全屏配置；PS2/PS3/3DS 仅 x86_64 |
 | `make doctor` | ⚠️ 需要 DroidDeck 桌面终端；Android 上 `lsof` 可能不存在 |
 
 ## 5. 环境变量与设置
@@ -145,7 +153,18 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 
 **PS2 BIOS 放哪 / PCSX2 提示没有 BIOS**
 
-- 放 `~/.local/share/freedeckCY/bios/ps2/*.bin`；安装时会复制到 `~/.local/share/PCSX2/bios` 与 `~/.config/PCSX2/bios`。注意 **PS2 平台在 DroidDeck 上被隐藏**，只有 x86_64 设备会用到这条路径。
+- 放 `~/.local/share/freedeckCY/bios/ps2/*.bin`（或压缩包）；v0.12.0 安装时会部署到 `<AppDir>/bios`、`~/.local/share/PCSX2/bios`、`~/.config/PCSX2/bios` 三处，并写 `portable.ini`/`inis/PCSX2.ini`。注意 **PS2 平台在 DroidDeck 上被隐藏**，只有 x86_64 设备会用到这条路径。
+
+**BIOS/固件压缩包没生效 / 路径不对**
+
+- 压缩包放 `~/.local/share/freedeckCY/bios/<platform>/`，安装时由 7zz 解压到 `_extracted/` 再部署；确认插件有 ARM64 7zz（`make runtime ARCH=aarch64` 或 `FREEDECKCY_7Z_BIN`），失败会在安装消息里显示。
+- 部署目标：`<AppDir>/bios`（AppImage 解包后的 `squashfs-root/bios`）、DuckStation/melonDS/Eden 的用户目录；portable 配置存在时模拟器优先读 `<AppDir>/bios`。
+- 只想手工放时，把已解压文件直接放 `bios/<platform>/`（会跳过解压步骤）；重装或重新注册 Steam 快捷方式会再次触发部署。
+
+**PS3 固件 / Switch keys 没识别**
+
+- PS3（仅 x86_64）：固件必须是 `bios/ps3/PS3UPDAT.PUP`；`~/.config/rpcs3/dev_flash` 非空时跳过；失败看安装消息里的 `--installfw` 错误。
+- Switch（aarch64 可用）：`prod.keys/title.keys` 放 `bios/switch/` → 复制到 `~/.local/share/eden/keys/`；固件压缩包解出的 `.nca` → `~/.local/share/eden/nand/system/Contents/registered/`；目录为空时重启 Eden 再试。
 
 **Switch / 3DS / PS3 装完不能直接玩**
 
@@ -172,7 +191,7 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 ## 7. 已知限制
 
 - 未在真机验证：DroidDeck 的 FEX/ARM Proton、不同 Android 机型的存储映射都可能影响结果。
-- aarch64 上可安装 **GBA/PSP/NDS/PS1/FC/MD/Switch** 共 7 个平台（mGBA/PPSSPP/melonDS/DuckStation/Mesen2/Eden；v0.6.0~v0.11.0，全部在线下载）；**3DS/PS2/PS3 官方包仅 x86_64，DroidDeck 上被目录白名单自动隐藏**（条目/筛选条都不出现，见 [ROADMAP.md](ROADMAP.md) 9.8）。**插件包不集成任何模拟器，7 个平台（含 GBA）首次安装都需要联网**从官方 release 下载 arm64 包（包体积约 45MB），离线可手动预置缓存或用 `FREEDECKCY_*_BIN`；**PS1 需自备 BIOS、Switch 需 keys+固件**（setup_hint 提示，缺失不阻断但装完不能直接玩）；各平台只识别各自 ROM 扩展名，不含存档管理；ARM64 上这些平台尚未真机验证。
+- aarch64 上可安装 **GBA/PSP/NDS/PS1/FC/MD/Switch** 共 7 个平台（mGBA/PPSSPP/melonDS/DuckStation/Mesen2/Eden；v0.6.0~v0.12.0，全部在线下载）；v0.12.0 安装后自动部署 `bios/<platform>/`（含压缩包）并写 portable 配置（PS1/NDS/Switch/GBA/PSP；PS2/PS3/3DS 仅 x86_64）；**3DS/PS2/PS3 官方包仅 x86_64，DroidDeck 上被目录白名单自动隐藏**（条目/筛选条都不出现，见 [ROADMAP.md](ROADMAP.md) 9.8）。**插件包不集成任何模拟器，7 个平台（含 GBA）首次安装都需要联网**从官方 release 下载 arm64 包（包体积约 45MB），离线可手动预置缓存或用 `FREEDECKCY_*_BIN`；**PS1 需自备 BIOS、Switch 需 keys+固件**（setup_hint 提示，缺失不阻断但装完不能直接玩）；各平台只识别各自 ROM 扩展名，不含存档管理；ARM64 上这些平台尚未真机验证。
 - **自动云存档边界（v0.8.0）**：只对 gamewatch 检测到"退出"的游戏自动上传，没有自动恢复/冲突策略；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档在模拟器配置目录，暂未纳入清单/Proton 扫描；指纹只看相对路径+大小+mtime（≤5000 文件）；`/proc` 不可用时依赖 `pgrep`；ARM64 上该链路尚未真机验证。
 - DroidDeck 升级/重装 Decky 可能清空插件，需重新导入 zip。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。

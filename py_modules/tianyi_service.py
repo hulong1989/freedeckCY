@@ -31,17 +31,15 @@ from yarl import URL
 import config
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
+from emulator_setup import setup_emulator
 from emulator_manager import (
     available_platforms,
-    bios_dir,
-    bios_present,
     create_launch_wrapper,
     emulator_name_for_platform,
     emulator_status,
     ensure_emulator,
     find_rom_file,
     get_spec,
-    prepare_bios,
     supported_platforms,
 )
 from gamewatch import GameWatcher
@@ -6609,6 +6607,10 @@ class TianyiService:
         warning = str(steam_result.get("warning", "") or "").strip()
         if warning:
             message_parts.append(warning)
+        for item in list(steam_result.get("setup_messages", []) or []):
+            text = str(item or "").strip()
+            if text:
+                message_parts.append(text)
 
         if bool(settings.auto_delete_package):
             deleted = 0
@@ -6756,12 +6758,16 @@ class TianyiService:
             return {"ok": False, "message": f"模拟器不可用: {exc}"}
 
         spec = get_spec(platform)
-        bios_messages: List[str] = []
-        if spec is not None and spec.bios_required:
-            try:
-                bios_messages = await asyncio.to_thread(prepare_bios, spec)
-            except Exception as exc:
-                bios_messages = [f"BIOS 处理失败: {exc}"]
+        setup_messages: List[str] = []
+        try:
+            setup_messages = await asyncio.to_thread(
+                setup_emulator,
+                platform,
+                command,
+                seven_zip=self.seven_zip,
+            )
+        except Exception as exc:
+            setup_messages = [f"模拟器初始化失败: {exc}"]
 
         wrapper_path = os.path.join(target_dir, "launch-freedeckcy.sh")
         try:
@@ -6822,17 +6828,8 @@ class TianyiService:
             result["rom_path"] = rom_path
             result["launcher_path"] = wrapper_path
             result["emulator"] = spec.adapter if spec else emulator_name_for_platform(platform)
-            if bios_messages:
-                result["bios_messages"] = bios_messages
-            warnings: List[str] = []
-            if spec is not None and spec.bios_required and not bios_present(platform):
-                warnings.append(
-                    f"{spec.name} 需要 BIOS：请把 BIOS 文件放到 {bios_dir(platform)}"
-                )
-            if spec is not None and spec.setup_required and spec.setup_hint:
-                warnings.append(spec.setup_hint)
-            if warnings:
-                result["warning"] = "；".join(warnings)
+            if setup_messages:
+                result["setup_messages"] = setup_messages
             return result
         except Exception as exc:
             config.logger.exception("Auto add emulator game to Steam exception game=%s", game_id or display_name)

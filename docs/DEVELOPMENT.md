@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.11.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.12.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -21,7 +21,8 @@
 | `py_modules/seven_zip_manager.py` | 7z 解压 / 压缩（带进度回调）；`test_archive()` 跑 `7z t` 做解压前校验（7z 不可用时 best-effort 跳过） |
 | `py_modules/save_manifest.py` | **Ludusavi 存档清单（v0.8.0）**：加载本地 JSON、标题/SteamID 匹配、`<base>/<winAppData>/...` 占位符解析到 Proton 前缀、glob 展开（最多 200 路径）；运行时不联网 |
 | `py_modules/gamewatch.py` | **游戏进程检测（v0.8.0）**：后台每 8 s 扫 `/proc/*/cmdline`（无 `/proc` 回退 `pgrep -f`），状态切换产出 start/end 事件（自动云存档只在 end 触发） |
-| `py_modules/emulator_manager.py` | **通用模拟器注册表（v0.11.0，10 平台全部在线下载）**：`EmulatorSpec`/`EMULATORS` 描述 GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch；`available_platforms(arch)` 做架构白名单（3DS/PS2/PS3 仅 x86_64）；官方资产解析、首次安装按需下载、AppImage/zip 解包、PS1/PS2 BIOS 准备、3DS/PS3/Switch setup 提示、`find_rom_file()`、`create_launch_wrapper()`、`emulator_status()` |
+| `py_modules/emulator_manager.py` | **通用模拟器注册表（v0.12.0，10 平台全部在线下载）**：`EmulatorSpec`/`EMULATORS` 描述 GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch；`available_platforms(arch)` 做架构白名单（3DS/PS2/PS3 仅 x86_64）；官方资产解析、首次安装按需下载、AppImage/zip 解包、`find_rom_file()`、`create_launch_wrapper()`、`emulator_status()`；旧 `prepare_bios()` 保留兼容 |
+| `py_modules/emulator_setup.py` | **安装后 BIOS/固件部署（v0.12.0）**：`setup_emulator(platform, command, seven_zip)` 把 `bios/<platform>/` 下文件/压缩包部署到模拟器目录并写 portable 配置（DuckStation/PCSX2 INI、mGBA/PPSSPP 全屏、RPCS3 `--installfw`）；只补缺失/只改单个键，不下载 |
 | `py_modules/steam_shortcuts.py` | 写 `shortcuts.vdf`（`DevkitGameID` token 去重、无变化不重写、写前备份 12 份、写后回读）、改 `config.vdf` 的 Proton 映射、下载 `grid` 封面、解析 appid；Steam 多库 / Flatpak / **DroidDeck** 识别（`is_droiddeck` / `_steam_root_candidates` / `detect_proton_tool`）、自定义用户名打分；`find_compatdata_dirs()` 跨库定位待清理的 Proton 前缀 |
 | `py_modules/game_catalog.py` | 读 CSV 资源清单（16 列 / 7084 条 / 11 平台，新目录优先、旧目录回退）：校验、搜索、分页、按 `game_id` 查找；`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底）；支持 `cover_index.csv` 合并（不覆盖已有值）；`list()` 支持 platform/category 过滤并返回 `platforms`/Top12 `categories`；`_is_valid_tianyi_url()` 兼容 `/t/` 与 `/web/share?code=` |
 | `py_modules/archive_bundle.py` | 多分卷归档识别（`.7z.001`/`.partN.rar`/`.z01+zip`/`.r00+rar` 等 6 类）：`detect_archive_sets` / `build_bundle_index` / `looks_like_multi_volume_name` |
@@ -39,7 +40,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（302 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（308 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -223,12 +224,18 @@ defaults/runtime/node/<arch>/bin/node
 
 **离线预置**：把官方包提前放到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`（AppImage 需 `chmod +x`；zip 可留原样，安装时会解），或用 `FREEDECKCY_*_BIN` 指向本地可执行文件/AppImage（GBA `FREEDECKCY_MGBA_BIN`、PSP `FREEDECKCY_PPSSPP_BIN`、NDS `FREEDECKCY_MELONDS_BIN`、PS1 `FREEDECKCY_DUCKSTATION_BIN`、FC/MD `FREEDECKCY_MESEN_BIN`）。
 
-**BIOS / setup（用户自备，插件只复制/提示）**：
+**BIOS / 固件部署（v0.12.0，用户自备，插件只部署/提示）**：
 
-- **PS1**：`bios/ps1/*.bin` → `prepare_bios()` 复制到 `~/.local/share/duckstation/bios/`；
-- **PS2**：`bios/ps2/*.bin` → `prepare_bios()` 复制到 `~/.local/share/PCSX2/bios` **和** `~/.config/PCSX2/bios`；
-- **3DS / PS3 / Switch**：`setup_required=True`，分别需要 Azahar system files、PS3 固件（`PS3UPDAT.PUP`）、Eden 的 `prod.keys`+固件；`setup_hint` 会随 status/plan 返回；
-- `emulator_status`/plan 返回 `bios_required/bios_present/bios_dir` 与 `setup_required/setup_hint`，缺失**不阻断安装**，但安装消息与库页弹窗会警告（装完不能直接玩通常是这些文件没配）。详见 §6.8。
+- 统一来源目录：`~/.local/share/freedeckCY/bios/<platform>/`；安装完成后 `setup_emulator(platform, command, seven_zip=self.seven_zip)` 递归扫描该目录（`.bin/.rom/.bios/.keys/.pup/.nca`），压缩包（`.zip/.7z/.rar/.tar/.gz/.tgz/.xz/.bz2`）用 7zz 解压后复制到 `bios/<platform>/_extracted/` 作持久缓存；
+- **PS1**：BIOS 复制到 `<AppDir>/bios` + 旧 `~/.local/share/duckstation/bios`；写 `portable.txt` 与 `portable_data/settings/settings.ini`（`[BIOS] SearchDirectory=./bios`、`[Display] Fullscreen=true`，已有 INI 只修这两个键）；
+- **PS2**：BIOS 复制到 `<AppDir>/bios`、`~/.local/share/PCSX2/bios`、`~/.config/PCSX2/bios`；写 `portable.ini` 与 `inis/PCSX2.ini`（`[Folders] Bios`、`[UI] Fullscreen=true`）；
+- **NDS**：`bios7.bin/bios9.bin/firmware.bin/dsi_firmware.bin` 等复制到 `<AppDir>` 与 `~/.local/share/melonDS`；
+- **Switch**：`prod.keys`/`title.keys` → `~/.local/share/eden/keys/`；固件解出的 `.nca` 目录 → `~/.local/share/eden/nand/system/Contents/registered/`；
+- **PS3**：`bios/ps3/PS3UPDAT.PUP`；若 `~/.config/rpcs3/dev_flash` 为空则执行 `rpcs3 --installfw <pup>`（600s 超时，失败原因写进消息）；
+- **3DS**：system files → `~/.local/share/azahar/sysdata` 与 `~/.local/share/citra/sysdata`；
+- **GBA / PSP**：只写 portable 配置（mGBA `portable.ini`+`qt.ini` 全屏；PPSSPP `portable.txt`+`memstick/PSP/SYSTEM/ppsspp.ini` 全屏）；
+- `<AppDir>` 是 `ensure_emulator()` 返回的可执行文件目录（AppImage 解包后是 `squashfs-root/`）；目录不可写时只写用户数据目录并提示；
+- 部署消息并入**安装完成消息**（不再单独发 `warning`）；`emulator_status`/plan 仍返回 `bios_required/bios_present/bios_dir` 与 `setup_required/setup_hint`。缺失**不阻断安装**，但装完不能直接玩通常是文件没放对/没触发部署。详见 §6.8。
 
 **ARM64 / DroidDeck**：运行时目录按 `platform.machine()` 归一（`x86_64`；`aarch64`/`arm64`→`aarch64`）选择，DroidDeck 上取 `defaults/runtime/aarch64/`。准备 arm64 运行时用 `make runtime ARCH=aarch64`（或 `ARCH=all` 同时两份），详见 §4.1 与 [DROIDDECK.md](DROIDDECK.md)。
 
@@ -319,7 +326,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **302 个用例**（`make test` 实测 `302 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **308 个用例**（`make test` 实测 `308 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -517,15 +524,24 @@ done
 # ps1 还要看 emulator_info.bios_required / bios_present / bios_dir
 ```
 
-**PS1 BIOS 放置与手工复制**：
+**PS1/PS2 BIOS 放置、压缩包与手工部署**：
 
 ```bash
-mkdir -p ~/.local/share/freedeckCY/bios/ps1
+mkdir -p ~/.local/share/freedeckCY/bios/ps1 ~/.local/share/freedeckCY/bios/ps2
 cp /path/to/scph5501.bin ~/.local/share/freedeckCY/bios/ps1/     # 区域版本按需
-# 安装时会自动复制到 DuckStation 默认目录：
-ls -l ~/.local/share/duckstation/bios/
-# 也可手工复制（已存在同名文件不会被覆盖）
-cp -n ~/.local/share/freedeckCY/bios/ps1/*.bin ~/.local/share/duckstation/bios/
+cp /path/to/scph39001.bin ~/.local/share/freedeckCY/bios/ps2/
+# 也支持压缩包：安装时会用 7zz 解到 bios/<platform>/_extracted/ 再部署
+cp /path/to/ps1-bios.zip ~/.local/share/freedeckCY/bios/ps1/
+
+# 安装后检查部署结果（setup 消息也会并入安装完成消息）
+ls -l ~/.local/share/freedeckCY/emulators/<state_key>/<arch>/squashfs-root/bios/ 2>/dev/null
+ls -l ~/.local/share/duckstation/bios/ ~/.local/share/PCSX2/bios/ ~/.config/PCSX2/bios/ 2>/dev/null
+cat ~/.local/share/freedeckCY/emulators/<state_key>/<arch>/squashfs-root/portable.txt 2>/dev/null
+# DuckStation: portable_data/settings/settings.ini
+# PCSX2: inis/PCSX2.ini（[Folders] Bios / [UI] Fullscreen）
+# 手工修复（示例，已存在文件不会被覆盖）：
+cp -n ~/.local/share/freedeckCY/bios/ps1/*.bin ~/.local/share/duckstation/bios/ 2>/dev/null || true
+cp -n ~/.local/share/freedeckCY/bios/ps2/*.bin ~/.local/share/PCSX2/bios/ 2>/dev/null || true
 ```
 
 BIOS 缺失不阻断安装：安装消息/库页弹窗会提示"需要 PS1 BIOS：请把 scph*.bin 放到 …"；补上 BIOS 后重装或手工复制即可（可先 `bash launch-freedeckcy.sh` 验证 DuckStation 是否识别）。
@@ -648,7 +664,11 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 | **模拟器快捷方式点了不启动** | 检查 `launch-freedeckcy.sh` 与 ROM 是否都在安装目录（`find_rom_file` 只认注册表扩展名）；`bash launch-freedeckcy.sh` 手工试跑；Steam 条目 Exe 必须是脚本路径、LaunchOptions 带 token（用于卸载定位），Proton 不应有映射。除 GBA 外还要确认首次下载/解包已完成；PS1 检查 BIOS（见下） |
 | **PS1 黑屏 / 提示没有 BIOS** | DuckStation 必须自备 BIOS：把 `scph*.bin` 放到 `~/.local/share/freedeckCY/bios/ps1/`，安装时会复制到 `~/.local/share/duckstation/bios/`；缺失**不阻断安装**但会警告、运行时可能黑屏。可用 `curl /api/tianyi/diagnostics` 看 `emulators.ps1.bios_present/bios_dir`，或手工 `cp -n ~/.local/share/freedeckCY/bios/ps1/*.bin ~/.local/share/duckstation/bios/` |
 | **DroidDeck / aarch64 看不到 3DS/PS2/PS3** | 预期行为：这三个平台官方包仅 x86_64，`available_platforms("aarch64")` 只返回 7 个平台，目录查询按白名单过滤，所以条目与平台筛选条都不显示；`emulator_status` 会返回"已隐藏该平台"。想在 ARM 上用只能等官方 arm64 包，不能靠环境变量绕过 |
-| **PS2 BIOS 放哪 / PCSX2 提示没有 BIOS** | 把 `*.bin`（如 `scph39001.bin`）放到 `~/.local/share/freedeckCY/bios/ps2/`；安装时会复制到 `~/.local/share/PCSX2/bios` 和 `~/.config/PCSX2/bios`（两处都写）。也可手工复制；诊断接口看 `emulators.ps2.bios_present/bios_dir` |
+| **PS2 BIOS 放哪 / PCSX2 提示没有 BIOS** | 把 `*.bin`（如 `scph39001.bin`）放到 `~/.local/share/freedeckCY/bios/ps2/`；v0.12.0 安装时会部署到 `<AppDir>/bios`、`~/.local/share/PCSX2/bios`、`~/.config/PCSX2/bios` 三处，并写 `portable.ini`+`inis/PCSX2.ini`（`[Folders] Bios`/`[UI] Fullscreen`）。也可手工复制；诊断接口看 `emulators.ps2.bios_present/bios_dir` |
+| **BIOS/固件压缩包没生效** | 压缩包放 `~/.local/share/freedeckCY/bios/<platform>/`，安装时由 7zz 解压到同目录 `_extracted/` 再部署；确认系统/插件有 7zz（`FREEDECKCY_7Z_BIN`），解压失败会在安装消息里提示。只想手工放时把已解压文件直接放 `bios/<platform>/`（会跳过解压） |
+| **BIOS 路径不对 / 模拟器仍找不到 BIOS** | 部署目标是 `<AppDir>/bios`（AppImage 解包后的 `squashfs-root/`）与各模拟器用户目录；检查 `~/.local/share/freedeckCY/emulators/<state_key>/<arch>/squashfs-root/bios/`、`~/.local/share/duckstation/bios/`、`~/.local/share/PCSX2/bios/`、`~/.config/PCSX2/bios/`。portable 配置存在时模拟器读 `<AppDir>/bios`，否则读用户目录 |
+| **PS3 固件安装失败** | 固件必须是 `bios/ps3/PS3UPDAT.PUP`；`~/.config/rpcs3/dev_flash` 已非空时插件会跳过；失败看安装消息里的 `--installfw` 错误，可手工 `rpcs3 --installfw <pup>`。RPCS3 不可执行时插件只提示不安装 |
+| **Switch keys/固件没识别** | `prod.keys`/`title.keys` 放 `bios/switch/`，安装时复制到 `~/.local/share/eden/keys/`；固件放压缩包，解出的 `.nca` 目录会部署到 `~/.local/share/eden/nand/system/Contents/registered/`；确认目录非空，必要时重启 Eden |
 | **3DS / PS3 / Switch 装完不能直接玩** | 这些平台需要用户自备系统文件：3DS 需要 Azahar 的 system files、PS3 需要固件（`PS3UPDAT.PUP`）、Switch 需要 `prod.keys`+固件。安装消息/库页弹窗会带 `setup_hint`；按提示在模拟器首次启动时配置，插件不内置也不下载这些文件 |
 | **Mesen2（FC/MD）不启动 / 参数不对** | Mesen2 是 zip 内单文件 `Mesen`，启动参数是 `/fullscreen <rom>`（不是 `-f`）；FC 与 MD 共用 `emulators/mesen/<arch>/` 缓存，删缓存会同时影响两者。检查 `cat launch-freedeckcy.sh` 是否 `exec <Mesen> /fullscreen <rom>`，并可手工试跑 |
 | **PS2/PS3/3DS/Switch 为什么不能装** | 未接入：PS2（PCSX2 官方包仅 x64，需 BIOS）、PS3（RPCS3 仅 x64，需固件）、3DS（Azahar 仅 x64，需 system files）、Switch（需 keys/固件，且无官方 arm64 包）。目录里只可浏览，后端拒绝安装（ROADMAP 9.8 剩余项，需先解决 arm64 官方包与固件合规） |
@@ -674,7 +694,7 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 - **仅早期版本**：`package.json` 版本 0.8.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
 - **DroidDeck 适配未真机验证**：ARM64 运行环境、FEX/ARM Proton、Android 存储映射都可能有差异；实测失败时优先参考 [DROIDDECK.md](DROIDDECK.md) 的排障与日志收集。
 - **目录数据需保持干净**：新增/合并目录后必须跑 `make normalize-catalog` 与 `make validate-catalog`（CI 对内置目录执行 `--strict`）；「模拟器」是清洗后的兜底分类，不是真实游戏分类。
-- **10 平台可安装，按架构裁剪**（v0.11.0）：x86_64 上 10 个平台（含 3DS/PS2/PS3/Switch）都可安装/启动；aarch64 上 3DS/PS2/PS3 无官方 arm64 包，目录按 `available_platforms()` 白名单隐藏（条目与筛选条都不出现），Switch 有 arm64 包可用。**插件包不集成任何模拟器，首次安装都需要联网下载**（包体积约 45MB）；PS1/PS2 需要 BIOS、3DS/PS3/Switch 需要 system files/固件/keys（setup_hint 提示，缺失不阻断安装但装完不能直接玩）；模拟器只识别注册表内扩展名，不含存档管理；下载/解包会额外占一份空间；ARM64/DroidDeck 上这些平台尚未真机验证。
+- **10 平台可安装，按架构裁剪，BIOS/固件自动部署**（v0.12.0）：x86_64 上 10 个平台（含 3DS/PS2/PS3/Switch）都可安装/启动；aarch64 上 3DS/PS2/PS3 无官方 arm64 包，目录按 `available_platforms()` 白名单隐藏（条目与筛选条都不出现），Switch 有 arm64 包可用。**插件包不集成任何模拟器，首次安装都需要联网下载**（包体积约 45MB）；PS1/PS2 需要 BIOS、3DS/PS3/Switch 需要 system files/固件/keys（v0.12.0 安装后自动从 `bios/<platform>/` 部署到模拟器目录并写 portable 配置，含压缩包；缺失不阻断安装但装完不能直接玩）；模拟器只识别注册表内扩展名，不含存档管理；下载/解包会额外占一份空间；ARM64/DroidDeck 上这些平台尚未真机验证。
 - **完整性校验是"大小 + 头部预检 + `7z t`（best-effort）"**：7z 不可用时自动跳过校验；没有哈希/签名校验；分卷识别只覆盖常见命名；云存档仍依赖 `node`。
 - **Steam 运行中写入仍可能被覆盖**：写前有备份且写后回读，但无法阻止运行中的 Steam 覆盖 `shortcuts.vdf`/`config.vdf`；装完建议重启 Steam（自动重启 Steam 在 ROADMAP §9）。
 - **compatdata 清理默认关闭**：卸载默认只删游戏文件；"连 Proton 前缀一起删"需要显式选择，避免误删存档。
@@ -714,6 +734,7 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 | 改 Proton 工具解析 / 设置 | `py_modules/steam_shortcuts.py` 的 `detect_proton_tool` / `add_or_update_tianyi_shortcut(proton_tool=)`；设置项 `proton_tool` 贯穿 `tianyi_store` / `tianyi_service.update_settings` / `main.set_tianyi_settings` / `tianyi_http.handle_settings_*` |
 | 改打包架构 / ARM64 产物 | `scripts/package.sh` 的 `PACKAGE_ARCH`；`Makefile` 的 `package-droiddeck` / `runtime ARCH=`（模拟器不在包内，与打包无关） |
 | 改模拟器支持 / 新增平台 | `py_modules/emulator_manager.py` 的 `EmulatorSpec` / `EMULATORS`（官方资产、launch_args、rom_extensions、env_var、state_key、executables、bios_required、setup_required/setup_hint）；`available_platforms(arch)` 决定架构白名单；`tianyi_service.list_catalog` 传 `allowed_platforms`；`_build_install_plan`/`_auto_register_emulator_to_steam` 的模拟器字段；BIOS 见 `bios_dir`/`bios_present`/`prepare_bios` |
+| 改 BIOS/固件部署 | `py_modules/emulator_setup.py`：`setup_emulator`、`_source_files`/`_extract_archives`（压缩包）、`_set_ini_value`（只修单键）、各平台 `_write_*`/`_deploy_*`；`tianyi_service._auto_register_emulator_to_steam` 调用并消费 `setup_messages` |
 | 改模拟器下载/缓存 | `py_modules/emulator_manager.py` 的 `_download_asset` / `_extract_zip_emulator` / `_ensure_extracted`（缓存目录 `~/.local/share/freedeckCY/emulators/<state_key>/<arch>/`）；插件包已不集成模拟器 |
 | 改 QAM 面板 UI | `src/index.tsx`（`Content` / `SettingsPage`） |
 | 改游戏库橱窗 / 登录桥 | `defaults/tianyi_library_ui/{index.html,app.js,app.css,login_bridge.*}` |
@@ -727,11 +748,12 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 302 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 308 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
 - [ ] 改动打包/运行时时验证两种架构：`make package`（x86_64）与 `make package-droiddeck`（aarch64），确认产物后缀与包内 `defaults/runtime/<arch>/` 只有 aria2c/7zz/node（**不含任何模拟器**）；模拟器首次安装联网下载，PS1/PS2 BIOS、3DS/PS3/Switch 系统文件由用户自备；
+- [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
 - [ ] 改动模拟器注册表后验证 `available_platforms()`：x86_64 应有 10 个平台、aarch64 只有 7 个（3DS/PS2/PS3 无包），并确认 `/api/tianyi/catalog` 的 `platforms` 计数同步裁剪；
 - [ ] 改了 `src/` → `pnpm build` 并提交 `dist/index.js(.map)`；
 - [ ] 没有新增 `__pycache__` / `*.pyc` / `.DS_Store` / `node_modules` 等产物；

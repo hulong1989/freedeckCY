@@ -11,6 +11,7 @@ import pytest
 
 import config
 import emulator_manager as emu
+import emulator_setup as emu_setup
 import tianyi_service as svc_module
 from game_catalog import GameCatalogEntry
 from tianyi_client import ResolvedFile, ResolvedShare
@@ -476,3 +477,109 @@ def test_ps2_rom_prefers_iso(tmp_path):
     (tmp_path / "game.bin").write_bytes(b"x")
     (tmp_path / "game.iso").write_bytes(b"x")
     assert emu.find_rom_file(str(tmp_path), "game.zip", "ps2").endswith("game.iso")
+
+
+def test_setup_ps1_deploys_bios_and_portable_config(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    root = tmp_path / "emu" / "duckstation"
+    root.mkdir(parents=True)
+    (root / "AppRun").write_text("#!/bin/sh\n", encoding="utf-8")
+    source = tmp_path / "state" / "bios" / "ps1"
+    source.mkdir(parents=True)
+    (source / "scph5501.bin").write_bytes(b"bios")
+
+    messages = emu_setup.setup_emulator("ps1", [str(root / "AppRun")])
+    assert "BIOS" in " ".join(messages)
+    assert (root / "portable.txt").is_file()
+    assert (root / "bios" / "scph5501.bin").is_file()
+    settings = (root / "portable_data" / "settings" / "settings.ini").read_text(encoding="utf-8")
+    assert "SearchDirectory = ./bios" in settings
+
+
+def test_setup_ps2_deploys_bios_and_ini(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    root = tmp_path / "emu" / "pcsx2"
+    root.mkdir(parents=True)
+    (root / "AppRun").write_text("#!/bin/sh\n", encoding="utf-8")
+    source = tmp_path / "state" / "bios" / "ps2"
+    source.mkdir(parents=True)
+    (source / "scph70012.bin").write_bytes(b"bios")
+
+    emu_setup.setup_emulator("ps2", [str(root / "AppRun")])
+    assert (root / "bios" / "scph70012.bin").is_file()
+    ini = (root / "inis" / "PCSX2.ini").read_text(encoding="utf-8")
+    assert "Bios = " in ini and "Fullscreen = true" in ini
+
+
+def test_setup_ps1_extracts_bios_archive(tmp_path, monkeypatch):
+    import zipfile
+
+    class FakeSevenZip:
+        def extract_archive(self, archive_path, output_dir):
+            with zipfile.ZipFile(archive_path) as zf:
+                zf.extractall(output_dir)
+
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    root = tmp_path / "emu" / "duckstation"
+    root.mkdir(parents=True)
+    (root / "AppRun").write_text("#!/bin/sh\n", encoding="utf-8")
+    source = tmp_path / "state" / "bios" / "ps1"
+    source.mkdir(parents=True)
+    with zipfile.ZipFile(source / "bios.zip", "w") as zf:
+        zf.writestr("scph5501.bin", b"bios")
+
+    emu_setup.setup_emulator("ps1", [str(root / "AppRun")], seven_zip=FakeSevenZip())
+    assert (root / "bios" / "scph5501.bin").is_file()
+
+
+def test_setup_switch_deploys_keys(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(emu_setup, "_EDEN_KEYS", tmp_path / "eden" / "keys")
+    monkeypatch.setattr(emu_setup, "_EDEN_REGISTERED", tmp_path / "eden" / "registered")
+    source = tmp_path / "state" / "bios" / "switch"
+    source.mkdir(parents=True)
+    (source / "prod.keys").write_text("key", encoding="utf-8")
+
+    messages = emu_setup.setup_emulator("switch", [])
+    assert (tmp_path / "eden" / "keys" / "prod.keys").is_file()
+    assert "keys" in " ".join(messages)
+
+
+def test_setup_missing_bios_message(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    root = tmp_path / "emu" / "duckstation"
+    root.mkdir(parents=True)
+    messages = emu_setup.setup_emulator("ps1", [str(root / "AppRun")])
+    assert any("未检测到" in message for message in messages)
+
+
+def test_setup_ps3_installs_firmware(tmp_path, monkeypatch):
+    import subprocess as subprocess_module
+
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(emu_setup, "_RPCS3_CONFIG", tmp_path / "rpcs3")
+    root = tmp_path / "emu" / "rpcs3"
+    root.mkdir(parents=True)
+    (root / "AppRun").write_text("#!/bin/sh\n", encoding="utf-8")
+    source = tmp_path / "state" / "bios" / "ps3"
+    source.mkdir(parents=True)
+    (source / "PS3UPDAT.PUP").write_bytes(b"pup")
+
+    calls = []
+
+    class Result:
+        returncode = 0
+        stderr = b""
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        return Result()
+
+    monkeypatch.setattr(subprocess_module, "run", fake_run)
+    messages = emu_setup.setup_emulator("ps3", [str(root / "AppRun")])
+    assert calls and "--installfw" in calls[0]
+    assert any("固件" in message for message in messages)

@@ -2,6 +2,24 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.12.0
+
+### 新增
+
+- **模拟器 BIOS/固件部署（参考 v0.6 / NewFreedeck）**：`bios/<platform>/` 里可以直接放原始文件或 zip/7z/rar 压缩包，安装时用 7zz 解压并部署到模拟器实际读取的位置。
+  - PS1/PS2：BIOS 复制到 portable 目录 + DuckStation/PCSX2 用户目录；自动写/修复 `portable.txt`、`settings.ini`、`PCSX2.ini` 的 BIOS 搜索路径。
+  - NDS：`bios7.bin`/`bios9.bin`/`firmware.bin`/DSi 固件复制到 melonDS 目录。
+  - Switch：`prod.keys`/`title.keys` 复制到 Eden keys；固件压缩包解压出 `.nca` 后部署到 `nand/system/Contents/registered`。
+  - PS3：检测到 `PS3UPDAT.PUP` 且 `dev_flash` 为空时，自动执行 `rpcs3 --installfw`。
+  - 3DS：system files 复制到 Azahar/Citra 的 sysdata 目录。
+- **Portable 配置**：mGBA（`portable.ini` + `qt.ini` 全屏）、PPSSPP（`portable.txt` + `ppsspp.ini` 全屏）、DuckStation/PCSX2（BIOS 搜索目录/全屏）。
+- 安装消息会列出 BIOS/固件部署结果与缺失提示。
+
+### 变更
+
+- 服务层安装流程改为统一调用 `emulator_setup.setup_emulator()`；旧 `prepare_bios()` 保留兼容。
+- 测试 302 → 308。
+
 ## v0.11.0
 
 ### 新增
