@@ -93,6 +93,10 @@ const getTianyiLibraryUrl = callable("get_tianyi_library_url");
 const getTianyiLoginUrl = callable("get_tianyi_login_url");
 const setTianyiSettings = callable("set_tianyi_settings");
 const clearTianyiLogin = callable("clear_tianyi_login");
+const startBaiduQrLogin = callable("start_baidu_qr_login");
+const pollBaiduQrLogin = callable("poll_baidu_qr_login");
+const cancelBaiduQrLogin = callable("cancel_baidu_qr_login");
+const clearBaiduLogin = callable("clear_baidu_login");
 const getBaiduOpenapiAuthorizeUrl = callable("get_baidu_openapi_authorize_url");
 const setBaiduOpenapiApp = callable("set_baidu_openapi_app");
 const exchangeBaiduOpenapiCode = callable("exchange_baidu_openapi_code");
@@ -197,8 +201,14 @@ const EMPTY_BAIDU_OPENAPI_STATE = {
     expires_at: 0,
     message: "未配置",
 };
+const EMPTY_BAIDU_WEB_STATE = {
+    logged_in: false,
+    user_account: "",
+    message: "未登录",
+};
 const EMPTY_STATE = {
     login: { logged_in: false, user_account: "", message: "" },
+    baidu_login: EMPTY_BAIDU_WEB_STATE,
     baidu_openapi_login: EMPTY_BAIDU_OPENAPI_STATE,
     installed: { total: 0, preview: [] },
     tasks: [],
@@ -1261,6 +1271,10 @@ function SettingsPage() {
     const [activeTab, setActiveTab] = SP_REACT.useState("paths");
     const [settings, setSettings] = SP_REACT.useState(EMPTY_SETTINGS);
     const [login, setLogin] = SP_REACT.useState(EMPTY_STATE.login);
+    const [baiduWebLogin, setBaiduWebLogin] = SP_REACT.useState(EMPTY_BAIDU_WEB_STATE);
+    const [baiduQr, setBaiduQr] = SP_REACT.useState({ stage: "idle" });
+    const [baiduQrBusy, setBaiduQrBusy] = SP_REACT.useState(false);
+    const baiduQrPollBusyRef = SP_REACT.useRef(false);
     const [baiduLogin, setBaiduLogin] = SP_REACT.useState(EMPTY_BAIDU_OPENAPI_STATE);
     const [baiduAppKey, setBaiduAppKey] = SP_REACT.useState("");
     const [baiduSecretKey, setBaiduSecretKey] = SP_REACT.useState("");
@@ -1366,6 +1380,7 @@ function SettingsPage() {
         const next = Object.assign({}, EMPTY_SETTINGS, result.data.settings || {});
         setSettings(next);
         setLogin(result.data.login || EMPTY_STATE.login);
+        setBaiduWebLogin(result.data.baidu_login || EMPTY_BAIDU_WEB_STATE);
         setBaiduLogin(result.data.baidu_openapi_login || EMPTY_BAIDU_OPENAPI_STATE);
         setSplitDraft(Math.max(1, Math.min(64, Number(next.split_count || 16))));
     }, []);
@@ -1566,6 +1581,93 @@ function SettingsPage() {
             setClearingLogin(false);
         }
     }, [clearingLogin, refreshCloudSaveRestoreStatus, refreshCloudSaveUploadStatus, refreshSettings]);
+    SP_REACT.useEffect(() => {
+        if (baiduQr.stage !== "waiting" && baiduQr.stage !== "scanned")
+            return;
+        let cancelled = false;
+        const timer = window.setInterval(async () => {
+            if (cancelled || baiduQrPollBusyRef.current)
+                return;
+            baiduQrPollBusyRef.current = true;
+            try {
+                const result = await pollBaiduQrLogin();
+                if (cancelled)
+                    return;
+                if (result.status !== "success" || !result.data)
+                    return;
+                const next = result.data;
+                setBaiduQr(next);
+                if (next.stage === "success") {
+                    setBaiduWebLogin({
+                        logged_in: true,
+                        user_account: String(next.user_account || ""),
+                        message: String(next.message || "已登录"),
+                    });
+                    toaster.toast({ title: "freedeckCY", body: "百度网盘扫码登录成功" });
+                    await refreshSettings();
+                }
+            }
+            catch {
+                // 轮询失败保持等待，下一轮继续。
+            }
+            finally {
+                baiduQrPollBusyRef.current = false;
+            }
+        }, Math.max(5, Number(baiduQr.interval || 5)) * 1000);
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+        };
+    }, [baiduQr.stage, baiduQr.interval, refreshSettings]);
+    const onStartBaiduQr = SP_REACT.useCallback(async () => {
+        if (baiduQrBusy)
+            return;
+        setBaiduQrBusy(true);
+        try {
+            const result = await startBaiduQrLogin();
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "获取百度二维码失败");
+            }
+            setBaiduQr(result.data);
+            if (!result.data.qr_data_url && !result.data.qrcode_url) {
+                throw new Error("百度二维码为空");
+            }
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBaiduQrBusy(false);
+        }
+    }, [baiduQrBusy]);
+    const onCancelBaiduQr = SP_REACT.useCallback(async () => {
+        try {
+            await cancelBaiduQrLogin();
+        }
+        catch {
+            // 忽略取消失败。
+        }
+        setBaiduQr({ stage: "idle" });
+    }, []);
+    const onClearBaiduWeb = SP_REACT.useCallback(async () => {
+        if (baiduQrBusy)
+            return;
+        setBaiduQrBusy(true);
+        try {
+            const result = await clearBaiduLogin();
+            if (result.status !== "success")
+                throw new Error(result.message || "退出百度网盘失败");
+            setBaiduWebLogin(result.data || EMPTY_BAIDU_WEB_STATE);
+            setBaiduQr({ stage: "idle" });
+            toaster.toast({ title: "freedeckCY", body: "已退出百度网盘" });
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBaiduQrBusy(false);
+        }
+    }, [baiduQrBusy]);
     const onSaveBaiduApp = SP_REACT.useCallback(async () => {
         if (baiduBusy)
             return;
@@ -1874,7 +1976,9 @@ function SettingsPage() {
             title: "账号",
             content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u5929\u7FFC\u4E91\u8D26\u53F7", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: login.logged_in
                                         ? `当前已登录：${login.user_account || "未知账号"}`
-                                        : "当前未登录" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8\uFF08\u5B98\u65B9 OpenAPI\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduLogin.logged_in
+                                        : "当前未登录" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8\uFF08\u626B\u7801\u767B\u5F55\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduWebLogin.logged_in
+                                        ? `已登录：${baiduWebLogin.user_account || "百度账号"}`
+                                        : "未登录（扫码后使用 BDUSS/Cookie，无需开放平台 App Key）" }) }), baiduQr.stage === "failed" || baiduQr.stage === "expired" ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#ffb4a8", lineHeight: 1.5 }, children: baiduQr.message || "扫码失败，请重试" }) })) : null, baiduQr.stage === "waiting" || baiduQr.stage === "scanned" ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }, children: [baiduQr.qr_data_url ? (SP_JSX.jsx("img", { src: baiduQr.qr_data_url, alt: "\u767E\u5EA6\u626B\u7801\u767B\u5F55", style: { width: "180px", height: "180px", background: "#fff", padding: "8px", borderRadius: "8px" } })) : (SP_JSX.jsxs("div", { style: { fontSize: "12px" }, children: ["\u4E8C\u7EF4\u7801\u56FE\u7247\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u6253\u5F00\uFF1A", SP_JSX.jsx("div", { style: { wordBreak: "break-all" }, children: baiduQr.qrcode_url })] })), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: baiduQr.message || "请用百度 App 扫码" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onCancelBaiduQr, children: "\u53D6\u6D88\u626B\u7801" })] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartBaiduQr, disabled: baiduQrBusy, children: baiduQrBusy ? "获取中..." : "扫码登录百度网盘" }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearBaiduWeb, disabled: baiduQrBusy || !baiduWebLogin.logged_in, children: "\u9000\u51FA\u767E\u5EA6\u7F51\u76D8" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8 OpenAPI\uFF08\u53EF\u9009\uFF0C\u9700\u5F00\u53D1\u8005\u8D44\u8D28\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduLogin.logged_in
                                         ? `已授权：${baiduLogin.user_account || "百度账号"}`
                                         : baiduLogin.configured
                                             ? "已配置应用，待授权"

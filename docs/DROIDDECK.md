@@ -1,6 +1,6 @@
 # 在 DroidDeck 上使用 freedeckCY
 
-[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）、v0.15.0 起模拟器存档纳入云存档上传、v0.16.0 起模拟器存档恢复 + PSP/PS3/3DS 按游戏拆分 + PS1 多碟 m3u 也可在 DroidDeck 上使用；本文是安装与排障说明。
+[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）、v0.15.0 起模拟器存档纳入云存档上传、v0.16.0 起模拟器存档恢复 + PSP/PS3/3DS 按游戏拆分 + PS1 多碟 m3u、v0.17.0 起百度网盘扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退）也可在 DroidDeck 上使用；本文是安装与排障说明。
 
 > 适配基于 DroidDeck 的源码与 ARM64 运行时结构，**尚未在真机上完整验证**。遇到问题请按文末“排障”收集日志。
 
@@ -23,7 +23,7 @@ freedeckCY 的处理方式：
 - 模拟器存档恢复（v0.16.0）：云存档恢复不再只支持 PC——模拟器存档按 `restore_roots` 白名单恢复（同机优先原父目录、跨设备落到平台第一个根），覆盖前自动生成 `*.freedeckcy-bak-<时间戳>` 备份；冲突需要确认。**aarch64 上可用 GBA/PSP/NDS/PS1/FC/MD 的恢复/拆分（3DS/PS2/PS3 平台本身隐藏）**；PSP（PARAM.SFO）、3DS（NCSD title id）拆分在 ARM 上同样适用（3DS 平台不可见）；PS1 多碟在 aarch64 上也会生成/优先 `.m3u`。
 - 模拟器存档上传（v0.15.0）：QAM「云存档上传 → 包含模拟器存档」（`cloud_save_include_emulators`，默认开）控制是否上传模拟器存档；发现路径基于 **proot 内 HOME**（`~/.local/share/...`、`~/.config/...`，如 `~/.local/share/ppsspp/PSP/SAVEDATA`、`~/.local/share/azahar/sdmc`、`~/.local/share/eden/nand/user/save`）。**Flatpak 的 `~/.var/app/...` 路径在 Android/proot 下不适用**（DroidDeck 没有 SteamOS Flatpak 环境），不会被误用；GBA/FC/MD/NDS 按 ROM 同名找单游戏存档，PSP/PS1/PS2/3DS/PS3/Switch 上传共享记忆卡/标题目录；**v0.16.0 起支持恢复**（见上一条，白名单目标 + 备份 + 冲突确认）。
 - 3DS（Azahar，v0.14.1）：SteamOS 3.9.5 上优先官方 Flathub Flatpak `org.azahar_emu.Azahar`（AppImage 有上游 #127/#953 兼容问题）；**DroidDeck/aarch64 没有 3DS 官方 arm64 包，目录里仍不显示 3DS**（架构白名单，见 §9.8）。如果设备能跑 x86_64 且装有 flatpak，则自动用 Flatpak、失败回退 AppImage；3DS 启动脚本会强制 XWayland（`QT_QPA_PLATFORM=xcb`/`SDL_VIDEODRIVER=x11`）；system files 放 `~/.local/share/freedeckCY/bios/3ds/sysdata/`，会部署到 azahar/citra 与 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`。已有 3DS 快捷方式由后台自动重写，无需重装。
-- 百度网盘（v0.14.0，官方 OpenAPI）：aarch64 与 x86_64 行为一致（纯 HTTPS API，无本地二进制）。QAM「百度网盘（官方 OpenAPI）」→ 填百度开放平台 **App Key/Secret Key** →「保存应用」→「获取授权链接」→ 浏览器授权后把**授权码**粘回 →「完成授权」；之后百度分享链接可直接安装，不要求天翼登录。token 过期自动 refresh；也可用 env `FREEDECKCY_BAIDU_OPENAPI_APP_KEY` / `SECRET_KEY` / `REFRESH_TOKEN`。**不接 BDUSS/Cookie 网页抓取/CDP**。详见 [ARCHITECTURE.md](ARCHITECTURE.md) §5.13 / [DEVELOPMENT.md](DEVELOPMENT.md) §6.11。
+- 百度网盘（v0.17.0，扫码/Cookie 主链路）：aarch64 与 x86_64 行为一致（纯 HTTPS API，无本地二进制）。QAM「百度网盘（扫码登录）」→「扫码登录百度网盘」→ 用手机百度 App/百度网盘 App 扫码确认；Cookie 写入 proot 内 `~/.local/share/freedeckCY/tianyi/state.json` 的 `baidu_login`，之后百度分享可直接安装，不需要开放平台 App Key。Cookie 会过期/被风控，失效后重新扫码；扫码 session 仅内存 180s。**OpenAPI（v0.14.0）保留为可选回退**（自建应用 + OAuth，无 Cookie 时才用）。**不接 CDP/网页逆向**。详见 [ARCHITECTURE.md](ARCHITECTURE.md) §5.13 / [DEVELOPMENT.md](DEVELOPMENT.md) §6.11。
 - 仓库游戏提交（v0.13.0）：网页库工具栏有「提交游戏」按钮，点击后用系统浏览器/Steam 内置浏览器打开 GitHub Issue 表单（`https://github.com/hulong1989/freedeckCY/issues/new?template=submit-game.yml`）；也可以直接提 PR 改 `submissions/*.json`。字段与原版资源池投稿一致（名称/英文名/平台/分享链接/提取码/版本/可执行文件名 + `openpath`），**只提交分享链接，不上传游戏文件**；这条链路与设备无关，DroidDeck 上不需要任何额外配置。详见 [submissions/README.md](../submissions/README.md)。
 - 自动云存档（v0.8.0）：内置 Ludusavi 清单（53,549 游戏）按标题/SteamID 匹配，并把 Windows 存档路径解析到 **ARM Proton 前缀**（`compatdata/.../pfx` 内布局与 x86_64 一致）；`gamewatch` 每 8 秒扫 `/proc/*/cmdline`（proot 下通常可用；没有 `/proc` 时回退 `pgrep -f`，需要系统有 pgrep），检测到游戏退出后只上传该游戏。自动上传**默认开启**，可在 QAM「云存档上传」里关闭。
 - 模拟器注册表（v0.11.0）共 **10 个平台**，但 DroidDeck/aarch64 上**只有 7 个可用**：GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC、MD（Mesen2）/ **Switch（Eden，有 arm64 官方包）**；**3DS（Azahar）/ PS2（PCSX2）/ PS3（RPCS3）官方包仅 x86_64**，`available_platforms("aarch64")` 不返回它们，目录查询按白名单过滤，**条目和平台筛选条都不会出现**（预期行为，不是缺数据）。
@@ -91,7 +91,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | 模拟器 BIOS/固件部署（v0.12.0） | ✅ 安装后自动部署 `bios/<platform>/`（支持压缩包，7zz 解压缓存）；aarch64 可用 PS1/NDS/Switch 的部署与 GBA/PSP 全屏配置；PS2/PS3/3DS 仅 x86_64 |
 | 仓库游戏提交（v0.13.0） | ✅ 网页库「提交游戏」按钮打开 GitHub Issue 表单；或直接 PR `submissions/*.json`。无设备特定逻辑，DroidDeck 与 Steam Deck 行为一致 |
 | 模拟器存档上传/恢复（v0.15.0 / v0.16.0） | ✅ aarch64 可用：按 proot 内 HOME 发现/恢复 GBA/PSP/NDS/PS1/FC/MD/Switch 存档；恢复走白名单目标 + `*.freedeckcy-bak-*` 备份，冲突需确认；PSP 按 PARAM.SFO 拆分；PS1 多碟 m3u 可用；3DS 拆分随平台隐藏（仅 x86_64） |
-| 百度网盘（官方 OpenAPI，v0.14.0） | ✅ aarch64 同样可用（纯 HTTPS API）；需自建百度开放平台应用并完成 OAuth oob 授权，分享文件转存 `/FreedeckTmp` 后下载、安装后清理；不接 BDUSS/Cookie/CDP |
+| 百度网盘（扫码/Cookie，v0.17.0） | ✅ aarch64 可用：QAM 显示二维码，手机扫码后 Cookie 存 state（0600）；安装优先 Cookie，任务带百度 Cookie/Referer/UA；Cookie 过期需重扫；OpenAPI 为可选回退（自建应用/授权）；不接 CDP/网页逆向 |
 | `make doctor` | ⚠️ 需要 DroidDeck 桌面终端；Android 上 `lsof` 可能不存在 |
 
 ## 5. 环境变量与设置
@@ -227,6 +227,15 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 共享记忆卡/标题目录可能很大（3DS/Switch），受指纹 5000 文件与上传体积限制；必要时关闭开关或手动清理。
 - 恢复支持模拟器存档（v0.16.0，白名单目标 + 备份 + 冲突确认）；PS1/PS2 单片记忆卡、Switch 目录仍整卡覆盖。
 
+**百度网盘扫码登录失败 / 安装提示未登录**
+
+- QAM「百度网盘（扫码登录）」点「扫码登录百度网盘」；二维码不显示时看返回的 `qrcode_url`，或检查 DroidDeck 内网络能否访问 `passport.baidu.com`。
+- 一直 waiting：手机未扫码/未确认；二维码 180s 过期，重新获取即可。scanned 表示已扫码待手机确认。
+- 扫码成功但安装仍提示未登录：确认 `state.json` 的 `baidu_login.cookie` 含 `BDUSS=`，`/api/tianyi/settings` 的 `baidu_login.logged_in` 为 true；必要时「退出百度网盘」后重扫。
+- Cookie 失效/直链 403：重新扫码；任务已带百度 Cookie/Referer/UA，403 多为直链过期/风控。
+- 想用 OpenAPI 回退：不扫码（或清空百度登录），在「百度网盘 OpenAPI（可选）」配置 App Key/Secret 并授权；分享文件会转存 `/FreedeckTmp`（安装后清理）。
+- 扫码确认/换 Cookie 尚未真机验证，遇到问题请附 QAM 状态与安装消息。
+
 **日志**
 
 - 插件日志：`/tmp/freedeckcy.log`
@@ -241,7 +250,7 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 模拟器存档恢复（v0.16.0）在 Android/proot 下按 HOME 白名单恢复，Flatpak 路径不适用；PS1/PS2 单片记忆卡、Switch 目录不能按游戏拆；3DS 恢复随平台不可见；共享卡覆盖需确认且有备份。
 - 模拟器存档（v0.15.0）在 Android/proot 下只认 HOME 内标准/portable 路径，Flatpak 的 `~/.var/app/...` 不适用；GBA/FC/MD/NDS 需 ROM 同名，PSP/PS1/PS2/3DS/PS3/Switch 上传共享记忆卡/标题目录（同卡其它游戏也会包含）；v0.16.0 起支持恢复（白名单目标/备份/冲突确认）；PS1/PS2/Switch 仍整卡覆盖，3DS/Switch 大目录受 5000 文件限制。
 - 3DS（v0.14.1）在 DroidDeck/aarch64 上仍不可用（无 arm64 官方包，目录隐藏）；SteamOS/x86_64 优先 Flatpak（需系统有 flatpak 且能访问 Flathub），无 Flatpak 时回退 AppImage（可能仍有上游 #127/#953 问题）；3DS wrapper 走 XWayland；已有快捷方式自动重写但未在 DroidDeck 真机验证。
-- 百度网盘（v0.14.0）只走官方 OpenAPI：必须自建应用并授权（无公共 App Key），分享文件需要转存 `/FreedeckTmp`（会占百度网盘空间，安装后清理，失败则保留）；不接 BDUSS/Cookie/CDP；公开分享页结构变化可能影响元数据解析；aarch64 与 x86_64 行为一致。
+- 百度网盘（v0.17.0）主链路是扫码登录（BDUSS/Cookie）：需要手机百度 App 扫码，Cookie 会过期/被风控、失效需重扫；扫码 session 仅内存 180s；OpenAPI 是可选回退（自建应用/授权，转存 `/FreedeckTmp` 占网盘空间）；不接 CDP/网页逆向；扫码确认/换 Cookie 尚未真机验证；aarch64 与 x86_64 行为一致。
 - 仓库游戏提交（v0.13.0）只依赖网页/GitHub，无设备特定逻辑；DroidDeck 上没有额外限制（除了需要能打开 GitHub 的浏览器）。
 - DroidDeck 升级/重装 Decky 可能清空插件，需重新导入 zip。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。

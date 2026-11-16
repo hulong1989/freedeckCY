@@ -376,6 +376,38 @@ async def handle_update_check(request: web.Request, plugin: Any) -> web.Response
         return _json_error_from_exception(exc)
 
 
+async def handle_baidu_qr_start(request: web.Request, plugin: Any) -> web.Response:
+    try:
+        data = await _service(plugin).start_baidu_qr_login()
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
+async def handle_baidu_qr_poll(request: web.Request, plugin: Any) -> web.Response:
+    try:
+        data = await _service(plugin).poll_baidu_qr_login()
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
+async def handle_baidu_qr_cancel(request: web.Request, plugin: Any) -> web.Response:
+    try:
+        data = await _service(plugin).cancel_baidu_qr_login()
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
+async def handle_baidu_clear(request: web.Request, plugin: Any) -> web.Response:
+    try:
+        data = await _service(plugin).clear_baidu_login()
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
 async def handle_baidu_openapi_authorize_url(request: web.Request, plugin: Any) -> web.Response:
     try:
         data = await _service(plugin).get_baidu_openapi_authorize_url()
@@ -658,6 +690,10 @@ def setup_routes(app: web.Application, plugin: Any) -> None:
     app.router.add_post("/api/tianyi/login/check", lambda request: handle_login_check(request, plugin))
     app.router.add_post("/api/tianyi/login/manual", lambda request: handle_login_manual(request, plugin))
     app.router.add_post("/api/tianyi/login/clear", lambda request: handle_login_clear(request, plugin))
+    app.router.add_post("/api/tianyi/baidu/qr/start", lambda request: handle_baidu_qr_start(request, plugin))
+    app.router.add_get("/api/tianyi/baidu/qr/poll", lambda request: handle_baidu_qr_poll(request, plugin))
+    app.router.add_post("/api/tianyi/baidu/qr/cancel", lambda request: handle_baidu_qr_cancel(request, plugin))
+    app.router.add_post("/api/tianyi/baidu/clear", lambda request: handle_baidu_clear(request, plugin))
     app.router.add_get("/api/tianyi/baidu/openapi/authorize-url", lambda request: handle_baidu_openapi_authorize_url(request, plugin))
     app.router.add_post("/api/tianyi/baidu/openapi/app", lambda request: handle_baidu_openapi_app(request, plugin))
     app.router.add_post("/api/tianyi/baidu/openapi/exchange", lambda request: handle_baidu_openapi_exchange(request, plugin))

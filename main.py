@@ -207,6 +207,36 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def start_baidu_qr_login(self) -> dict:
+        """百度网页版扫码登录：获取二维码。"""
+        try:
+            data = await self._get_tianyi_service().start_baidu_qr_login()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def poll_baidu_qr_login(self) -> dict:
+        """轮询百度扫码状态。"""
+        try:
+            data = await self._get_tianyi_service().poll_baidu_qr_login()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def cancel_baidu_qr_login(self) -> dict:
+        try:
+            data = await self._get_tianyi_service().cancel_baidu_qr_login()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def clear_baidu_login(self) -> dict:
+        try:
+            data = await self._get_tianyi_service().clear_baidu_login()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def get_baidu_openapi_authorize_url(self) -> dict:
         """百度网盘开放平台授权链接。"""
         try:

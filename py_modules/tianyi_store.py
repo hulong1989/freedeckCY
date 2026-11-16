@@ -57,6 +57,19 @@ class TianyiLoginState:
 
 
 @dataclass
+class BaiduLoginState:
+    """百度网盘网页扫码登录（BDUSS/Cookie）。"""
+
+    cookie: str = ""
+    user_account: str = ""
+    updated_at: int = 0
+
+    @property
+    def logged_in(self) -> bool:
+        return "BDUSS=" in self.cookie.upper()
+
+
+@dataclass
 class BaiduOpenApiLoginState:
     """百度网盘官方 OpenAPI 授权状态。"""
 
@@ -219,6 +232,7 @@ class TianyiStateStore:
         self._state_file = state_file
         self._lock = threading.RLock()
         self.login = TianyiLoginState()
+        self.baidu_login = BaiduLoginState()
         self.baidu_openapi = BaiduOpenApiLoginState()
         self.settings = TianyiSettings()
         self.tasks: List[TianyiTaskRecord] = []
@@ -243,6 +257,7 @@ class TianyiStateStore:
 
             login_raw = raw.get("login") if isinstance(raw, dict) else {}
             baidu_raw = raw.get("baidu_openapi") if isinstance(raw, dict) else {}
+            baidu_web_raw = raw.get("baidu_login") if isinstance(raw, dict) else {}
             settings_raw = raw.get("settings") if isinstance(raw, dict) else {}
             tasks_raw = raw.get("tasks") if isinstance(raw, dict) else []
             installed_raw = raw.get("installed_games") if isinstance(raw, dict) else []
@@ -255,6 +270,13 @@ class TianyiStateStore:
                     cookie=str(login_raw.get("cookie", "")),
                     user_account=str(login_raw.get("user_account", "")),
                     updated_at=_to_int(login_raw.get("updated_at", 0), 0),
+                )
+
+            if isinstance(baidu_web_raw, dict):
+                self.baidu_login = BaiduLoginState(
+                    cookie=str(baidu_web_raw.get("cookie", "") or ""),
+                    user_account=str(baidu_web_raw.get("user_account", "") or ""),
+                    updated_at=_to_int(baidu_web_raw.get("updated_at", 0), 0),
                 )
 
             if isinstance(baidu_raw, dict):
@@ -334,6 +356,7 @@ class TianyiStateStore:
             _chmod_private(state_dir, 0o700)
             payload = {
                 "login": asdict(self.login),
+                "baidu_login": asdict(self.baidu_login),
                 "baidu_openapi": asdict(self.baidu_openapi),
                 "settings": asdict(self.settings),
                 "tasks": [asdict(t) for t in self.tasks],

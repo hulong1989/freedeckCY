@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import io
 import json
@@ -31,6 +32,8 @@ from yarl import URL
 import config
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
+from baidu_client import BaiduApiError, fetch_baidu_download_url, resolve_baidu_share
+from baidu_qr import BaiduQrError, complete_login, fetch_qr_image, poll_qr, request_qr
 from baidu_openapi_client import (
     BaiduOpenApiError,
     build_baidu_oauth_authorize_url,
@@ -39,7 +42,9 @@ from baidu_openapi_client import (
     fetch_baidu_openapi_download_url,
     fetch_baidu_openapi_user_info,
     is_baidu_openapi_auth_error,
+    poll_baidu_device_token,
     refresh_baidu_oauth_token,
+    request_baidu_device_code,
     resolve_baidu_openapi_share_url,
 )
 from emulator_setup import setup_emulator
@@ -239,7 +244,7 @@ def _share_provider(url: str) -> str:
     if _is_tianyi_share_url(url):
         return "tianyi"
     if _is_baidu_share_url(url):
-        return "baidu_openapi"
+        return "baidu"
     return ""
 
 
@@ -466,6 +471,10 @@ class TianyiService:
         self._post_process_jobs: Dict[str, asyncio.Task] = {}
         self._launcher_repair_task: Optional[asyncio.Task] = None
         self._launcher_repair_done = False
+        self._baidu_device_lock = asyncio.Lock()
+        self._baidu_device_login: Dict[str, Any] = {}
+        self._baidu_qr_lock = asyncio.Lock()
+        self._baidu_qr_session: Dict[str, Any] = {}
         # 后台维护（不依赖前端轮询）与安装互斥。
         self._maintenance_lock = asyncio.Lock()
         self._install_locks: Dict[str, asyncio.Lock] = {}
@@ -841,6 +850,11 @@ class TianyiService:
             "settings": asdict(self.store.settings),
             "library_url": library_url,
             "login_capture": await self.get_login_capture_status(),
+            "baidu_login": {
+                "logged_in": self.store.baidu_login.logged_in,
+                "user_account": self.store.baidu_login.user_account,
+                "message": "已登录" if self.store.baidu_login.logged_in else "未登录",
+            },
             "baidu_openapi_login": self._baidu_openapi_payload(),
             "power_diagnostics": power_diagnostics,
         }
@@ -885,6 +899,83 @@ class TianyiService:
         self.store.set_login(cookie, account)
         return True, account, "登录态有效"
 
+    def _baidu_web_login_payload(self) -> Dict[str, Any]:
+        state = self.store.baidu_login
+        return {
+            "logged_in": state.logged_in,
+            "user_account": state.user_account,
+            "message": "已登录" if state.logged_in else "未登录",
+        }
+
+    async def start_baidu_qr_login(self) -> Dict[str, Any]:
+        """百度网页版扫码：返回二维码 data URL。"""
+        async with self._baidu_qr_lock:
+            try:
+                qr = await request_qr()
+            except BaiduQrError as exc:
+                raise TianyiApiError(f"获取百度二维码失败：{exc}") from exc
+            raw = b""
+            try:
+                raw = await fetch_qr_image(str(qr.get("imgurl", "") or ""))
+            except Exception as exc:
+                config.logger.warning("下载百度二维码图片失败: %s", exc)
+            qr_data_url = ""
+            if raw:
+                qr_data_url = "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+            self._baidu_qr_session = {
+                "sign": qr["sign"],
+                "imgurl": qr.get("imgurl", ""),
+                "expires_at": _now_wall_ts() + 180,
+            }
+            return {
+                "stage": "waiting",
+                "qr_data_url": qr_data_url,
+                "qrcode_url": str(qr.get("imgurl", "") or ""),
+                "expires_at": self._baidu_qr_session["expires_at"],
+                "message": "请用百度 App / 百度网盘 App 扫码登录",
+            }
+
+    async def poll_baidu_qr_login(self) -> Dict[str, Any]:
+        """轮询百度扫码状态；确认后写入 BDUSS/Cookie。"""
+        async with self._baidu_qr_lock:
+            session = dict(self._baidu_qr_session or {})
+            if not session:
+                return {"stage": "idle", "message": "未开始扫码登录", **self._baidu_web_login_payload()}
+            if int(session.get("expires_at", 0) or 0) <= _now_wall_ts():
+                self._baidu_qr_session = {}
+                return {"stage": "expired", "message": "二维码已过期，请重新获取", **self._baidu_web_login_payload()}
+            result = await poll_qr(str(session.get("sign", "") or ""), timeout=8.0)
+            stage = str(result.get("status", "") or "")
+            if stage == "scanned":
+                return {"stage": "scanned", "message": "已扫码，请在手机上确认登录", **self._baidu_web_login_payload()}
+            if stage != "confirmed":
+                return {"stage": "waiting", "message": "等待手机扫码…", **self._baidu_web_login_payload()}
+            try:
+                login = await complete_login(str(result.get("v", "") or ""))
+            except BaiduQrError as exc:
+                self._baidu_qr_session = {}
+                return {"stage": "failed", "message": str(exc), **self._baidu_web_login_payload()}
+            self.store.baidu_login.cookie = str(login.get("cookie", "") or "")
+            self.store.baidu_login.user_account = str(login.get("user_account", "") or "")
+            self.store.baidu_login.updated_at = _now_wall_ts()
+            self._baidu_qr_session = {}
+            await asyncio.to_thread(self.store.save)
+            self._invalidate_panel_cache(all_data=True)
+            return {"stage": "success", "message": "百度网盘登录成功", **self._baidu_web_login_payload()}
+
+    async def cancel_baidu_qr_login(self) -> Dict[str, Any]:
+        async with self._baidu_qr_lock:
+            self._baidu_qr_session = {}
+        return {"stage": "idle", "message": "已取消百度扫码登录"}
+
+    async def clear_baidu_login(self) -> Dict[str, Any]:
+        self.store.baidu_login.cookie = ""
+        self.store.baidu_login.user_account = ""
+        self.store.baidu_login.updated_at = _now_wall_ts()
+        await asyncio.to_thread(self.store.save)
+        self._invalidate_panel_cache(all_data=True)
+        return {"ok": True, **self._baidu_web_login_payload()}
+
     def _baidu_openapi_payload(self) -> Dict[str, Any]:
         state = self.store.baidu_openapi
         return {
@@ -910,6 +1001,98 @@ class TianyiService:
             "redirect_uri": "oob",
             "message": "在浏览器授权后把页面显示的授权码粘贴回来",
         }
+
+    async def start_baidu_openapi_device_login(self) -> Dict[str, Any]:
+        """官方设备码扫码登录：返回二维码 data URL 与用户码。"""
+        app_key, secret_key = self._baidu_openapi_credentials()
+        if not app_key or not secret_key:
+            raise BaiduOpenApiError("请先填写百度开放平台 App Key 与 Secret Key")
+        async with self._baidu_device_lock:
+            data = await request_baidu_device_code(app_key=app_key)
+            qr_data_url = ""
+            qrcode_url = str(data.get("qrcode_url", "") or "").strip()
+            if qrcode_url:
+                try:
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.get(qrcode_url, headers={"User-Agent": "pan.baidu.com"}) as response:
+                            if response.status == 200:
+                                raw = await response.read()
+                                if 0 < len(raw) <= 2 * 1024 * 1024:
+                                    qr_data_url = "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+                except Exception as exc:
+                    config.logger.warning("下载百度二维码失败: %s", exc)
+            self._baidu_device_login = {
+                "device_code": data["device_code"],
+                "user_code": data["user_code"],
+                "qrcode_url": qrcode_url,
+                "verification_url": data.get("verification_url", ""),
+                "expires_at": _now_wall_ts() + max(60, int(data.get("expires_in", 300))),
+                "interval": max(5, int(data.get("interval", 5))),
+                "app_key": app_key,
+            }
+            return {
+                "stage": "waiting",
+                "qr_data_url": qr_data_url,
+                "qrcode_url": qrcode_url,
+                "user_code": self._baidu_device_login["user_code"],
+                "verification_url": self._baidu_device_login["verification_url"],
+                "expires_at": self._baidu_device_login["expires_at"],
+                "interval": self._baidu_device_login["interval"],
+                "message": "请用百度 App / 百度网盘 App 扫码并确认授权",
+            }
+
+    async def poll_baidu_openapi_device_login(self) -> Dict[str, Any]:
+        """轮询扫码结果；成功时写入 token 并返回 logged_in。"""
+        async with self._baidu_device_lock:
+            session = dict(self._baidu_device_login or {})
+            if not session:
+                return {"stage": "idle", "message": "未开始扫码登录", **self._baidu_openapi_payload()}
+            if int(session.get("expires_at", 0) or 0) <= _now_wall_ts():
+                self._baidu_device_login = {}
+                return {"stage": "expired", "message": "二维码已过期，请重新获取", **self._baidu_openapi_payload()}
+
+            app_key, secret_key = self._baidu_openapi_credentials()
+            try:
+                tokens = await poll_baidu_device_token(
+                    app_key=app_key,
+                    secret_key=secret_key,
+                    device_code=str(session.get("device_code", "") or ""),
+                )
+            except BaiduOpenApiError as exc:
+                diagnostics = dict(getattr(exc, "diagnostics", {}) or {})
+                payload = diagnostics.get("response") if isinstance(diagnostics.get("response"), dict) else {}
+                error = str(diagnostics.get("error", "") or payload.get("error", "") or "").lower()
+                if error in {"authorization_pending", "slow_down", "authorization_waiting"}:
+                    return {"stage": "waiting", "message": "等待手机确认授权…", "interval": session.get("interval", 5)}
+                self._baidu_device_login = {}
+                return {"stage": "failed", "message": str(exc), **self._baidu_openapi_payload()}
+
+            user_account = ""
+            try:
+                info = await fetch_baidu_openapi_user_info(access_token=str(tokens.get("access_token", "") or ""))
+                user_account = str(
+                    info.get("netdisk_name") or info.get("user_name") or info.get("uk") or ""
+                ).strip()
+            except Exception as exc:
+                config.logger.warning("Baidu device user info failed: %s", exc)
+            state = self.store.baidu_openapi
+            state.app_key = app_key
+            state.secret_key = secret_key
+            state.access_token = str(tokens.get("access_token", "") or "")
+            state.refresh_token = str(tokens.get("refresh_token", "") or "")
+            state.expires_at = _safe_int(tokens.get("expires_at"), 0)
+            state.user_account = user_account
+            state.updated_at = _now_wall_ts()
+            self._baidu_device_login = {}
+            await asyncio.to_thread(self.store.save)
+            self._invalidate_panel_cache(all_data=True)
+            return {"stage": "success", "message": "百度网盘扫码授权成功", "user_account": user_account, **self._baidu_openapi_payload()}
+
+    async def cancel_baidu_openapi_device_login(self) -> Dict[str, Any]:
+        async with self._baidu_device_lock:
+            self._baidu_device_login = {}
+        return {"stage": "idle", "message": "已取消扫码登录"}
 
     async def set_baidu_openapi_app(self, app_key: str = "", secret_key: str = "") -> Dict[str, Any]:
         normalized_key = str(app_key or "").strip()
@@ -5620,6 +5803,14 @@ class TianyiService:
         if not provider:
             raise ValueError("分享链接来源不受支持")
         share_ctx: Dict[str, Any] = {}
+        if provider == "baidu":
+            baidu_cookie = str(self.store.baidu_login.cookie or "").strip()
+            if "BDUSS=" in baidu_cookie.upper():
+                provider = "baidu"
+            elif self.store.baidu_openapi.configured:
+                provider = "baidu_openapi"
+            else:
+                raise TianyiApiError("请先扫码登录百度网盘（设置 → 百度网盘扫码登录）")
         if provider == "tianyi":
             login_ok, _, message = await self.check_login_state()
             if not login_ok:
@@ -5634,6 +5825,14 @@ class TianyiService:
                 diagnostics = dict(getattr(exc, "diagnostics", {}) or {})
                 diagnostics.setdefault("stage", "resolve_share")
                 raise TianyiApiError(str(exc), diagnostics=diagnostics) from exc
+        elif provider == "baidu":
+            baidu_cookie = str(self.store.baidu_login.cookie or "").strip()
+            try:
+                resolved, share_ctx = await resolve_baidu_share(share_url, baidu_cookie)
+            except BaiduApiError as exc:
+                diagnostics = dict(getattr(exc, "diagnostics", {}) or {})
+                diagnostics.setdefault("stage", "baidu_resolve_share")
+                raise TianyiApiError(f"百度网盘解析失败：{exc}", diagnostics=diagnostics) from exc
         else:
             try:
                 await self._ensure_baidu_openapi_access_token()
@@ -5758,6 +5957,12 @@ class TianyiService:
         result["files"] = files
         return result
 
+    async def _fetch_baidu_web_direct_url(self, share_ctx: Dict[str, Any], file_id: str) -> str:
+        cookie = str(self.store.baidu_login.cookie or "").strip()
+        if "BDUSS=" not in cookie.upper():
+            raise BaiduApiError("未登录百度网盘，请先扫码登录", diagnostics={"stage": "login"})
+        return await fetch_baidu_download_url(cookie, share_ctx, file_id)
+
     async def _fetch_baidu_direct_url(self, share_ctx: Dict[str, Any], file_id: str) -> str:
         access_token = await self._ensure_baidu_openapi_access_token()
         try:
@@ -5808,7 +6013,18 @@ class TianyiService:
             name = str(file_item.get("name", "")).strip() or f"file-{file_id}"
             file_size = max(0, _safe_int(file_item.get("size"), 0))
 
-            if provider == "baidu_openapi":
+            if provider == "baidu":
+                direct_url = await self._fetch_baidu_web_direct_url(share_ctx, file_id)
+                gid = await self.aria2.add_uri(
+                    direct_url=direct_url,
+                    cookie=str(self.store.baidu_login.cookie or "").strip(),
+                    download_dir=target_dir,
+                    out_name=name,
+                    split=split,
+                    referer="https://pan.baidu.com/disk/home",
+                    user_agent="pan.baidu.com",
+                )
+            elif provider == "baidu_openapi":
                 direct_url = await self._fetch_baidu_direct_url(share_ctx, file_id)
                 gid = await self.aria2.add_uri(
                     direct_url=direct_url,
@@ -5856,7 +6072,7 @@ class TianyiService:
                     platform=str(plan.get("platform", "pc") or "pc"),
                     provider=provider,
                     share_url=share_url,
-                    share_ctx=self._compact_baidu_share_ctx(share_ctx) if provider == "baidu_openapi" else {},
+                    share_ctx=self._compact_baidu_share_ctx(share_ctx) if provider in {"baidu", "baidu_openapi"} else {},
                     created_at=now,
                     updated_at=now,
                 )
@@ -6045,7 +6261,9 @@ class TianyiService:
             self._readd_attempts[task.task_id] = 1
 
         try:
-            if provider == "baidu_openapi":
+            if provider == "baidu":
+                direct_url = await self._fetch_baidu_web_direct_url(share_ctx, file_id)
+            elif provider == "baidu_openapi":
                 direct_url = await self._fetch_baidu_direct_url(share_ctx, file_id)
             else:
                 access_token = await fetch_access_token(cookie)
@@ -6074,12 +6292,16 @@ class TianyiService:
         split = max(1, min(64, int(self.store.settings.split_count or 16)))
         add_kwargs = {
             "direct_url": direct_url,
-            "cookie": "" if provider == "baidu_openapi" else cookie,
+            "cookie": (
+                str(self.store.baidu_login.cookie or "").strip()
+                if provider == "baidu"
+                else ("" if provider == "baidu_openapi" else cookie)
+            ),
             "download_dir": str(task.download_dir or "").strip(),
             "out_name": str(task.file_name or "").strip(),
             "split": split,
         }
-        if provider == "baidu_openapi":
+        if provider in {"baidu", "baidu_openapi"}:
             add_kwargs["referer"] = "https://pan.baidu.com/disk/home"
             add_kwargs["user_agent"] = "pan.baidu.com"
         try:

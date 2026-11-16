@@ -90,6 +90,22 @@ interface SettingsState {
   cloud_save_include_emulators: boolean;
 }
 
+interface BaiduWebLoginState {
+  logged_in: boolean;
+  user_account: string;
+  message: string;
+}
+
+interface BaiduQrState {
+  stage: string;
+  user_account?: string;
+  qr_data_url?: string;
+  qrcode_url?: string;
+  expires_at?: number;
+  interval?: number;
+  message?: string;
+}
+
 interface BaiduOpenApiLoginState {
   configured: boolean;
   logged_in: boolean;
@@ -100,6 +116,7 @@ interface BaiduOpenApiLoginState {
 
 interface PanelState {
   login: LoginState;
+  baidu_login?: BaiduWebLoginState;
   baidu_openapi_login?: BaiduOpenApiLoginState;
   installed: InstalledState;
   tasks: TaskItem[];
@@ -324,6 +341,10 @@ const getTianyiLibraryUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_l
 const getTianyiLoginUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_login_url");
 const setTianyiSettings = callable<[SettingsPayload], ApiResponse<SettingsState>>("set_tianyi_settings");
 const clearTianyiLogin = callable<[], ApiResponse<ClearLoginResponse>>("clear_tianyi_login");
+const startBaiduQrLogin = callable<[], ApiResponse<BaiduQrState>>("start_baidu_qr_login");
+const pollBaiduQrLogin = callable<[], ApiResponse<BaiduQrState>>("poll_baidu_qr_login");
+const cancelBaiduQrLogin = callable<[], ApiResponse<BaiduQrState>>("cancel_baidu_qr_login");
+const clearBaiduLogin = callable<[], ApiResponse<BaiduWebLoginState>>("clear_baidu_login");
 const getBaiduOpenapiAuthorizeUrl = callable<[], ApiResponse<UrlResponse>>("get_baidu_openapi_authorize_url");
 const setBaiduOpenapiApp = callable<[Record<string, string>], ApiResponse<BaiduOpenApiLoginState>>(
   "set_baidu_openapi_app",
@@ -465,8 +486,15 @@ const EMPTY_BAIDU_OPENAPI_STATE: BaiduOpenApiLoginState = {
   message: "未配置",
 };
 
+const EMPTY_BAIDU_WEB_STATE: BaiduWebLoginState = {
+  logged_in: false,
+  user_account: "",
+  message: "未登录",
+};
+
 const EMPTY_STATE: PanelState = {
   login: { logged_in: false, user_account: "", message: "" },
+  baidu_login: EMPTY_BAIDU_WEB_STATE,
   baidu_openapi_login: EMPTY_BAIDU_OPENAPI_STATE,
   installed: { total: 0, preview: [] },
   tasks: [],
@@ -1609,6 +1637,10 @@ function SettingsPage() {
   const [activeTab, setActiveTab] = useState<string>("paths");
   const [settings, setSettings] = useState<SettingsState>(EMPTY_SETTINGS);
   const [login, setLogin] = useState<LoginState>(EMPTY_STATE.login);
+  const [baiduWebLogin, setBaiduWebLogin] = useState<BaiduWebLoginState>(EMPTY_BAIDU_WEB_STATE);
+  const [baiduQr, setBaiduQr] = useState<BaiduQrState>({ stage: "idle" });
+  const [baiduQrBusy, setBaiduQrBusy] = useState<boolean>(false);
+  const baiduQrPollBusyRef = useRef<boolean>(false);
   const [baiduLogin, setBaiduLogin] = useState<BaiduOpenApiLoginState>(EMPTY_BAIDU_OPENAPI_STATE);
   const [baiduAppKey, setBaiduAppKey] = useState<string>("");
   const [baiduSecretKey, setBaiduSecretKey] = useState<string>("");
@@ -1730,6 +1762,7 @@ function SettingsPage() {
     const next = Object.assign({}, EMPTY_SETTINGS, result.data.settings || {});
     setSettings(next);
     setLogin(result.data.login || EMPTY_STATE.login);
+    setBaiduWebLogin(result.data.baidu_login || EMPTY_BAIDU_WEB_STATE);
     setBaiduLogin(result.data.baidu_openapi_login || EMPTY_BAIDU_OPENAPI_STATE);
     setSplitDraft(Math.max(1, Math.min(64, Number(next.split_count || 16))));
   }, []);
@@ -1915,6 +1948,83 @@ function SettingsPage() {
       setClearingLogin(false);
     }
   }, [clearingLogin, refreshCloudSaveRestoreStatus, refreshCloudSaveUploadStatus, refreshSettings]);
+
+  useEffect(() => {
+    if (baiduQr.stage !== "waiting" && baiduQr.stage !== "scanned") return;
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      if (cancelled || baiduQrPollBusyRef.current) return;
+      baiduQrPollBusyRef.current = true;
+      try {
+        const result = await pollBaiduQrLogin();
+        if (cancelled) return;
+        if (result.status !== "success" || !result.data) return;
+        const next = result.data;
+        setBaiduQr(next);
+        if (next.stage === "success") {
+          setBaiduWebLogin({
+            logged_in: true,
+            user_account: String(next.user_account || ""),
+            message: String(next.message || "已登录"),
+          });
+          toaster.toast({ title: "freedeckCY", body: "百度网盘扫码登录成功" });
+          await refreshSettings();
+        }
+      } catch {
+        // 轮询失败保持等待，下一轮继续。
+      } finally {
+        baiduQrPollBusyRef.current = false;
+      }
+    }, Math.max(5, Number(baiduQr.interval || 5)) * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [baiduQr.stage, baiduQr.interval, refreshSettings]);
+
+  const onStartBaiduQr = useCallback(async () => {
+    if (baiduQrBusy) return;
+    setBaiduQrBusy(true);
+    try {
+      const result = await startBaiduQrLogin();
+      if (result.status !== "success" || !result.data) {
+        throw new Error(result.message || "获取百度二维码失败");
+      }
+      setBaiduQr(result.data);
+      if (!result.data.qr_data_url && !result.data.qrcode_url) {
+        throw new Error("百度二维码为空");
+      }
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBaiduQrBusy(false);
+    }
+  }, [baiduQrBusy]);
+
+  const onCancelBaiduQr = useCallback(async () => {
+    try {
+      await cancelBaiduQrLogin();
+    } catch {
+      // 忽略取消失败。
+    }
+    setBaiduQr({ stage: "idle" });
+  }, []);
+
+  const onClearBaiduWeb = useCallback(async () => {
+    if (baiduQrBusy) return;
+    setBaiduQrBusy(true);
+    try {
+      const result = await clearBaiduLogin();
+      if (result.status !== "success") throw new Error(result.message || "退出百度网盘失败");
+      setBaiduWebLogin(result.data || EMPTY_BAIDU_WEB_STATE);
+      setBaiduQr({ stage: "idle" });
+      toaster.toast({ title: "freedeckCY", body: "已退出百度网盘" });
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBaiduQrBusy(false);
+    }
+  }, [baiduQrBusy]);
 
   const onSaveBaiduApp = useCallback(async () => {
     if (baiduBusy) return;
@@ -2317,7 +2427,57 @@ function SettingsPage() {
               </PanelSectionRow>
             </PanelSection>
 
-            <PanelSection title="百度网盘（官方 OpenAPI）">
+            <PanelSection title="百度网盘（扫码登录）">
+              <PanelSectionRow>
+                <div style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                  {baiduWebLogin.logged_in
+                    ? `已登录：${baiduWebLogin.user_account || "百度账号"}`
+                    : "未登录（扫码后使用 BDUSS/Cookie，无需开放平台 App Key）"}
+                </div>
+              </PanelSectionRow>
+              {baiduQr.stage === "failed" || baiduQr.stage === "expired" ? (
+                <PanelSectionRow>
+                  <div style={{ fontSize: "12px", color: "#ffb4a8", lineHeight: 1.5 }}>
+                    {baiduQr.message || "扫码失败，请重试"}
+                  </div>
+                </PanelSectionRow>
+              ) : null}
+              {baiduQr.stage === "waiting" || baiduQr.stage === "scanned" ? (
+                <PanelSectionRow>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
+                    {baiduQr.qr_data_url ? (
+                      <img
+                        src={baiduQr.qr_data_url}
+                        alt="百度扫码登录"
+                        style={{ width: "180px", height: "180px", background: "#fff", padding: "8px", borderRadius: "8px" }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: "12px" }}>
+                        二维码图片加载失败，请打开：
+                        <div style={{ wordBreak: "break-all" }}>{baiduQr.qrcode_url}</div>
+                      </div>
+                    )}
+                    <div style={{ fontSize: "12px" }}>{baiduQr.message || "请用百度 App 扫码"}</div>
+                    <ButtonItem layout="below" onClick={onCancelBaiduQr}>
+                      取消扫码
+                    </ButtonItem>
+                  </div>
+                </PanelSectionRow>
+              ) : (
+                <PanelSectionRow>
+                  <ButtonItem layout="below" onClick={onStartBaiduQr} disabled={baiduQrBusy}>
+                    {baiduQrBusy ? "获取中..." : "扫码登录百度网盘"}
+                  </ButtonItem>
+                </PanelSectionRow>
+              )}
+              <PanelSectionRow>
+                <ButtonItem layout="below" onClick={onClearBaiduWeb} disabled={baiduQrBusy || !baiduWebLogin.logged_in}>
+                  退出百度网盘
+                </ButtonItem>
+              </PanelSectionRow>
+            </PanelSection>
+
+            <PanelSection title="百度网盘 OpenAPI（可选，需开发者资质）">
               <PanelSectionRow>
                 <div style={{ fontSize: "12px", lineHeight: 1.5 }}>
                   {baiduLogin.logged_in

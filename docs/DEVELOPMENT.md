@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.16.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.17.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -26,8 +26,9 @@
 | `py_modules/param_sfo.py` | 最小 `PARAM.SFO` 解析（v0.16.0）：`read_param_sfo()` 读 key/value、`find_param_sfo()` 在存档目录递归查找，用于 PSP/PS3 按 TITLE 拆分存档 |
 | `py_modules/emulator_setup.py` | **安装后 BIOS/固件部署（v0.12.0；v0.14.1 3DS 加 Flatpak 路径）**：`setup_emulator(platform, command, seven_zip)` 把 `bios/<platform>/` 下文件/压缩包部署到模拟器目录并写 portable 配置；3DS sysdata 同时部署到 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`；只补缺失/只改单个键，不下载 |
 | `py_modules/submission.py` | **仓库游戏提交（v0.13.0）**：`normalize_platform()` 平台别名、`validate_submission()`/`validate_submission_files()` 校验、`build_catalog_row()` 生成目录行、`merge_submissions()` 合并（dry-run/`--apply`）；纯标准库，可被 CLI 直接 import |
-| `py_modules/baidu_client.py` | **百度公开分享 URL 解析（v0.14.0）**：`resolve_baidu_share(share_url, "")` 取分享页元数据（share_id/uk/sekey/files），**只传空 cookie，不读 BDUSS/Cookie**；给 OpenAPI 链路提供公开分享上下文 |
-| `py_modules/baidu_openapi_client.py` | **百度网盘官方 OpenAPI（v0.14.0）**：OAuth oob 授权（`build_baidu_oauth_authorize_url`/`exchange_baidu_oauth_code`/`refresh_baidu_oauth_token`）、公开分享转存、`fetch_baidu_openapi_download_url`、`delete_baidu_openapi_transfer_file`；纯 HTTPS API，无网页抓取/CDP |
+| `py_modules/baidu_qr.py` | **百度 Passport 扫码登录（v0.17.0，主链路）**：`request_qr()` 取二维码 sign/imgurl、`fetch_qr_image()` 下载 PNG、`poll_qr()` 长轮询 waiting/scanned/confirmed、`complete_login()` 用 v 换 `BDUSS/STOKEN/PTOKEN` |
+| `py_modules/baidu_client.py` | **百度分享 URL 解析/直链（v0.17.0）**：`resolve_baidu_share(share_url, cookie)` 走 Cookie 主链路解析分享/文件列表，`fetch_baidu_download_url()` 取直链；OpenAPI 回退也复用其公开分享元数据 |
+| `py_modules/baidu_openapi_client.py` | **百度官方 OpenAPI（v0.14.0，v0.17.0 起可选回退）**：OAuth oob 授权（`build_baidu_oauth_authorize_url`/`exchange_baidu_oauth_code`/`refresh_baidu_oauth_token`）、公开分享转存、`fetch_baidu_openapi_download_url`、`delete_baidu_openapi_transfer_file`；没有 Cookie 时才使用 |
 | `py_modules/steam_shortcuts.py` | 写 `shortcuts.vdf`（`DevkitGameID` token 去重、无变化不重写、写前备份 12 份、写后回读）、改 `config.vdf` 的 Proton 映射、下载 `grid` 封面、解析 appid；Steam 多库 / Flatpak / **DroidDeck** 识别（`is_droiddeck` / `_steam_root_candidates` / `detect_proton_tool`）、自定义用户名打分；`find_compatdata_dirs()` 跨库定位待清理的 Proton 前缀 |
 | `py_modules/game_catalog.py` | 读 CSV 资源清单（16 列 / 7084 条 / 11 平台，新目录优先、旧目录回退）：校验、搜索、分页、按 `game_id` 查找；`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底）；支持 `cover_index.csv` 合并（不覆盖已有值）；`list()` 支持 platform/category 过滤并返回 `platforms`/Top12 `categories`；`_is_valid_tianyi_url()` 兼容 `/t/` 与 `/web/share?code=` |
 | `py_modules/archive_bundle.py` | 多分卷归档识别（`.7z.001`/`.partN.rar`/`.z01+zip`/`.r00+rar` 等 6 类）：`detect_archive_sets` / `build_bundle_index` / `looks_like_multi_volume_name` |
@@ -45,7 +46,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（345 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度 OpenAPI（来源识别/token 刷新/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（348 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -334,7 +335,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **345 个用例**（`make test` 实测 `345 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **348 个用例**（`make test` 实测 `348 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -729,48 +730,67 @@ make validate-catalog                      # 合并后再跑目录体检
 
 **CI**：`.github/workflows/ci.yml` 的 `Validate game submissions` 步骤跑 `python scripts/validate_submissions.py --catalog ...`，无提交也通过。
 
-### 6.11 百度网盘 OpenAPI（v0.14.0）
+### 6.11 百度网盘（扫码/Cookie 主链路，v0.17.0；OpenAPI 可选回退）
 
-**模块**：`py_modules/baidu_openapi_client.py`（OAuth/转存/dlink/清理）、`py_modules/baidu_client.py`（仅公开分享 URL 元数据，空 cookie）；服务层 `_share_provider()` 把 `pan.baidu.com`/`yun.baidu.com`/`eyun.baidu.com` 识别为 `baidu_openapi`。**不接 BDUSS/Cookie 网页抓取、不接 CDP**。
+**模块**：`py_modules/baidu_qr.py`（Passport 扫码）、`py_modules/baidu_client.py`（Cookie 分享解析/直链）、`py_modules/baidu_openapi_client.py`（OpenAPI 回退）。服务层 `_share_provider()` 识别百度链接；安装计划**优先 Cookie，其次 OpenAPI，再提示扫码**。**不接 CDP/网页接口逆向**。
 
-**配置步骤（QAM，推荐）**：
+**扫码登录（QAM 推荐）**：
 
-1. 去百度网盘开放平台创建应用（应用类型选可用的网盘/文件类，回调地址填 `oob`），拿 **App Key / Secret Key**；
-2. QAM「百度网盘（官方 OpenAPI）」→ 填 App Key/Secret Key →「保存应用」；
-3. 点「获取授权链接」（`https://openapi.baidu.com/oauth/2.0/authorize?...redirect_uri=oob&scope=basic,netdisk`），浏览器登录百度并授权；
-4. 页面显示授权码，粘到「授权码」→「完成授权」；成功后面板显示账号/有效期；
-5. 过期会自动 refresh；要换账号/撤销时点「清除授权」（保留 App Key/Secret）。
+1. QAM「百度网盘（扫码登录）」→「扫码登录百度网盘」，插件请求 `https://passport.baidu.com/v2/api/getqrcode?lp=pc&qrloginfrom=pc` 并显示二维码（`data:image/png;base64`，session 内存 180s）；
+2. 用百度 App/百度网盘 App 扫码，QAM 会从 waiting→scanned（已扫码待确认）→success；
+3. 成功后 Cookie 写入 `state.json` 的 `baidu_login`（`BDUSS=...; STOKEN=...; PTOKEN=...`），可安装百度分享；「退出百度网盘」清空。
 
-**无头/纯 API 环境**：
+HTTP/手动调试（不依赖 QAM）：
 
 ```bash
-export FREEDECKCY_BAIDU_OPENAPI_APP_KEY=...
-export FREEDECKCY_BAIDU_OPENAPI_SECRET_KEY=...
-export FREEDECKCY_BAIDU_OPENAPI_REFRESH_TOKEN=...   # 可选，state 为空时兜底
-# 也可走 HTTP：
-curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/app \
-  -H 'Content-Type: application/json' -d '{"app_key":"...","secret_key":"..."}'
-curl -s http://127.0.0.1:59271/api/tianyi/baidu/openapi/authorize-url | python3 -m json.tool
-curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/exchange \
-  -H 'Content-Type: application/json' -d '{"code":"<授权码>"}'
-curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/qr/start | python3 -m json.tool
+# 返回 qr_data_url / qrcode_url / expires_at
+curl -s http://127.0.0.1:59271/api/tianyi/baidu/qr/poll | python3 -m json.tool
+# stage: waiting / scanned / success / expired / failed
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/qr/cancel
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/clear
 ```
 
-**测试/mock**：`python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`。测试用 `monkeypatch` mock `aiohttp`/`baidu_openapi_client._request_json`，不访问真实百度；覆盖来源识别、token refresh、安装计划（不要求天翼登录）、aria2 header、授权码交换、dlink 缓存复用。
+底层接口（调试用；`sign`/`v` 来自上一步返回）：
+
+```bash
+# 1) 取二维码
+curl -s 'https://passport.baidu.com/v2/api/getqrcode?lp=pc&qrloginfrom=pc' | python3 -m json.tool
+# 2) 轮询（channel_id 即 sign；长轮询，空响应/errno=1 表示 waiting）
+curl -s 'https://passport.baidu.com/channel/unicast?channel_id=<sign>&tpl=pp&tt=<ms>' 
+# 3) 手机确认后，用返回的 v 换 Cookie
+curl -s 'https://passport.baidu.com/v3/login/main/qrbdusslogin?bduss=<v>&qrcode=1&tpl=pp&apiver=v3&tt=<ms>&time=<ms>&alg=v3&elapsed=1'
+```
+
+**确认 Cookie 生效**：
+
+```bash
+curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep -A3 baidu_login
+# state.json 里应有 baidu_login.cookie（注意不要外传；文件 0600）
+# 准备百度分享 → 安装计划应返回 provider="baidu"，不再要求开放平台 App Key
+```
+
+任务会带百度 Cookie + `Referer=https://pan.baidu.com/disk/home` + `UA=pan.baidu.com`；重试/补下会重新取直链。
+
+**OpenAPI 回退（可选，需开发者资质）**：QAM「百度网盘 OpenAPI（可选）」里填 App Key/Secret → 获取授权链接 → 粘贴授权码；或 env `FREEDECKCY_BAIDU_OPENAPI_APP_KEY` / `SECRET_KEY` / `REFRESH_TOKEN`。只有**没有 Cookie 时**才走这条链路，且分享文件需要转存 `/FreedeckTmp`（安装后清理）。
+
+**测试/mock**：`python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`；扫码测试 mock `request_qr`/`fetch_qr_image`/`poll_qr`/`complete_login`，不访问真实百度。
 
 **排障**：
 
 | 现象 | 处理 |
 |---|---|
-| 计划阶段报“未配置百度开放平台应用” | 先在 QAM 保存 App Key/Secret（或设 env）；state 值优先 |
-| 授权失效/refresh 失败 | 清除授权后重新走 oob；确认 Secret 没填错、应用未被删除；必要时用 `FREEDECKCY_BAIDU_OPENAPI_REFRESH_TOKEN` 兜底 |
-| `errno=-6` / transfer disabled | 百度账号未开通/被限制转存，或分享文件禁止转存；换账号/稍后重试，看安装消息里的官方 errno |
-| dlink 403 / 下载失败 | 插件已带 `Referer=https://pan.baidu.com/disk/home`、`UA=pan.baidu.com`、空 cookie；403 多为 dlink 过期/风控，重试会重新取 dlink；仍失败看安装消息 |
-| 转存占用网盘空间 | 分享文件会转到 `/FreedeckTmp`，安装结束自动删除；清理失败会保留，可到百度网盘手动删 `/FreedeckTmp` |
-| 百度链接认不出 | 支持 `pan.baidu.com/s/<surl>`、`/share/init?surl=...`、`yun.baidu.com`/`eyun.baidu.com`；短链先展开成原始分享 URL |
-| 为什么不做 BDUSS/Cookie | 网页抓取/BDUSS 已多次失效且有风控/合规风险；只走官方 OpenAPI（参见 5.13 / 已知限制） |
+| 二维码不显示/获取失败 | 看 `/baidu/qr/start` 返回；网络需能访问 `passport.baidu.com`；图片下载失败时用返回的 `qrcode_url` 手工打开 |
+| 一直 waiting | 手机未扫码/未登录百度 App；刷新二维码重试；长轮询超时是正常行为 |
+| scanned 后失败/过期 | 二维码 180s 过期或手机未确认；重新扫码；失败信息看 poll 返回 |
+| 扫码成功但安装仍提示未登录 | 确认 `state.json` 的 `baidu_login.cookie` 含 `BDUSS=`；`/api/tianyi/settings` 的 `baidu_login.logged_in` 应为 true；必要时清空后重扫 |
+| Cookie 失效 / 直链 403 | Cookie 过期/风控，重新扫码；aria2 已带百度 Cookie/Referer/UA，403 多为直链过期/风控 |
+| 想用 OpenAPI 而不是扫码 | QAM 清空百度登录（或不要扫码），配置 OpenAPI 应用并授权；安装计划会在无 Cookie 时回退 OpenAPI |
+| 为什么不做 CDP | 不逆向网页接口；Cookie 只通过百度 Passport 官方扫码（`getqrcode/unicast/qrbdusslogin`）获取 |
 
 ---
+
+## 7. 常见故障排查---
 
 ## 7. 常见故障排查
 
@@ -860,7 +880,8 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 - **模拟器存档恢复/拆分（v0.16.0）**：PSP/PS3 用 PARAM.SFO、3DS 用 NCSD title id 拆分，PS1/PS2/Switch 仍整卡/整目录；恢复目标受 `restore_roots` 白名单限制，跨设备 3DS 可能退化到根目录；覆盖前有 `*.freedeckcy-bak-<时间戳>` 备份，共享卡冲突需确认；PS1 多碟自动 m3u 需要多张 `.cue/.chd`，已有 m3u 优先。
 - **模拟器存档上传（v0.15.0）**：PSP/PS1/PS2/3DS/PS3/Switch 共享记忆卡整目录上传、不按游戏拆分（同卡其它游戏也会包含）；GBA/FC/MD/NDS 按 ROM 文件名匹配，改名会 `game_save_not_found`；3DS/Switch 目录可能很大；`cloud_save_include_emulators` 默认开，可关。
 - **3DS（Azahar）SteamOS 兼容**（v0.14.1）：SteamOS 3.9.5 优先 Flathub Flatpak（AppImage 有上游 #127/#953 问题），需要系统有 flatpak 且能访问 Flathub；Flatpak 安装失败会回退 AppImage（可能仍打不开）；3DS 仅 x86_64（aarch64 目录隐藏）；system files 需用户自备并部署到 `~/.var/app/org.azahar_emu.Azahar/data/...`；已有快捷方式会自动重写，但真机验证仍待补。
-- **百度网盘只走官方 OpenAPI**（v0.14.0）：必须自建应用 + OAuth 授权（无公共应用）；分享文件需转存 `/FreedeckTmp` 才能取 dlink，会占用户网盘（安装后清理，失败则保留）；`errno=-6`/dlink 403 等官方错误进安装消息；**不接 BDUSS/Cookie/CDP**；公开分享元数据解析仍依赖分享页结构（空 cookie），页面改版可能影响解析。
+- **百度网盘（v0.17.0）**：主链路是扫码登录（BDUSS/Cookie），Cookie 等价账号凭据、会过期/被风控，失效需重新扫码；扫码 session 仅内存 180s，**扫码确认/换 Cookie 尚未真机验证**；OpenAPI 是可选回退（需自建应用，转存 `/FreedeckTmp`）；不接 CDP/网页逆向；百度接口变更可能影响扫码/直链。
+- **百度网盘 OpenAPI（v0.14.0，可选回退）**：必须自建应用 + OAuth 授权（无公共应用）；分享文件需转存 `/FreedeckTmp` 才能取 dlink，会占用户网盘（安装后清理，失败则保留）；`errno=-6`/dlink 403 等官方错误进安装消息；v0.17.0 主链路是扫码/Cookie，OpenAPI 仅在无 Cookie 时回退；**仍不接 CDP/网页逆向**；公开分享元数据/扫码接口变更可能影响解析。
 - **10 平台可安装，按架构裁剪，BIOS/固件自动部署**（v0.12.0）：x86_64 上 10 个平台（含 3DS/PS2/PS3/Switch）都可安装/启动；aarch64 上 3DS/PS2/PS3 无官方 arm64 包，目录按 `available_platforms()` 白名单隐藏（条目与筛选条都不出现），Switch 有 arm64 包可用。**插件包不集成任何模拟器，首次安装都需要联网下载**（包体积约 45MB）；PS1/PS2 需要 BIOS、3DS/PS3/Switch 需要 system files/固件/keys（v0.12.0 安装后自动从 `bios/<platform>/` 部署到模拟器目录并写 portable 配置，含压缩包；缺失不阻断安装但装完不能直接玩）；模拟器只识别注册表内扩展名，不含存档管理；下载/解包会额外占一份空间；ARM64/DroidDeck 上这些平台尚未真机验证。
 - **完整性校验是"大小 + 头部预检 + `7z t`（best-effort）"**：7z 不可用时自动跳过校验；没有哈希/签名校验；分卷识别只覆盖常见命名；云存档仍依赖 `node`。
 - **Steam 运行中写入仍可能被覆盖**：写前有备份且写后回读，但无法阻止运行中的 Steam 覆盖 `shortcuts.vdf`/`config.vdf`；装完建议重启 Steam（自动重启 Steam 在 ROADMAP §9）。
@@ -904,6 +925,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 | 改模拟器存档恢复/拆分 | `emulator_saves.py`（`restore_roots`/`build_restore_targets`/`_split_param_sfo`/`_split_3ds`/`_read_3ds_title_id`）、`param_sfo.py`、`tianyi_service._plan_emulator_save_restore`；PS1 多碟见 `emulator_manager.find_rom_file` |
 | 改模拟器存档发现 | `py_modules/emulator_saves.py`（`STANDARD_SAVE_DIRS`/`PORTABLE_SUBDIRS`/`PER_GAME_PLATFORMS`/`collect_emulator_save_paths`）；`tianyi_service._collect_cloud_save_candidates` 的 `emulator_saves` 分支与去重；设置 `cloud_save_include_emulators` |
 | 改 3DS Flatpak/修复 | `emulator_manager.py` 的 `_is_steamos`/`flatpak_installed`/`_ensure_flatpak`/`ensure_emulator`/`create_launch_wrapper`；`emulator_setup._deploy_3ds`；`tianyi_service._maybe_schedule_launcher_repair`/`_repair_emulator_launchers` |
+| 改百度扫码/Cookie | `py_modules/baidu_qr.py`（request_qr/fetch_qr_image/poll_qr/complete_login）、`baidu_client.py`（Cookie 解析/直链）、`tianyi_service` 的 `start/poll/cancel/clear_baidu_*`、`_share_provider` 与任务 header；OpenAPI 见 `baidu_openapi_client.py` |
 | 改百度 OpenAPI | `py_modules/baidu_openapi_client.py`（OAuth/refresh/转存/dlink/清理）、`py_modules/baidu_client.py`（公开分享元数据）、`tianyi_service` 的 `_share_provider`/`_build_install_plan`/`_fetch_baidu_direct_url`/`_cleanup_baidu_transfer_files`、QAM 百度区；不引入 BDUSS/Cookie |
 | 改仓库提交校验/合并 | `py_modules/submission.py`（`normalize_platform`/`validate_submission`/`build_catalog_row`/`merge_submissions`）、`submissions/schema.json`、`scripts/validate_submissions.py` / `merge_submissions.py`、`.github/workflows/ci.yml` 的提交校验步骤 |
 | 改 BIOS/固件部署 | `py_modules/emulator_setup.py`：`setup_emulator`、`_source_files`/`_extract_archives`（压缩包）、`_set_ini_value`（只修单键）、各平台 `_write_*`/`_deploy_*`；`tianyi_service._auto_register_emulator_to_steam` 调用并消费 `setup_messages` |
@@ -920,7 +942,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 345 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 348 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
@@ -928,7 +950,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
 - [ ] 改模拟器存档发现/恢复后跑 `pytest tests/test_emulator_saves.py -q`：单游戏不退化成整目录、共享目录去重、PARAM.SFO/3DS 拆分、恢复目标白名单、开关关闭；PS1 多碟跑 `tests/test_emulator.py` 的 m3u 用例；
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
-- [ ] 改百度相关代码后跑 `python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`（mock HTTP，不联网）；确认未引入 Cookie/BDUSS 路径；
+- [ ] 改百度相关代码后跑 `python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`（mock HTTP/扫码，不联网）；确认扫码 Cookie 只存 state、不写日志/诊断；
 - [ ] 改提交校验/合并后跑 `make validate-submissions`、`python scripts/merge_submissions.py --dry-run`，确认无 JSON 时 CI 也通过；`make validate-catalog` 确认合并后的 CSV 合法；
 - [ ] 改动模拟器注册表后验证 `available_platforms()`：x86_64 应有 10 个平台、aarch64 只有 7 个（3DS/PS2/PS3 无包），并确认 `/api/tianyi/catalog` 的 `platforms` 计数同步裁剪；
 - [ ] 改了 `src/` → `pnpm build` 并提交 `dist/index.js(.map)`；

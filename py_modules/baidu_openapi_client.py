@@ -20,6 +20,7 @@ from tianyi_client import ResolvedFile, ResolvedShare
 
 BAIDU_OPENAPI_AUTHORIZE_URL = "https://openapi.baidu.com/oauth/2.0/authorize"
 BAIDU_OPENAPI_TOKEN_URL = "https://openapi.baidu.com/oauth/2.0/token"
+BAIDU_OPENAPI_DEVICE_CODE_URL = "https://openapi.baidu.com/oauth/2.0/device/code"
 BAIDU_OPENAPI_XPAN_FILE_URL = "https://pan.baidu.com/rest/2.0/xpan/file"
 BAIDU_OPENAPI_XPAN_MULTIMEDIA_URL = "https://pan.baidu.com/rest/2.0/xpan/multimedia"
 BAIDU_OPENAPI_XPAN_NAS_URL = "https://pan.baidu.com/rest/2.0/xpan/nas"
@@ -278,6 +279,81 @@ def _raise_api_error(message: str, *, payload: Dict[str, Any], diagnostics: Opti
     else:
         error_message = message
     raise BaiduOpenApiError(error_message, diagnostics=_sanitize_diagnostics(merged))
+
+
+async def request_baidu_device_code(*, app_key: str, scope: str = "basic,netdisk") -> Dict[str, Any]:
+    """官方设备码模式：获取 device_code/user_code/二维码 URL。"""
+    client_id = str(app_key or "").strip()
+    if not client_id:
+        raise BaiduOpenApiError("App Key 为空")
+    payload = await _request_json(
+        "GET",
+        BAIDU_OPENAPI_DEVICE_CODE_URL,
+        params={
+            "response_type": "device_code",
+            "client_id": client_id,
+            "scope": scope,
+        },
+        headers={"User-Agent": "pan.baidu.com"},
+    )
+    if payload.get("error"):
+        raise BaiduOpenApiError(
+            str(payload.get("error_description") or payload.get("error") or "获取百度设备码失败"),
+            diagnostics={"stage": "device_code", "response": payload},
+        )
+    device_code = str(payload.get("device_code", "") or "").strip()
+    user_code = str(payload.get("user_code", "") or "").strip()
+    if not device_code or not user_code:
+        raise BaiduOpenApiError("百度设备码响应缺少 device_code/user_code", diagnostics={"response": payload})
+    return {
+        "device_code": device_code,
+        "user_code": user_code,
+        "verification_url": str(payload.get("verification_url", "") or "https://openapi.baidu.com/device"),
+        "qrcode_url": str(payload.get("qrcode_url", "") or ""),
+        "expires_in": max(0, int(payload.get("expires_in") or 300)),
+        "interval": max(5, int(payload.get("interval") or 5)),
+    }
+
+
+async def poll_baidu_device_token(
+    *,
+    app_key: str,
+    secret_key: str,
+    device_code: str,
+) -> Dict[str, Any]:
+    """轮询设备码换 token；未授权时抛 BaiduOpenApiError（diagnostics.error 为 pending 等）。"""
+    payload = await _request_json(
+        "GET",
+        BAIDU_OPENAPI_TOKEN_URL,
+        params={
+            "grant_type": "device_token",
+            "code": str(device_code or "").strip(),
+            "client_id": str(app_key or "").strip(),
+            "client_secret": str(secret_key or "").strip(),
+        },
+        headers={"User-Agent": "pan.baidu.com"},
+    )
+    if payload.get("error"):
+        raise BaiduOpenApiError(
+            str(payload.get("error_description") or payload.get("error") or "百度设备码授权失败"),
+            diagnostics={
+                "stage": "device_token",
+                "error": str(payload.get("error", "") or ""),
+                "response": payload,
+            },
+        )
+    access_token = str(payload.get("access_token", "") or "").strip()
+    refresh_token = str(payload.get("refresh_token", "") or "").strip()
+    if not access_token or not refresh_token:
+        raise BaiduOpenApiError("百度设备码响应缺少 access_token/refresh_token", diagnostics={"response": payload})
+    expires_in = max(0, int(payload.get("expires_in") or 0))
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "expires_in": expires_in,
+        "expires_at": int(time.time()) + expires_in if expires_in > 0 else 0,
+        "scope": str(payload.get("scope", "") or "").strip(),
+    }
 
 
 def build_baidu_oauth_authorize_url(

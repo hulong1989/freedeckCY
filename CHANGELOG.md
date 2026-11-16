@@ -2,6 +2,28 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.17.0
+
+### 新增
+
+- **百度网盘扫码登录（BDUSS/Cookie）**：
+  - `passport.baidu.com` 二维码 + 长轮询 + `qrbdusslogin`，扫码确认后保存 `BDUSS/STOKEN/PTOKEN`，不依赖开放平台 App Key。
+  - QAM「百度网盘（扫码登录）」：二维码直接显示、已扫码/已确认状态、取消/退出登录。
+  - 百度链接优先走 Cookie 链路（`provider=baidu`）：`resolve_baidu_share` + `fetch_baidu_download_url`，aria2 带百度 Cookie/Referer/UA。
+  - 没有 Cookie 时仍可回退到 OpenAPI（`provider=baidu_openapi`，需要 App Key）；OpenAPI 继续保留在设置里作为可选。
+- 新增 HTTP API：`/api/tianyi/baidu/qr/{start,poll,cancel}`、`/api/tianyi/baidu/clear`。
+
+### 变更
+
+- `BaiduLoginState`（cookie/user_account/updated_at）持久化；面板增加 `baidu_login`。
+- 测试 345 → 348（Cookie provider 计划/任务、扫码登录流程）。
+- 实测 `getqrcode` 能返回二维码图片、`unicast` 未扫码时返回等待；扫码确认需要真机手机验证。
+
+### 说明
+
+- 二维码/轮询来自百度网页版接口，不是官方 OpenAPI；Cookie 失效需重新扫码。
+- Cookie 仅存本地 state（0600），不写入日志/诊断。
+
 ## v0.16.0
 
 ### 新增
