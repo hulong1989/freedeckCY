@@ -1,3 +1,11 @@
+## Unreleased
+
+### 工具 / 文档
+
+- 新增 `scripts/export_remote_catalog.py` + `make catalog-json`：把本地目录导出为 NewFreedeck 兼容的 `all.json` / `platform/*.json` / `curated/*.json` / `manifest.json`，可放任意静态服务器自托管，不依赖作者服务器。
+- 新增 [docs/UPSTREAM_SERVER.md](docs/UPSTREAM_SERVER.md)：逆向 `panyiwei.xyz` 的目录/`emu.json`/模拟器源协议、缓存与失败模式、安全问题与替代方案；实测该服务器当前不可达。
+- 测试 260 → 264。
+
 # Changelog
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。

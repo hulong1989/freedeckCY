@@ -46,6 +46,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **GBA 模拟器闭环**：内置 mGBA（x64/arm64 AppImage），GBA 资源可安装/启动；不写 Proton 映射
 - **诊断与更新**：一键导出脱敏诊断 zip；检查 GitHub 最新 Release
 - **全量资源目录**：内置 7084 条资源（来自 v0.6），合并封面索引后 6823 条有封面（96.3%；原始自带 3473 条，索引命中 3311）；分类已清洗（不含平台名），可用 `scripts/merge_v06_catalog.py` 复现/更新
+- **无作者服务器依赖**：目录/封面/模拟器运行时均为本地或官方源；NewFreedeck 的 `panyiwei.xyz` 硬依赖已逆向并记录替代方案（[docs/UPSTREAM_SERVER.md](docs/UPSTREAM_SERVER.md)）
 - **数据体检**：`make validate-catalog` 检查重复 ID / 非法链接 / 空标题 / 分类混平台名，并统计封面覆盖率、平台分布与资源总大小（约 39 TB）；CI 每次都会跑
 - **封面索引与缓存**：内置 `cover_index.csv` 3470 行（可用 `FREEDECKCY_COVER_INDEX_CSV` 覆盖）；解析过的封面落盘缓存（正缓存 7 天 / 负缓存 30 分钟），重启后不再重复请求
 - **DroidDeck（Android/ARM64）适配**：ARM64 运行时、ARM Proton 工具自动解析、双 Steam 根、`make package-droiddeck` 出 arm64 包，详见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
@@ -112,12 +113,13 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 260）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 264）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
 
 更多细节（模块职责、调试、故障排查）见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)；
+上游 `panyiwei.xyz` 依赖的逆向记录与自托管替代方案见 [docs/UPSTREAM_SERVER.md](docs/UPSTREAM_SERVER.md)；
 后续可做项见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
 常用环境变量：
@@ -174,11 +176,11 @@ src/index.tsx               QAM 面板（React，构建产物在 dist/）
 defaults/tianyi_library_ui  本地游戏库页面（Vue 3，免构建：浏览/分页/排序/已安装/诊断）
 defaults/tianyi_catalog     资源清单（freedeckcy_catalog.csv 7084 条 + 旧目录回退）与封面索引
 backend/*.js                Node 辅助脚本（分享解析兜底、云盘上传）
-scripts/                    运行时获取（含 mGBA）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗
+scripts/                    运行时获取（含 mGBA）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗 / 远程目录导出
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
-tests/                      pytest 用例（260 个）
+tests/                      pytest 用例（264 个）
 CHANGELOG.md                版本变更记录
-Makefile                    构建入口：runtime / emulator-runtime / package / package-droiddeck / test / doctor / validate-catalog / normalize-catalog / clean
+Makefile                    构建入口：runtime / emulator-runtime / catalog-json / package / package-droiddeck / test / doctor / validate-catalog / normalize-catalog / clean
 ```
 
 ## 安全说明

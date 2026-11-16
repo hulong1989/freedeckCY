@@ -40,7 +40,7 @@
 
 - 拆出至少 4 个模块（建议：`install_flow.py`、`cloud_save_flow.py`、`login_flow.py`、`playtime.py`），`TianyiService` 只做编排与状态持有；
 - `main.py` / `tianyi_http.py` 的调用面不变（RPC 与 HTTP 契约不动）；
-- `make test`（当前 260 个用例）保持全绿，新增用例覆盖搬迁后的模块；
+- `make test`（当前 264 个用例）保持全绿，新增用例覆盖搬迁后的模块；
 - 单个 Python 文件 < 1500 行；`docs/ARCHITECTURE.md` 的引用与模块图同步更新。
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_http.py`、`docs/ARCHITECTURE.md`。
@@ -280,7 +280,7 @@
 - **平台/分类双筛选 UI**：库页两行筛选条（全部平台 + 各平台；全部分类 + Top12 分类），手柄焦点顺序 搜索框→搜索按钮→平台条→分类条→卡片；
 - **链接格式**：`_is_valid_tianyi_url()` / `parse_share_url()` 支持 `/t/<code>` 与 `/web/share?code=` 两种天翼分享链接；
 - **数据质量（v0.3.1）**：`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底），数据 606 行改写、「模拟器」606 条；`scripts/validate_catalog.py --strict` 进 CI，重复 `game_id`/非法链接/空标题/分类混平台名会让 CI 红；
-- 测试：`make test` 260 用例（含 `tests/test_catalog_platform.py` / `tests/test_droiddeck.py` / `tests/test_emulator.py` 与分类清洗/默认目录洁净度用例）。
+- 测试：`make test` 264 用例（含 `tests/test_catalog_platform.py` / `tests/test_droiddeck.py` / `tests/test_emulator.py` 与分类清洗/默认目录洁净度用例）。
 
 **仍未做**：封面索引的**生成流水线**（`generate_*_cover_urls.py` 类脚本；当前 index 直接来自 v0.6）、无网络时纯离线封面库、其它平台模拟器安装（GBA 已在 v0.6.0 落地，见 9.8）。
 
@@ -310,7 +310,7 @@
 - 安装计划只放行 PC + GBA，GBA 计划返回 `platform/emulator/emulator_info/rom_target`；任务记录新增 `platform`；
 - 安装完成后 `find_rom_file()` 找 `.gba` → 生成 `<install_dir>/launch-freedeckcy.sh`（`exec <mGBA> -f <rom>`）→ Steam 快捷方式 Exe=脚本、LaunchOptions 带 `freedeckcy:tianyi:<token>`（卸载定位）、**Proton 写 none（原生 Linux）**；已安装记录新增 `platform/emulator/rom_path/launcher_path`；
 - 诊断包 `emulators.mgba` 报告可用性/来源/版本；构建侧 `scripts/fetch_emulator.sh` + `make emulator-runtime`，打包按架构裁剪并检查 `mGBA.AppImage`；
-- 测试 `tests/test_emulator.py`；`make test` 260 用例。
+- 测试 `tests/test_emulator.py`；`make test` 264 用例。
 
 **仍未做 / 待评估**：其它平台（PS1/PS2/PS3/PSP/3DS/NDS/FC/MD/Switch）均为"只可浏览不可安装"——每个模拟器配置差异大（BIOS、存档、键位、Proton/原生启动），ROM/BIOS 版权风险极高；**建议先合规评审再逐个平台接入**。GBA 闭环也只识别 `.gba`，不含 BIOS/存档管理与包内嵌套处理。
 
@@ -380,4 +380,4 @@
 - 架构与问题清单：[ARCHITECTURE.md](ARCHITECTURE.md)
 - 与作者 v0.6 的能力对照：[ARCHITECTURE.md](ARCHITECTURE.md) §13
 - 本地开发、调试、故障排查：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 当前测试基线：`make test` → 260 passed（2026-11 v0.6.0）
+- 当前测试基线：`make test` → 264 passed（2026-11 v0.6.0）
