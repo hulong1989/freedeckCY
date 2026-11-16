@@ -216,6 +216,7 @@ class Plugin:
         page_size: int = 50,
         auto_delete_package: bool = False,
         auto_install: bool = True,
+        proton_tool: str = "auto",
     ) -> dict:
         """保存天翼下载设置。"""
         try:
@@ -226,6 +227,7 @@ class Plugin:
                 page_size = int(payload.get("page_size", page_size))
                 auto_delete_package = bool(payload.get("auto_delete_package", auto_delete_package))
                 auto_install = bool(payload.get("auto_install", auto_install))
+                proton_tool = str(payload.get("proton_tool", proton_tool))
             elif isinstance(payload, str) and not download_dir:
                 download_dir = payload
 
@@ -236,6 +238,7 @@ class Plugin:
                 page_size=page_size,
                 auto_delete_package=auto_delete_package,
                 auto_install=auto_install,
+                proton_tool=proton_tool,
             )
             return {"status": "success", "data": data}
         except Exception as exc:

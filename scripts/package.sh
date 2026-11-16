@@ -45,6 +45,10 @@ usage() {
   - 默认复用已提交的 dist/index.js，不强制构建前端
   - 若 defaults/runtime 缺失只警告（提示先跑 fetch_runtime.sh），不中断
 
+环境变量:
+  PACKAGE_ARCH       目标架构：x86_64（默认）| aarch64 | all
+                     aarch64 产物名带 -arm64 后缀；all 产物名带 -universal 后缀
+
 选项:
   --build-ui         打包前执行 `pnpm build` 重新构建前端（需要 pnpm；默认不构建）
   --out-dir <目录>   输出目录，默认 <repo>/dist-artifacts
@@ -172,7 +176,20 @@ VERSION_RAW="$(read_version "$REPO_ROOT/package.json")"
 VERSION="$(printf '%s' "$VERSION_RAW" | tr -cd 'A-Za-z0-9._+~-')"
 [[ -n "$VERSION" ]] || die "package.json version 含非法字符，处理后为空: ${VERSION_RAW}"
 
+PACKAGE_ARCH="${PACKAGE_ARCH:-x86_64}"
+case "$PACKAGE_ARCH" in
+    x86_64 | aarch64 | all) ;;
+    *) die "PACKAGE_ARCH 仅支持 x86_64|aarch64|all（当前: ${PACKAGE_ARCH}）" ;;
+esac
+ARCH_SUFFIX=""
+if [[ "$PACKAGE_ARCH" == "aarch64" ]]; then
+    ARCH_SUFFIX="-arm64"
+elif [[ "$PACKAGE_ARCH" == "all" ]]; then
+    ARCH_SUFFIX="-universal"
+fi
+
 log "插件版本: ${VERSION_RAW}"
+log "目标架构: ${PACKAGE_ARCH}"
 
 # ---- 运行时提示（缺失只警告） ----------------------------------------------
 if [[ ! -d "$REPO_ROOT/defaults/runtime" ]]; then
@@ -182,12 +199,16 @@ else
     runtime_has_binary() { # comp_file_name
         local name="$1"
         local found
-        found="$(find "$REPO_ROOT/defaults/runtime" -type f -name "$name" | sed -n '1p')"
+        if [[ "$PACKAGE_ARCH" == "all" ]]; then
+            found="$(find "$REPO_ROOT/defaults/runtime" -type f -name "$name" | sed -n '1p')"
+        else
+            found="$(find "$REPO_ROOT/defaults/runtime" -type f -path "*/${PACKAGE_ARCH}/*" -name "$name" | sed -n '1p')"
+        fi
         [[ -n "$found" ]]
     }
-    runtime_has_binary aria2c || warn "defaults/runtime/ 中没有 aria2c：包内不含 aria2 运行时，Steam Deck 上可能无法下载"
-    runtime_has_binary 7zz || warn "defaults/runtime/ 中没有 7zz：包内不含 7z 运行时，可能无法解压压缩包"
-    runtime_has_binary node || warn "defaults/runtime/ 中没有 node：包内不含 node 运行时，天翼 JS 解析可能不可用"
+    runtime_has_binary aria2c || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 aria2c：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
+    runtime_has_binary 7zz || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 7zz：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
+    runtime_has_binary node || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 node：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
 fi
 
 # ---- 组装暂存目录 -----------------------------------------------------------
@@ -239,6 +260,16 @@ for _d in "${PACKAGE_DIRS[@]}"; do
     copy_tree "$_d"
 done
 
+# 单架构打包：删掉 defaults/runtime 下其它架构，避免包体积翻倍
+if [[ "$PACKAGE_ARCH" != "all" && -d "$STAGE/defaults/runtime" ]]; then
+    for _component in aria2 7z node; do
+        _dir="$STAGE/defaults/runtime/$_component"
+        [[ -d "$_dir" ]] || continue
+        find "$_dir" -mindepth 1 -maxdepth 1 -type d ! -name "$PACKAGE_ARCH" -exec rm -rf {} + 2>/dev/null || true
+    done
+    log "已裁剪运行时到 ${PACKAGE_ARCH}"
+fi
+
 # ---- 校验暂存内容 -----------------------------------------------------------
 for _f in main.py plugin.json package.json dist/index.js; do
     [[ -f "$STAGE/$_f" ]] || die "打包暂存目录缺少 ${_f}"
@@ -250,7 +281,7 @@ done
 # ---- 生成 zip ---------------------------------------------------------------
 mkdir -p "$OUT_DIR"
 [[ -d "$OUT_DIR" ]] || die "无法创建输出目录: ${OUT_DIR}"
-OUT_ZIP="$OUT_DIR/freedeckCY-v${VERSION}.zip"
+OUT_ZIP="$OUT_DIR/freedeckCY-v${VERSION}${ARCH_SUFFIX}.zip"
 if [[ -f "$OUT_ZIP" ]]; then
     rm -f -- "$OUT_ZIP"
 fi

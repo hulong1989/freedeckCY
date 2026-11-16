@@ -1,7 +1,7 @@
 # freedeckCY
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.3.1**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.4.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 
 Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把"下载 → 解压 → 装进 Steam 库"整条链路做成几个按钮，另带云存档上传/恢复和游玩时长统计。
@@ -15,7 +15,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.3.1**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.4.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -38,7 +38,8 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **全量资源目录**：内置 7084 条资源（来自 v0.6），合并封面索引后 6823 条有封面（96.3%；原始自带 3473 条，索引命中 3311）；分类已清洗（不含平台名），可用 `scripts/merge_v06_catalog.py` 复现/更新
 - **数据体检**：`make validate-catalog` 检查重复 ID / 非法链接 / 空标题 / 分类混平台名，并统计封面覆盖率、平台分布与资源总大小（约 39 TB）；CI 每次都会跑
 - **封面索引与缓存**：内置 `cover_index.csv` 3470 行（可用 `FREEDECKCY_COVER_INDEX_CSV` 覆盖）；解析过的封面落盘缓存（正缓存 7 天 / 负缓存 30 分钟），重启后不再重复请求
-- **多库 / SD 卡 / Flatpak**：扫描 `libraryfolders.vdf`，Proton 前缀不只在主库找
+- **DroidDeck（Android/ARM64）适配**：ARM64 运行时、ARM Proton 工具自动解析、双 Steam 根、`make package-droiddeck` 出 arm64 包，详见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
+- **多库 / SD 卡 / Flatpak**：扫描 `libraryfolders.vdf`，Proton 前缀不只在主库找（DroidDeck 双 Steam 根也覆盖）
 - **云存档**：扫描 Proton 前缀里的存档目录，打包 `7z + manifest.json` 上传到自己的网盘；恢复时做冲突探测，覆盖前就地备份
 - **游玩时长**：监听 Steam 启动/退出事件累计时长，并在游戏库详情页展示（含 HowLongToBeat 的主线/总时长）
 
@@ -56,10 +57,21 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
-make package     # 产出 dist-artifacts/freedeckCY-v0.3.1.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.4.0.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
+
+### 方式 C：DroidDeck（Android / ARM64）
+
+DroidDeck 支持导入 Decky 插件，但手机是 ARM64，需要 arm64 包：
+
+```bash
+make runtime ARCH=aarch64
+make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zip
+```
+
+在 DroidDeck 的 Decky 菜单里 **Import plugin zip** 选择它。路径、Proton 工具、双 Steam 客户端等细节见 [docs/DROIDDECK.md](docs/DROIDDECK.md)。
 
 ### 方式 B：直接拿 Release 包
 
@@ -81,8 +93,9 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 233）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 242）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
+make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
 
 更多细节（模块职责、调试、故障排查）见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)；
@@ -95,6 +108,7 @@ make doctor                  # 环境诊断：运行时/Steam/state/日志/端�
 | `FREEDECKCY_ARIA2_BIN` | 指定 aria2c 路径（默认用 `defaults/runtime/aria2/<arch>/aria2c`） |
 | `FREEDECKCY_7Z_BIN` | 指定 7zz 路径 |
 | `FREEDECKCY_NODE_BIN` | 指定 node 路径 |
+| `FREEDECKCY_PROTON_TOOL` | 覆盖 Proton 兼容工具名；`none` 表示不写映射（DroidDeck 默认 `droiddeck-proton-arm64`） |
 | `FREEDECKCY_STEAM_ROOT` | 覆盖 Steam 根目录（Flatpak/自定义安装时用） |
 | `FREEDECKCY_STATE_FILE` | `clear_freedeckcy_tasks.sh` 使用的 state.json 路径 |
 | `FREEDECKCY_GAME_CATALOG_CSV` | 覆盖资源清单 CSV 路径 |
@@ -139,11 +153,11 @@ src/index.tsx               QAM 面板（React，构建产物在 dist/）
 defaults/tianyi_library_ui  本地游戏库页面（Vue 3，免构建）
 defaults/tianyi_catalog     资源清单（freedeckcy_catalog.csv 7084 条 + 旧目录回退）与封面索引
 backend/*.js                Node 辅助脚本（分享解析兜底、云盘上传）
-scripts/                    运行时获取 / 打包 / 诊断 / 目录合并 / 目录体检 / 分类清洗
+scripts/                    运行时获取 / 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
-tests/                      pytest 用例（233 个）
+tests/                      pytest 用例（242 个）
 CHANGELOG.md                版本变更记录
-Makefile                    构建入口：runtime / package / test / doctor / validate-catalog / normalize-catalog / clean
+Makefile                    构建入口：runtime / package / package-droiddeck / test / doctor / validate-catalog / normalize-catalog / clean
 ```
 
 ## 安全说明
@@ -168,6 +182,7 @@ Makefile                    构建入口：runtime / package / test / doctor / v
 - 云存档的上传/恢复仍依赖 `node`（`make runtime` 会准备；未执行则该功能不可用）
 - 下载完整性做「大小 + 文件头 + `7z t`」，但没有哈希校验；7z 不可用时自动跳过校验（best-effort）
 - 模拟器平台（FC/NDS/PSP/GBA/3DS/PS2/PS1/PS3/MD/Switch）当前**只可浏览、不可安装**：点击会提示未集成模拟器，后端也会拒绝生成安装计划
+- **DroidDeck 适配未真机验证**：FEX / ARM Proton / Android 存储映射可能有差异，排障见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
 - 分卷识别只覆盖常见 6 类命名，冷门命名会被当成普通文件
 - `tianyi_service.py` 仍是单文件巨型类，长期维护成本高
 

@@ -319,6 +319,7 @@ async def handle_settings_set(request: web.Request, plugin: Any) -> web.Response
             page_size=body.get("page_size"),
             auto_delete_package=body.get("auto_delete_package"),
             auto_install=body.get("auto_install"),
+            proton_tool=body.get("proton_tool"),
         )
         return _json_ok({"data": data})
     except Exception as exc:

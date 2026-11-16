@@ -66,6 +66,8 @@ class TianyiSettings:
     page_size: int = 50
     auto_delete_package: bool = False
     auto_install: bool = True
+    # Proton 兼容工具：auto=按环境自动判断（DroidDeck 用 ARM 工具），none=不写映射
+    proton_tool: str = "auto"
 
 
 @dataclass
@@ -218,6 +220,7 @@ class TianyiStateStore:
                     page_size=max(10, min(200, _to_int(settings_raw.get("page_size", 50), 50))),
                     auto_delete_package=_to_bool(settings_raw.get("auto_delete_package", False), False),
                     auto_install=_to_bool(settings_raw.get("auto_install", True), True),
+                    proton_tool=str(settings_raw.get("proton_tool", "auto") or "auto").strip() or "auto",
                 )
 
             next_tasks: List[TianyiTaskRecord] = []
@@ -336,6 +339,7 @@ class TianyiStateStore:
         page_size: Optional[int] = None,
         auto_delete_package: Optional[bool] = None,
         auto_install: Optional[bool] = None,
+        proton_tool: Optional[str] = None,
     ) -> None:
         """更新设置。"""
         with self._lock:
@@ -351,6 +355,8 @@ class TianyiStateStore:
                 self.settings.auto_delete_package = bool(auto_delete_package)
             if auto_install is not None:
                 self.settings.auto_install = bool(auto_install)
+            if proton_tool is not None:
+                self.settings.proton_tool = str(proton_tool).strip() or "auto"
             self.save()
 
     def upsert_tasks(self, records: List[TianyiTaskRecord]) -> None:

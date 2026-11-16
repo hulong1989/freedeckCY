@@ -37,6 +37,11 @@ def _steam_root_candidates() -> List[str]:
     candidates: List[str] = []
     if env_root:
         candidates.append(env_root)
+    # DroidDeck（Android 上跑 SteamOS）的 x64 Steam 客户端有独立 HOME；
+    # 如果它正在运行（steam.pid），优先写它的 shortcuts/config。
+    droiddeck_x64 = os.path.join(home, ".droiddeck-x64", ".local", "share", "Steam")
+    if os.path.isfile(os.path.join(droiddeck_x64, "steam.pid")):
+        candidates.append(droiddeck_x64)
     candidates.extend(
         [
             os.path.join(home, ".steam", "steam"),
@@ -47,7 +52,52 @@ def _steam_root_candidates() -> List[str]:
             os.path.join(home, ".var", "app", "com.valvesoftware.Steam", ".steam", "steam"),
         ]
     )
+    if droiddeck_x64 not in candidates:
+        candidates.append(droiddeck_x64)
     return candidates
+
+
+def is_droiddeck(steam_root: str = "") -> bool:
+    """判断当前是否运行在 DroidDeck（Android 上的 SteamOS 运行时）。
+
+    只看文件系统标记，不依赖进程名；DroidDeck 会在 HOME 下留下
+    .droiddeck-* 目录，并在 Steam 根下写 package/droiddeck-installed。
+    """
+    home = os.path.expanduser("~")
+    markers = [
+        os.getenv("DROIDDECK_ROOT", ""),
+        os.path.join(home, ".droiddeck-x64"),
+        os.path.join(home, ".droiddeck-decky-enabled"),
+        os.path.join(home, ".droiddeck"),
+    ]
+    if steam_root:
+        markers.append(os.path.join(str(steam_root), "package", "droiddeck-installed"))
+    return any(path and os.path.exists(path) for path in markers)
+
+
+def detect_proton_tool(steam_root: str = "") -> str:
+    """解析默认 Proton 兼容工具。
+
+    优先级：
+      1. 环境变量 FREEDECKCY_PROTON_TOOL（none 表示不写映射）
+      2. DroidDeck：droiddeck-proton-11-arm64（若 config.vdf 已出现）或 droiddeck-proton-arm64
+      3. 其它环境：proton_experimental
+    """
+    env_value = str(os.getenv("FREEDECKCY_PROTON_TOOL") or "").strip()
+    if env_value:
+        return env_value
+    if is_droiddeck(steam_root):
+        config_path = _config_vdf_path(steam_root) if steam_root else ""
+        if config_path and os.path.isfile(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8", errors="replace") as fh:
+                    text = fh.read()
+                if "droiddeck-proton-11-arm64" in text:
+                    return "droiddeck-proton-11-arm64"
+            except Exception:
+                pass
+        return "droiddeck-proton-arm64"
+    return "proton_experimental"
 
 
 def _find_steam_root() -> str:
@@ -978,7 +1028,7 @@ async def add_or_update_tianyi_shortcut(
     display_name: str,
     exe_path: str,
     launch_options: str,
-    proton_tool: str = "proton_experimental",
+    proton_tool: str = "auto",
     cover_landscape_url: str = "",
     cover_portrait_url: str = "",
     cover_hero_url: str = "",
@@ -1001,12 +1051,19 @@ async def add_or_update_tianyi_shortcut(
     user_id = str(shortcut.get("user_id", "") or "")
     app_id = _safe_int(shortcut.get("appid"), 0)
 
-    proton = await asyncio.to_thread(
-        _set_proton_mapping_sync,
-        steam_root=steam_root,
-        app_id=app_id,
-        compat_tool=str(proton_tool or "").strip() or "proton_experimental",
-    )
+    requested_tool = str(proton_tool or "").strip() or "auto"
+    resolved_tool = detect_proton_tool(steam_root) if requested_tool.lower() == "auto" else requested_tool
+    if resolved_tool.lower() in {"none", "skip", "disabled"}:
+        proton = {"ok": True, "skipped": True, "message": "已按设置跳过 Proton 映射"}
+    else:
+        proton = await asyncio.to_thread(
+            _set_proton_mapping_sync,
+            steam_root=steam_root,
+            app_id=app_id,
+            compat_tool=resolved_tool,
+        )
+    proton["requested"] = requested_tool
+    proton["tool"] = resolved_tool
 
     landscape = str(cover_landscape_url or "").strip()
     portrait = str(cover_portrait_url or "").strip()

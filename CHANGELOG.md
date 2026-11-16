@@ -2,6 +2,21 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.4.0
+
+### 新增
+
+- **DroidDeck 适配（Android/ARM64）**：新增 `make package-droiddeck` 产出 `-arm64` 插件包；运行时按 `platform.machine()` 选择 `aarch64` 版 aria2c / 7zz / node。
+- **Proton 工具自动判断**：检测到 DroidDeck 时自动改用 `droiddeck-proton-arm64`（若 `config.vdf` 出现 11 版则用 `droiddeck-proton-11-arm64`）；新增设置项 `proton_tool`（`auto` / `none` / 指定工具名）与环境变量 `FREEDECKCY_PROTON_TOOL`。
+- **双 Steam 客户端处理**：DroidDeck 的 x64 Steam 客户端有独立 HOME（`~/.droiddeck-x64/.local/share/Steam`）；若其正在运行（`steam.pid`）则优先写入该客户端。
+- 新增 [docs/DROIDDECK.md](docs/DROIDDECK.md)：安装、构建、路径、Proton、排障与已知限制。
+
+### 变更
+
+- 打包脚本支持 `PACKAGE_ARCH=x86_64|aarch64|all`，单架构打包会裁剪其它架构运行时。
+- `GET /api/tianyi/settings` 返回 `proton_tool_resolved` 与 `droiddeck_detected`。
+- 测试 233 → 242（新增 DroidDeck 检测、ARM 工具选择、双客户端路径、设置往返等用例）。
+
 ## v0.3.1
 
 ### 新增

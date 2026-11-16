@@ -34,6 +34,8 @@ from game_catalog import (
 from seven_zip_manager import SevenZipError, SevenZipManager
 from steam_shortcuts import (
     add_or_update_tianyi_shortcut,
+    detect_proton_tool,
+    is_droiddeck,
     find_compatdata_dirs,
     list_tianyi_shortcuts_sync,
     remove_tianyi_shortcut,
@@ -2328,8 +2330,15 @@ class TianyiService:
         }
 
     async def get_settings(self) -> Dict[str, Any]:
-        """获取下载设置。"""
-        return asdict(self.store.settings)
+        """获取下载设置（附带当前环境的 Proton 工具解析结果）。"""
+        data = asdict(self.store.settings)
+        try:
+            steam_root = ""
+            data["proton_tool_resolved"] = detect_proton_tool(steam_root)
+            data["droiddeck_detected"] = is_droiddeck(steam_root)
+        except Exception as exc:
+            config.logger.warning("解析 Proton 工具失败: %s", exc)
+        return data
 
     def _new_cloud_save_state(self) -> Dict[str, Any]:
         """构建云存档任务默认状态。"""
@@ -4771,6 +4780,7 @@ class TianyiService:
         page_size: Optional[int] = None,
         auto_delete_package: Optional[bool] = None,
         auto_install: Optional[bool] = None,
+        proton_tool: Optional[str] = None,
     ) -> Dict[str, Any]:
         """更新下载设置。"""
         if download_dir is not None:
@@ -6175,7 +6185,7 @@ class TianyiService:
                 display_name=display_name,
                 exe_path=exe_path,
                 launch_options=launch_options,
-                proton_tool="proton_experimental",
+                proton_tool=str(self.store.settings.proton_tool or "auto"),
                 cover_landscape_url=cover_landscape,
                 cover_portrait_url=cover_portrait,
                 steam_app_id=steam_app_id,

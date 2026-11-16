@@ -1,12 +1,12 @@
 # freedeckCY 后续路线图（ROADMAP）
 
-> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检之后**（第三轮参考作者 v0.6 对齐下载/Steam 集成能力；v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 落地平台字段、封面缓存与分类筛选；v0.3.0 补齐 7084 条 / 11 平台目录、cover index 与平台筛选 UI；v0.3.1 清洗分类并给目录加体检/CI 门禁）值得继续做、以及明确不建议做的方向。当前版本 **v0.3.1**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
+> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配之后**（第三轮参考作者 v0.6 对齐下载/Steam 集成能力；v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 落地平台字段、封面缓存与分类筛选；v0.3.0 补齐 7084 条 / 11 平台目录、cover index 与平台筛选 UI；v0.3.1 清洗分类并给目录加体检/CI 门禁；v0.4.0 适配 Android/ARM64 的 DroidDeck）值得继续做、以及明确不建议做的方向。当前版本 **v0.4.0**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
 >
 > 背景：上游作者已停止维护，`main` 只是早期版本，Releases 里的百度网盘 / 模拟器 / 资源池代码**不在本仓库**（见 [ARCHITECTURE.md](ARCHITECTURE.md) §2）。
 >
 > ⚠️ 合规提示：本项目分发的资源链接来自互联网，属于盗版资源分发，违反云盘服务条款并涉及版权风险。本路线图只讨论**工程改进**，不建议部署使用，更不建议扩大资源分发能力。
 >
-> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0/v0.3.0 —— 目录平台字段 + `cover_index.csv` + 封面磁盘缓存 + **全量目录（7084 条 / 11 平台）+ 平台/分类双筛选 UI**（§9.6）；v0.3.1 —— 分类清洗（606 行，「模拟器」606 条）+ `validate_catalog --strict` 进 CI。
+> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0/v0.3.0 —— 目录平台字段 + `cover_index.csv` + 封面磁盘缓存 + **全量目录（7084 条 / 11 平台）+ 平台/分类双筛选 UI**（§9.6）；v0.3.1 —— 分类清洗（606 行，「模拟器」606 条）+ `validate_catalog --strict` 进 CI；v0.4.0 —— **DroidDeck（Android/ARM64）适配**：ARM64 运行时/ARM Proton 解析/双 Steam 根/`PACKAGE_ARCH` 打包（见 [DROIDDECK.md](DROIDDECK.md)，尚未真机验证）。
 
 ---
 
@@ -14,7 +14,7 @@
 
 | # | 事项 | 优先级 | 预估 | 一句话收益 |
 |---|---|---|---|---|
-| 1 | 拆分 `tianyi_service.py` | P0（工程健康） | 大 | 让 7500 行巨型类可维护、可测试 |
+| 1 | 拆分 `tianyi_service.py` | P0（工程健康） | 大 | 让 7600 行巨型类可维护、可测试 |
 | 2 | CI 增加 `ruff` / `mypy` | P0（工程健康） | 中 | 拦住低级错误与类型漂移 |
 | 3 | 云存档 plan/apply 与 HTTP handler 测试 | P1（数据安全） | 中 | 覆盖最容易丢存档的路径 |
 | 4 | 去掉 node 依赖（纯 Python 实现） | P1（可部署性） | 中 | 去掉约 90 MB 的 node 运行时与跨架构问题 |
@@ -28,9 +28,9 @@
 
 ---
 
-## 1. 拆分 `tianyi_service.py`（P0，当前约 7500 行）
+## 1. 拆分 `tianyi_service.py`（P0，当前约 7600 行）
 
-**现状**：`py_modules/tianyi_service.py` 约 7500 行、单个 `TianyiService` 类 100+ 方法，覆盖安装、云存档、登录采集、时长、面板缓存等互相独立的职责；此外 `_post_process_completed_task` / `_collect_cloud_save_candidates` 等长函数仍在膨胀。
+**现状**：`py_modules/tianyi_service.py` 约 7600 行、单个 `TianyiService` 类 100+ 方法，覆盖安装、云存档、登录采集、时长、面板缓存等互相独立的职责；此外 `_post_process_completed_task` / `_collect_cloud_save_candidates` 等长函数仍在膨胀。
 
 **为什么**：巨型类导致改动风险高、review 困难、测试只能整体起实例；第二轮的"分组安装 / 重启恢复"是在这个文件里继续叠加的，再拖延拆分成本只会更高。
 
@@ -40,7 +40,7 @@
 
 - 拆出至少 4 个模块（建议：`install_flow.py`、`cloud_save_flow.py`、`login_flow.py`、`playtime.py`），`TianyiService` 只做编排与状态持有；
 - `main.py` / `tianyi_http.py` 的调用面不变（RPC 与 HTTP 契约不动）；
-- `make test`（当前 233 个用例）保持全绿，新增用例覆盖搬迁后的模块；
+- `make test`（当前 242 个用例）保持全绿，新增用例覆盖搬迁后的模块；
 - 单个 Python 文件 < 1500 行；`docs/ARCHITECTURE.md` 的引用与模块图同步更新。
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_http.py`、`docs/ARCHITECTURE.md`。
@@ -280,7 +280,7 @@
 - **平台/分类双筛选 UI**：库页两行筛选条（全部平台 + 各平台；全部分类 + Top12 分类），手柄焦点顺序 搜索框→搜索按钮→平台条→分类条→卡片；
 - **链接格式**：`_is_valid_tianyi_url()` / `parse_share_url()` 支持 `/t/<code>` 与 `/web/share?code=` 两种天翼分享链接；
 - **数据质量（v0.3.1）**：`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底），数据 606 行改写、「模拟器」606 条；`scripts/validate_catalog.py --strict` 进 CI，重复 `game_id`/非法链接/空标题/分类混平台名会让 CI 红；
-- 测试：`make test` 233 用例（含 `tests/test_catalog_platform.py` 与分类清洗/默认目录洁净度用例）。
+- 测试：`make test` 242 用例（含 `tests/test_catalog_platform.py` / `tests/test_droiddeck.py` 与分类清洗/默认目录洁净度用例）。
 
 **仍未做**：封面索引的**生成流水线**（`generate_*_cover_urls.py` 类脚本；当前 index 直接来自 v0.6）、无网络时纯离线封面库、模拟器安装（见 9.8）。非 PC 资源当前只可浏览不可安装。
 
@@ -367,6 +367,7 @@
 
 | 事项 | 说明 | 验收要点 |
 |---|---|---|
+| DroidDeck 适配 ✅ | **v0.4.0 已落地**：ARM64 运行时选择（`make runtime ARCH=aarch64`）、`is_droiddeck()` 检测、ARM Proton 自动解析（`droiddeck-proton-arm64`/`11-arm64`）、双 Steam 根（x64 客户端优先）、`PACKAGE_ARCH` 打包（`-arm64`/`-universal`）。**尚未真机验证**；模拟器平台仍只可浏览不可装（§9.8） | 真机验证通过后回归本项；详见 [DROIDDECK.md](DROIDDECK.md) |
 | 目录数据体检 / 分类清洗 ✅ | **v0.3.1 已完成**：`normalize_categories` + `normalize_catalog_categories.py` 清洗 606 行，`validate_catalog.py --strict` 进 CI（封面覆盖 96.3%，总大小约 39 TB） | 已完成，后续仅在数据变更时复用 `make normalize-catalog` / `make validate-catalog` |
 | 日志路径可配置 | 目前写死 `/tmp/freedeckcy.log`（已轮转） | 支持 `FREEDECKCY_LOG_FILE`，非法路径回退默认；文档同步 |
 | 下载完整性升级为 hash | 目前只比对 `file_size` | 清单提供 sha256 时校验；不提供时保持现状 |
@@ -380,4 +381,4 @@
 - 架构与问题清单：[ARCHITECTURE.md](ARCHITECTURE.md)
 - 与作者 v0.6 的能力对照：[ARCHITECTURE.md](ARCHITECTURE.md) §13
 - 本地开发、调试、故障排查：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 当前测试基线：`make test` → 233 passed（2026-11 v0.3.1）
+- 当前测试基线：`make test` → 242 passed（2026-11 v0.4.0）
