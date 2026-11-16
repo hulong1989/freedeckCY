@@ -2,6 +2,20 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.17.1
+
+### 修复
+
+- **Decky「从文件安装 ZIP」无反应**：Decky 对 `version=dev` 的本地 ZIP 会查找
+  `顶层目录/plugin.json`（路径中恰好一个 `/`）；旧包把 `plugin.json` 放在 zip 根目录，
+  Decky 静默 `return`，表现为点安装没反应。现在打包统一为：
+  ```
+  freedeckCY/
+    main.py plugin.json package.json ...
+  ```
+  已用 ZipFile 校验 `freedeckCY/plugin.json` 命中 Decky 规则。
+- 同步 `scripts/package.sh` 的结构校验（顶层只能有一个 `freedeckCY/`）与文档。
+
 ## v0.17.0
 
 ### 新增

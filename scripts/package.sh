@@ -2,7 +2,7 @@
 # package.sh - 组装可安装的 Decky 插件 zip
 #
 # 产物：dist-artifacts/freedeckCY-v<package.json version>.zip
-# zip 根目录直接是插件根（不额外套一层目录），包含：
+# zip 内顶层目录为 freedeckCY/（Decky 手动安装要求），其下包含：
 #   main.py plugin.json package.json LICENSE README.md
 #   dist/ py_modules/ backend/ defaults/
 # 排除：__pycache__、*.pyc、.DS_Store、node_modules、.git、tests、scripts、
@@ -39,8 +39,8 @@ usage() {
 用法: bash scripts/package.sh [选项]
 
 组装 Decky 插件 zip 到 dist-artifacts/freedeckCY-v<version>.zip：
-  - zip 根目录直接是 main.py / plugin.json / package.json / LICENSE / README.md
-    以及 dist/、py_modules/、backend/、defaults/
+  - zip 顶层目录为 freedeckCY/，其下是 main.py / plugin.json / package.json /
+    LICENSE / README.md 以及 dist/、py_modules/、backend/、defaults/
   - 版本号取自 package.json
   - 默认复用已提交的 dist/index.js，不强制构建前端
   - 若 defaults/runtime 缺失只警告（提示先跑 fetch_runtime.sh），不中断
@@ -214,6 +214,9 @@ fi
 
 # ---- 组装暂存目录 -----------------------------------------------------------
 STAGE="$(mktemp -d "${TMP_BASE}/freedeckcy-package.XXXXXX")"
+PLUGIN_NAME="freedeckCY"
+PLUGIN_ROOT="$STAGE/$PLUGIN_NAME"
+mkdir -p "$PLUGIN_ROOT"
 trap cleanup EXIT INT TERM
 
 # macOS 下避免 tar 把扩展属性写成 ._* 文件
@@ -225,8 +228,8 @@ copy_file() { # rel_path
         warn "跳过不存在的文件: ${rel}"
         return 0
     fi
-    mkdir -p "$STAGE/$(dirname "$rel")"
-    cp -p "$src" "$STAGE/$rel"
+    mkdir -p "$PLUGIN_ROOT/$(dirname "$rel")"
+    cp -p "$src" "$PLUGIN_ROOT/$rel"
     log "复制 ${rel}"
     return 0
 }
@@ -237,7 +240,7 @@ copy_tree() { # rel_dir
         warn "跳过不存在的目录: ${rel}/"
         return 0
     fi
-    mkdir -p "$STAGE/$rel"
+    mkdir -p "$PLUGIN_ROOT/$rel"
     # 白名单复制 + 统一排除缓存/版本库/依赖目录
     tar -C "$src" -cf - \
         --exclude='__pycache__' \
@@ -246,7 +249,7 @@ copy_tree() { # rel_dir
         --exclude='.DS_Store' \
         --exclude='node_modules' \
         --exclude='.git' \
-        . | tar -C "$STAGE/$rel" -xf -
+        . | tar -C "$PLUGIN_ROOT/$rel" -xf -
     log "复制 ${rel}/"
     return 0
 }
@@ -262,9 +265,9 @@ for _d in "${PACKAGE_DIRS[@]}"; do
 done
 
 # 单架构打包：删掉 defaults/runtime 下其它架构，避免包体积翻倍
-if [[ "$PACKAGE_ARCH" != "all" && -d "$STAGE/defaults/runtime" ]]; then
+if [[ "$PACKAGE_ARCH" != "all" && -d "$PLUGIN_ROOT/defaults/runtime" ]]; then
     for _component in aria2 7z node; do
-        _dir="$STAGE/defaults/runtime/$_component"
+        _dir="$PLUGIN_ROOT/defaults/runtime/$_component"
         [[ -d "$_dir" ]] || continue
         find "$_dir" -mindepth 1 -maxdepth 1 -type d ! -name "$PACKAGE_ARCH" -exec rm -rf {} + 2>/dev/null || true
     done
@@ -273,11 +276,11 @@ fi
 
 # ---- 校验暂存内容 -----------------------------------------------------------
 for _f in main.py plugin.json package.json dist/index.js; do
-    [[ -f "$STAGE/$_f" ]] || die "打包暂存目录缺少 ${_f}"
+    [[ -f "$PLUGIN_ROOT/$_f" ]] || die "打包暂存目录缺少 ${_f}"
 done
-[[ -d "$STAGE/py_modules" ]] || die "打包暂存目录缺少 py_modules/"
-[[ -d "$STAGE/defaults" ]] || die "打包暂存目录缺少 defaults/"
-[[ -f "$STAGE/backend/tianyi_share_resolver.js" ]] || warn "backend/tianyi_share_resolver.js 缺失：天翼 JS 分享解析可能不可用"
+[[ -d "$PLUGIN_ROOT/py_modules" ]] || die "打包暂存目录缺少 py_modules/"
+[[ -d "$PLUGIN_ROOT/defaults" ]] || die "打包暂存目录缺少 defaults/"
+[[ -f "$PLUGIN_ROOT/backend/tianyi_share_resolver.js" ]] || warn "backend/tianyi_share_resolver.js 缺失：天翼 JS 分享解析可能不可用"
 
 # ---- 生成 zip ---------------------------------------------------------------
 mkdir -p "$OUT_DIR"
@@ -290,8 +293,8 @@ fi
 log "生成 ${OUT_ZIP}"
 (
     cd "$STAGE"
-    # zip 根目录即插件根，不额外套目录；-x 为防御性排除（正常在复制阶段已排除）。
-    zip -qr "$OUT_ZIP" . \
+    # Decky 手动安装要求 zip 内有且仅有一个顶层插件目录（如 freedeckCY/plugin.json）。
+    zip -qr "$OUT_ZIP" "$PLUGIN_NAME" \
         -x '*/__pycache__/*' '__pycache__/*' '*__pycache__*' \
         '*.pyc' '*.pyo' \
         '*/.DS_Store' '.DS_Store' \
@@ -318,23 +321,31 @@ if have_cmd unzip; then
     log "zip 顶层结构:"
     printf '%s\n' "$ZIP_LIST" | awk -F/ 'NF > 0 && $1 != "" { print $1 }' | sort -u | sed 's/^/  /'
 
-    # 根目录必需条目检查
+    # Decky 安装要求：顶层有且仅有一个插件目录，且其下是 plugin.json。
+    TOP_LEVEL="$(printf '%s\n' "$ZIP_LIST" | awk -F/ 'NF > 0 && $1 != "" { print $1 }' | sort -u)"
+    if [[ "$TOP_LEVEL" != "$PLUGIN_NAME" ]]; then
+        die "zip 顶层目录不是单个 ${PLUGIN_NAME}/: ${OUT_ZIP}"
+    fi
+    if ! grep -qx "${PLUGIN_NAME}/plugin.json" <<<"$ZIP_LIST"; then
+        die "zip 内缺少 ${PLUGIN_NAME}/plugin.json: ${OUT_ZIP}"
+    fi
+    # 插件根必需条目检查
     ROOT_ENTRIES_OK=1
     for _entry in main.py plugin.json package.json dist/index.js py_modules/aria2_manager.py; do
-        if grep -qx "$_entry" <<<"$ZIP_LIST"; then
-            log "根条目存在: ${_entry}"
+        if grep -qx "${PLUGIN_NAME}/${_entry}" <<<"$ZIP_LIST"; then
+            log "条目存在: ${PLUGIN_NAME}/${_entry}"
         else
-            warn "zip 根目录缺少必需条目: ${_entry}"
+            warn "zip 缺少必需条目: ${PLUGIN_NAME}/${_entry}"
             ROOT_ENTRIES_OK=0
         fi
     done
     if [[ "$ROOT_ENTRIES_OK" -ne 1 ]]; then
-        die "zip 根结构校验失败: ${OUT_ZIP}"
+        die "zip 结构校验失败: ${OUT_ZIP}"
     fi
 
     # 排除规则检查
     LEAKED="$(printf '%s\n' "$ZIP_LIST" |
-        grep -E '(__pycache__|\.pyc$|\.pyo$|\.DS_Store$|(^|/)node_modules/|(^|/)\.git/|^tests/|^scripts/|^\.github/|^docs/|^gl/|^dist-artifacts/)' || true)"
+        grep -E '(__pycache__|\.pyc$|\.pyo$|\.DS_Store$|(^|/)node_modules/|(^|/)\.git/|^freedeckCY/(tests|scripts|\.github|docs|gl|dist-artifacts)/)' || true)"
     if [[ -n "$LEAKED" ]]; then
         warn "zip 中发现应排除的条目（请检查打包规则）:"
         printf '%s\n' "$LEAKED" | sed 's/^/  /'
