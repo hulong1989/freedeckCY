@@ -18,12 +18,15 @@ import pytest
 import utils
 
 
-def _listening_socket() -> socket.socket:
+def _listening_socket(drain: bool = True) -> socket.socket:
     """在 127.0.0.1 上开一个临时监听端口。
 
     注意：必须用足够大的 backlog 并在后台 accept/close。
     `is_port_in_use` 会反复 connect 探测，若监听端不 accept，
     完成握手的连接会占满队列，导致后续 connect 超时、探测结果抖动。
+
+    `drain` 线程用 accept 超时轮询，close 后能在 ~50ms 内退出并释放 fd
+    （Linux 上阻塞 accept 不会因为另一个线程 close 立刻返回）。
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -34,10 +37,19 @@ def _listening_socket() -> socket.socket:
         sock.close()
         raise
 
+    if not drain:
+        return sock
+
+    sock.settimeout(0.05)
+
     def _drain(listener: socket.socket) -> None:
         while True:
             try:
                 conn, _ = listener.accept()
+            except socket.timeout:
+                if listener.fileno() < 0:
+                    return
+                continue
             except OSError:
                 return
             try:
@@ -50,11 +62,13 @@ def _listening_socket() -> socket.socket:
 
 
 def _free_port() -> int:
-    """拿一个刚刚释放的端口号。"""
-    sock = _listening_socket()
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
+    """拿一个当前没有进程监听的端口号（只 bind 不 listen，避免后台线程持有 fd）。"""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+    finally:
+        sock.close()
 
 
 # ---------------------------------------------------------------------------
