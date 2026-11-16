@@ -7,6 +7,8 @@
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
 > 版本号从 **0.1.0** 起步、当前 **0.6.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
+>
+> 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
 
 Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把"下载 → 解压 → 装进 Steam 库"整条链路做成几个按钮，另带云存档上传/恢复和游玩时长统计。
 
