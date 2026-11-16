@@ -90,6 +90,7 @@ function FaCloudDownloadAlt (props) {
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const getTianyiLibraryUrl = callable("get_tianyi_library_url");
+const getTianyiStorageOptions = callable("get_tianyi_storage_options");
 const getTianyiLoginUrl = callable("get_tianyi_login_url");
 const setTianyiSettings = callable("set_tianyi_settings");
 const clearTianyiLogin = callable("clear_tianyi_login");
@@ -1270,6 +1271,7 @@ function SettingsPage() {
     const [clearingLogin, setClearingLogin] = SP_REACT.useState(false);
     const [activeTab, setActiveTab] = SP_REACT.useState("paths");
     const [settings, setSettings] = SP_REACT.useState(EMPTY_SETTINGS);
+    const [storageOptions, setStorageOptions] = SP_REACT.useState([]);
     const [login, setLogin] = SP_REACT.useState(EMPTY_STATE.login);
     const [baiduWebLogin, setBaiduWebLogin] = SP_REACT.useState(EMPTY_BAIDU_WEB_STATE);
     const [baiduQr, setBaiduQr] = SP_REACT.useState({ stage: "idle" });
@@ -1372,6 +1374,17 @@ function SettingsPage() {
         setTargetCandidates([]);
         setSelectedRestoreTargetDir("");
     }, [selectedRestoreGameKey, selectedRestoreVersion]);
+    const refreshStorageOptions = SP_REACT.useCallback(async () => {
+        try {
+            const result = await getTianyiStorageOptions();
+            if (result.status === "success" && result.data) {
+                setStorageOptions(Array.isArray(result.data.options) ? result.data.options : []);
+            }
+        }
+        catch {
+            // 静默：没有 SD 卡/挂载信息时不影响设置页。
+        }
+    }, []);
     const refreshSettings = SP_REACT.useCallback(async () => {
         const result = await withTimeout(getTianyiPanelState(), PANEL_REQUEST_TIMEOUT_MS, "读取设置超时，请稍后重试");
         if (result.status !== "success" || !result.data) {
@@ -1552,6 +1565,14 @@ function SettingsPage() {
         }
         await savePatch({ split_count: value }, "下载参数已更新");
     }, [savePatch, splitDraft]);
+    SP_REACT.useEffect(() => {
+        void refreshStorageOptions();
+    }, [refreshStorageOptions]);
+    const onUseStorage = SP_REACT.useCallback(async (option, field) => {
+        const value = field === "download_dir" ? option.download_dir : option.install_dir;
+        await savePatch({ [field]: value }, `${field === "download_dir" ? "下载" : "安装"}目录已切换到：${value}`);
+        await refreshStorageOptions();
+    }, [refreshStorageOptions, savePatch]);
     const onClearLogin = SP_REACT.useCallback(async () => {
         if (clearingLogin)
             return;
@@ -1954,7 +1975,7 @@ function SettingsPage() {
         {
             id: "paths",
             title: "路径",
-            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E0B\u8F7D\u76EE\u5F55", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.download_dir || "未设置" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickDownloadDir, disabled: saving, children: "\u9009\u62E9\u4E0B\u8F7D\u76EE\u5F55" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u76EE\u5F55", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.install_dir || "未设置" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickInstallDir, disabled: saving, children: "\u9009\u62E9\u5B89\u88C5\u76EE\u5F55" }) })] })] })),
+            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E0B\u8F7D\u76EE\u5F55", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.download_dir || "未设置" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickDownloadDir, disabled: saving, children: "\u9009\u62E9\u4E0B\u8F7D\u76EE\u5F55" }) }), storageOptions.filter((item) => item.kind === "external").map((item) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "download_dir"), disabled: saving, children: ["\u4E0B\u8F7D\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `download-${item.mount}`))), !storageOptions.some((item) => item.kind === "external") ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.75 }, children: "\u672A\u68C0\u6D4B\u5230\u53EF\u5199 SD \u5361/\u5916\u7F6E\u5B58\u50A8\uFF08\u8BF7\u5148\u5728 SteamOS/\u7CFB\u7EDF\u4E2D\u6302\u8F7D\uFF09" }) })) : null] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u76EE\u5F55", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.install_dir || "未设置" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickInstallDir, disabled: saving, children: "\u9009\u62E9\u5B89\u88C5\u76EE\u5F55" }) }), storageOptions.filter((item) => item.kind === "external").map((item) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "install_dir"), disabled: saving, children: ["\u5B89\u88C5\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `install-${item.mount}`)))] })] })),
         },
         {
             id: "install",

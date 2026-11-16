@@ -60,6 +60,7 @@ from emulator_manager import (
     supported_platforms,
 )
 from emulator_saves import build_restore_targets, collect_emulator_save_paths
+from storage_options import detect_storage_options
 from gamewatch import GameWatcher
 from save_manifest import load_manifest, match_manifest, resolve_manifest_paths
 from game_catalog import (
@@ -6784,6 +6785,13 @@ class TianyiService:
     @staticmethod
     def _normalize_scan_title(value: str) -> str:
         return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", str(value or "").lower())
+
+    async def get_storage_options(self) -> Dict[str, Any]:
+        """返回内置存储与可写 SD/外置挂载，供下载/安装目录一键选择。"""
+        data = await asyncio.to_thread(detect_storage_options, home=os.path.expanduser("~"))
+        data["download_dir"] = str(self.store.settings.download_dir or "")
+        data["install_dir"] = str(self.store.settings.install_dir or "")
+        return data
 
     async def scan_installed_games(self) -> Dict[str, Any]:
         """扫描安装目录，把旧版本/手动安装的游戏补回已安装列表。"""

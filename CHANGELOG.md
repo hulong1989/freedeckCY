@@ -2,6 +2,21 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.19.0
+
+### 新增
+
+- **下载/安装目录支持 SD 卡选择**：
+  - 新增 `storage_options.py`：解析 `/proc/mounts`，识别 `/run/media/*`（SteamOS SD）、`/media/*`、`/mnt/*`、`/storage/*`（DroidDeck）等可写挂载点，带剩余/总容量。
+  - QAM 的「下载目录」「安装目录」下直接显示 SD 卡按钮：一键切到
+    `<挂载点>/freedeckCY/downloads` / `<挂载点>/freedeckCY/installed`。
+  - 没有检测到可写外置存储时显示提示；仍保留原来的目录选择器。
+  - API：`GET /api/tianyi/storage/options`；main callable `get_tianyi_storage_options`。
+
+### 变更
+
+- 测试 349 → 351（SD/外置挂载识别、系统挂载过滤）。
+
 ## v0.18.0
 
 ### 新增

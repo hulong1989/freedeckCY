@@ -136,6 +136,24 @@ interface SettingsPayload {
   cloud_save_include_emulators: boolean;
 }
 
+interface StorageOption {
+  kind: string;
+  label: string;
+  mount: string;
+  download_dir: string;
+  install_dir: string;
+  free_bytes: number;
+  total_bytes: number;
+  free_text: string;
+  total_text: string;
+}
+
+interface StorageOptionsState {
+  internal?: StorageOption;
+  external?: StorageOption[];
+  options?: StorageOption[];
+}
+
 interface UrlResponse {
   url: string;
 }
@@ -338,6 +356,7 @@ interface LibraryGameTimeStatsData {
 
 const getTianyiPanelState = callable<[Record<string, unknown>?], ApiResponse<PanelState>>("get_tianyi_panel_state");
 const getTianyiLibraryUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_library_url");
+const getTianyiStorageOptions = callable<[], ApiResponse<StorageOptionsState>>("get_tianyi_storage_options");
 const getTianyiLoginUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_login_url");
 const setTianyiSettings = callable<[SettingsPayload], ApiResponse<SettingsState>>("set_tianyi_settings");
 const clearTianyiLogin = callable<[], ApiResponse<ClearLoginResponse>>("clear_tianyi_login");
@@ -1636,6 +1655,7 @@ function SettingsPage() {
   const [clearingLogin, setClearingLogin] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("paths");
   const [settings, setSettings] = useState<SettingsState>(EMPTY_SETTINGS);
+  const [storageOptions, setStorageOptions] = useState<StorageOption[]>([]);
   const [login, setLogin] = useState<LoginState>(EMPTY_STATE.login);
   const [baiduWebLogin, setBaiduWebLogin] = useState<BaiduWebLoginState>(EMPTY_BAIDU_WEB_STATE);
   const [baiduQr, setBaiduQr] = useState<BaiduQrState>({ stage: "idle" });
@@ -1749,6 +1769,17 @@ function SettingsPage() {
     setTargetCandidates([]);
     setSelectedRestoreTargetDir("");
   }, [selectedRestoreGameKey, selectedRestoreVersion]);
+
+  const refreshStorageOptions = useCallback(async () => {
+    try {
+      const result = await getTianyiStorageOptions();
+      if (result.status === "success" && result.data) {
+        setStorageOptions(Array.isArray(result.data.options) ? result.data.options : []);
+      }
+    } catch {
+      // 静默：没有 SD 卡/挂载信息时不影响设置页。
+    }
+  }, []);
 
   const refreshSettings = useCallback(async () => {
     const result = await withTimeout(
@@ -1921,6 +1952,19 @@ function SettingsPage() {
     }
     await savePatch({ split_count: value }, "下载参数已更新");
   }, [savePatch, splitDraft]);
+
+  useEffect(() => {
+    void refreshStorageOptions();
+  }, [refreshStorageOptions]);
+
+  const onUseStorage = useCallback(
+    async (option: StorageOption, field: "download_dir" | "install_dir") => {
+      const value = field === "download_dir" ? option.download_dir : option.install_dir;
+      await savePatch({ [field]: value }, `${field === "download_dir" ? "下载" : "安装"}目录已切换到：${value}`);
+      await refreshStorageOptions();
+    },
+    [refreshStorageOptions, savePatch],
+  );
 
   const onClearLogin = useCallback(async () => {
     if (clearingLogin) return;
@@ -2326,6 +2370,22 @@ function SettingsPage() {
                   选择下载目录
                 </ButtonItem>
               </PanelSectionRow>
+              {storageOptions.filter((item) => item.kind === "external").map((item) => (
+                <PanelSectionRow key={`download-${item.mount}`}>
+                  <ButtonItem
+                    layout="below"
+                    onClick={() => void onUseStorage(item, "download_dir")}
+                    disabled={saving}
+                  >
+                    下载到 {item.label}（剩余 {item.free_text}）
+                  </ButtonItem>
+                </PanelSectionRow>
+              ))}
+              {!storageOptions.some((item) => item.kind === "external") ? (
+                <PanelSectionRow>
+                  <div style={{ fontSize: "11px", opacity: 0.75 }}>未检测到可写 SD 卡/外置存储（请先在 SteamOS/系统中挂载）</div>
+                </PanelSectionRow>
+              ) : null}
             </PanelSection>
             <PanelSection title="安装目录">
               <PanelSectionRow>
@@ -2336,6 +2396,17 @@ function SettingsPage() {
                   选择安装目录
                 </ButtonItem>
               </PanelSectionRow>
+              {storageOptions.filter((item) => item.kind === "external").map((item) => (
+                <PanelSectionRow key={`install-${item.mount}`}>
+                  <ButtonItem
+                    layout="below"
+                    onClick={() => void onUseStorage(item, "install_dir")}
+                    disabled={saving}
+                  >
+                    安装到 {item.label}（剩余 {item.free_text}）
+                  </ButtonItem>
+                </PanelSectionRow>
+              ))}
             </PanelSection>
           </>
         ),

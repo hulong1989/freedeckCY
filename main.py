@@ -322,6 +322,14 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def get_tianyi_storage_options(self) -> dict:
+        """下载/安装目录可选的存储位置（内置 + SD 卡）。"""
+        try:
+            data = await self._get_tianyi_service().get_storage_options()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def scan_tianyi_installed_games(self) -> dict:
         """扫描安装目录，补回已安装游戏。"""
         try:
