@@ -34,8 +34,9 @@ from emulator_manager import (
     create_launch_wrapper,
     emulator_name_for_platform,
     emulator_status,
-    ensure_mgba,
+    ensure_emulator,
     find_rom_file,
+    supported_platforms,
 )
 from game_catalog import (
     GameCatalog,
@@ -5029,11 +5030,11 @@ class TianyiService:
         emulator = emulator_name_for_platform(platform)
         if platform != "pc" and not emulator:
             raise ValueError(
-                f"当前只支持 PC 与 GBA（mGBA）资源，{platform.upper()} 暂未接入模拟器"
+                f"当前只支持 PC 与已接入模拟器的平台（GBA/PSP/NDS），{platform.upper()} 暂未接入模拟器"
             )
         emulator_info: Dict[str, Any] = {}
         if emulator:
-            emulator_info = emulator_status(self.plugin_dir)
+            emulator_info = emulator_status(platform, self.plugin_dir)
             if not emulator_info.get("available"):
                 raise ValueError(str(emulator_info.get("message") or "mGBA 不可用"))
 
@@ -5982,7 +5983,9 @@ class TianyiService:
                 "missing_paths": installed_missing,
             },
             "settings": settings,
-            "emulators": {"mgba": emulator_status(root)},
+            "emulators": {
+                name: emulator_status(name, root) for name in supported_platforms()
+            },
             "recent_errors": recent_errors,
             "log_tail": log_tail,
         }
@@ -6571,17 +6574,26 @@ class TianyiService:
         platform: str,
     ) -> Dict[str, Any]:
         """模拟器资源：生成启动脚本并注册原生 Linux 快捷方式（不写 Proton 映射）。"""
-        rom_path = find_rom_file(target_dir, open_path=str(task.openpath or ""))
+        rom_path = find_rom_file(
+            target_dir,
+            open_path=str(task.openpath or ""),
+            platform_name=platform,
+        )
         if not rom_path:
             return {"ok": False, "message": "安装目录未找到 ROM 文件（.gba）"}
         try:
-            command = await ensure_mgba(self.plugin_dir)
+            command = await ensure_emulator(platform, self.plugin_dir)
         except Exception as exc:
             return {"ok": False, "message": f"mGBA 不可用: {exc}"}
 
         wrapper_path = os.path.join(target_dir, "launch-freedeckcy.sh")
         try:
-            create_launch_wrapper(command=command, rom_path=rom_path, wrapper_path=wrapper_path)
+            create_launch_wrapper(
+                command=command,
+                rom_path=rom_path,
+                wrapper_path=wrapper_path,
+                platform_name=platform,
+            )
         except Exception as exc:
             return {"ok": False, "message": f"生成启动脚本失败: {exc}"}
 

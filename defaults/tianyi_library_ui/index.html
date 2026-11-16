@@ -204,7 +204,7 @@
               </div>
             </div>
             <div class="modal-side">
-              <p class="modal-sub">{{ installDialog.plan.emulator ? "模拟器：mGBA · " : "" }}确认后自动下载并解压安装</p>
+              <p class="modal-sub">{{ installDialog.plan.emulator_info && installDialog.plan.emulator_info.name ? "模拟器：" + installDialog.plan.emulator_info.name + " · " : "" }}确认后自动下载并解压安装</p>
 
               <div class="space-block">
                 <div class="space-row">

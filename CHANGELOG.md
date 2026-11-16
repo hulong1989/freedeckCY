@@ -2,6 +2,22 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.7.0
+
+### 新增
+
+- **通用模拟器注册表**：`py_modules/emulator_manager.py` 改为按平台描述（官方资产、启动参数、ROM 扩展名、环境变量），后续平台只需加一条配置。
+- **PSP（PPSSPP）**：支持 `.iso/.cso/.pbp/.elf`；首次安装按需下载官方 AppImage（x86_64 / aarch64，约 46–48MB），启动加 `--fullscreen`。
+- **NDS（melonDS）**：支持 `.nds/.dsi/.srl`；首次安装按需下载官方 AppImage zip（x86_64 / aarch64，约 32MB），自动解包。
+- 已安装的模拟器缓存到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`；`FREEDECKCY_PPSSPP_BIN` / `FREEDECKCY_MELONDS_BIN` 可覆盖。
+- 诊断包 `emulators` 改为输出所有已接入平台的状态（本地/需下载/不可用）。
+
+### 变更
+
+- 库页允许安装 GBA / PSP / NDS；弹窗显示对应模拟器名称。
+- 安装计划不再要求模拟器已存在：可下载的平台会标记 `source=download`，安装完成时再拉取；失败会写入安装消息。
+- 测试 271 → 280。
+
 ## v0.6.2
 
 ### 新增

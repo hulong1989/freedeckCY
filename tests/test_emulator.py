@@ -105,7 +105,7 @@ def test_emulator_status_prefers_bundled(tmp_path, monkeypatch):
     appimage.parent.mkdir(parents=True)
     appimage.write_bytes(b"x" * 1024)
 
-    status = emu.emulator_status(str(tmp_path / "plugin"))
+    status = emu.emulator_status("gba", str(tmp_path / "plugin"))
     assert status["available"] is True
     assert status["source"] == "bundled"
 
@@ -130,7 +130,7 @@ def test_gba_plan_selects_target_rom(monkeypatch, tmp_path):
     monkeypatch.setattr(
         svc_module,
         "emulator_status",
-        lambda plugin_dir: {"available": True, "source": "bundled", "command": "mGBA.AppImage"},
+        lambda platform, plugin_dir: {"available": True, "source": "local", "command": "mGBA.AppImage"},
     )
 
     plan = asyncio.run(service._build_install_plan(game_id="gba-1"))
@@ -157,7 +157,7 @@ def test_gba_plan_reports_missing_rom(monkeypatch, tmp_path):
     monkeypatch.setattr(
         svc_module,
         "emulator_status",
-        lambda plugin_dir: {"available": True, "source": "bundled", "command": "mGBA.AppImage"},
+        lambda platform, plugin_dir: {"available": True, "source": "local", "command": "mGBA.AppImage"},
     )
 
     with pytest.raises(svc_module.TianyiApiError) as exc:
@@ -205,7 +205,8 @@ def test_register_gba_creates_wrapper_and_none_proton(monkeypatch, tmp_path):
         platform="gba",
     )
 
-    async def _ensure(plugin_dir="", **kwargs):
+    async def _ensure(platform_name, plugin_dir="", **kwargs):
+        assert platform_name == "gba"
         return ["/usr/bin/mgba"]
 
     captured = {}
@@ -214,7 +215,7 @@ def test_register_gba_creates_wrapper_and_none_proton(monkeypatch, tmp_path):
         captured.update(kwargs)
         return {"ok": True, "appid_unsigned": 123, "steam_root": "/tmp/Steam"}
 
-    monkeypatch.setattr(svc_module, "ensure_mgba", _ensure)
+    monkeypatch.setattr(svc_module, "ensure_emulator", _ensure)
     monkeypatch.setattr(svc_module, "add_or_update_tianyi_shortcut", _shortcut)
 
     result = asyncio.run(service._auto_register_task_to_steam(task=task, target_dir=str(install_dir)))
@@ -245,3 +246,94 @@ def test_installed_view_exposes_emulator_fields():
     assert view["emulator"] == "mgba"
     assert view["rom_path"].endswith("game.gba")
     assert view["launcher_path"].endswith("launch-freedeckcy.sh")
+
+
+def test_registry_has_psp_and_nds_assets():
+    assert emu.emulator_name_for_platform("psp") == "ppsspp"
+    assert emu.emulator_name_for_platform("nds") == "melonds"
+    assert emu.emulator_name_for_platform("switch") == ""
+    psp = emu.get_spec("psp")
+    assert psp is not None
+    assert psp.assets["x86_64"].endswith("x86_64.AppImage")
+    assert psp.assets["aarch64"].endswith("aarch64.AppImage")
+    nds = emu.get_spec("nds")
+    assert nds is not None
+    assert nds.archive == "zip"
+    assert nds.assets["aarch64"].endswith(".zip")
+
+
+def test_find_rom_file_platform_extensions(tmp_path):
+    (tmp_path / "game.bin").write_bytes(b"x")
+    (tmp_path / "game.cue").write_bytes(b"x")
+    (tmp_path / "game.iso").write_bytes(b"x")
+    (tmp_path / "game.nds").write_bytes(b"x")
+
+    assert emu.find_rom_file(str(tmp_path), "game.zip", "psp").endswith("game.iso")
+    assert emu.find_rom_file(str(tmp_path), "game.zip", "nds").endswith("game.nds")
+    assert emu.find_rom_file(str(tmp_path), "game.zip", "gba") == ""
+
+
+def test_launch_args_per_platform(tmp_path):
+    psp_wrapper = tmp_path / "psp.sh"
+    emu.create_launch_wrapper(
+        command=["/usr/bin/ppsspp"],
+        rom_path="/roms/game.iso",
+        wrapper_path=str(psp_wrapper),
+        platform_name="psp",
+    )
+    text = psp_wrapper.read_text(encoding="utf-8")
+    assert "--fullscreen" in text
+    assert "game.iso" in text
+
+    nds_wrapper = tmp_path / "nds.sh"
+    emu.create_launch_wrapper(
+        command=["/usr/bin/melonds"],
+        rom_path="/roms/game.nds",
+        wrapper_path=str(nds_wrapper),
+        platform_name="nds",
+    )
+    assert "game.nds" in nds_wrapper.read_text(encoding="utf-8")
+
+
+def test_psp_status_offers_official_download(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.delenv("FREEDECKCY_PPSSPP_BIN", raising=False)
+    status = emu.emulator_status("psp", str(tmp_path / "plugin"))
+    assert status["available"] is True
+    assert status["source"] == "download"
+    assert "PPSSPP" in status["url"]
+
+
+def test_psp_plan_allowed(monkeypatch, tmp_path):
+    service = _service(tmp_path)
+    service.catalog = _FakeCatalog(
+        _entry(platform="psp", openpath="PSPCH001.7z", title="PSP Game")
+    )
+
+    async def _resolve(share_url, cookie, *, target_name="", max_pages=40):
+        assert target_name == "PSPCH001.7z"
+        return ResolvedShare(
+            share_code="abc",
+            share_id="share-1",
+            pwd="1234",
+            files=[
+                ResolvedFile(file_id="1", name="Other.7z", size=10, is_folder=False),
+                ResolvedFile(file_id="2", name="PSPCH001.7z", size=4096, is_folder=False),
+            ],
+        )
+
+    monkeypatch.setattr(svc_module, "resolve_share", _resolve)
+    monkeypatch.setattr(
+        svc_module,
+        "emulator_status",
+        lambda platform, plugin_dir: {
+            "available": True,
+            "source": "download",
+            "name": "PPSSPP",
+        },
+    )
+
+    plan = asyncio.run(service._build_install_plan(game_id="gba-1"))
+    assert plan["platform"] == "psp"
+    assert plan["emulator"] == "ppsspp"
+    assert [item["name"] for item in plan["files"]] == ["PSPCH001.7z"]

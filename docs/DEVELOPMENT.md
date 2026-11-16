@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.6.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.7.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -19,7 +19,7 @@
 | `py_modules/tianyi_store.py` | 数据类（登录/设置/任务/已装游戏，含 `file_size` / `group_id` / `group_total`）+ `state.json` 原子读写；写入时目录 0700 / 文件 0600 |
 | `py_modules/aria2_manager.py` | aria2 子进程管理（运行时元数据 `aria2-runtime.json` + `flock` 让插件重载可附着存活实例）+ JSON-RPC（`addUri` / `changeUri` / `tellStatus` / `listDownloads` …） |
 | `py_modules/seven_zip_manager.py` | 7z 解压 / 压缩（带进度回调）；`test_archive()` 跑 `7z t` 做解压前校验（7z 不可用时 best-effort 跳过） |
-| `py_modules/emulator_manager.py` | **mGBA 运行时管理（v0.6.0）**：内置 AppImage 解析/首次 `--appimage-extract` 解包、系统/Flatpak/`FREEDECKCY_MGBA_BIN` 回退、`find_rom_file()`、`create_launch_wrapper()`、`emulator_status()` |
+| `py_modules/emulator_manager.py` | **通用模拟器注册表（v0.7.0）**：`EmulatorSpec`/`EMULATORS` 描述 GBA（mGBA，内置）/ PSP（PPSSPP，按需下载）/ NDS（melonDS，按需下载 zip）；官方资产解析、按需下载、`--appimage-extract` 解包、系统/Flatpak/env 回退、`find_rom_file()`、`create_launch_wrapper()`、`emulator_status()` |
 | `py_modules/steam_shortcuts.py` | 写 `shortcuts.vdf`（`DevkitGameID` token 去重、无变化不重写、写前备份 12 份、写后回读）、改 `config.vdf` 的 Proton 映射、下载 `grid` 封面、解析 appid；Steam 多库 / Flatpak / **DroidDeck** 识别（`is_droiddeck` / `_steam_root_candidates` / `detect_proton_tool`）、自定义用户名打分；`find_compatdata_dirs()` 跨库定位待清理的 Proton 前缀 |
 | `py_modules/game_catalog.py` | 读 CSV 资源清单（16 列 / 7084 条 / 11 平台，新目录优先、旧目录回退）：校验、搜索、分页、按 `game_id` 查找；`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底）；支持 `cover_index.csv` 合并（不覆盖已有值）；`list()` 支持 platform/category 过滤并返回 `platforms`/Top12 `categories`；`_is_valid_tianyi_url()` 兼容 `/t/` 与 `/web/share?code=` |
 | `py_modules/archive_bundle.py` | 多分卷归档识别（`.7z.001`/`.partN.rar`/`.z01+zip`/`.r00+rar` 等 6 类）：`detect_archive_sets` / `build_bundle_index` / `looks_like_multi_volume_name` |
@@ -37,7 +37,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（264 个用例）：目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**GBA 计划/ROM 查找/wrapper/mGBA 解析**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（280 个用例）：目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**GBA/PSP/NDS 计划/ROM 查找/wrapper/注册表**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -88,7 +88,7 @@ pnpm watch      # 开发时可选：文件变化自动重打包
 `defaults/tianyi_library_ui/` 下的 `index.html`、`app.js`、`app.css`、`login_bridge.*`、`vue.global.prod.js` 是**浏览器直出**的静态文件，没有构建步骤：
 
 - 直接编辑这些文件，刷新 Steam 内置浏览器里的页面即可（必要时重载插件让 Python 重新识别资源目录）；
-- 本地网页地址：QAM 里"打开游戏库"按钮会调 `get_tianyi_library_url`，形如 `http://127.0.0.1:59275/tianyi/library`；
+- 本地网页地址：QAM 里"打开游戏库"按钮会调 `get_tianyi_library_url`，形如 `http://127.0.0.1:59271/tianyi/library`；
 - 建议在桌面浏览器的无痕窗口里直接访问上述地址调试（只在回环地址监听，必须在本机访问）。
 
 ### 2.5 目录数据、封面索引与筛选
@@ -118,6 +118,8 @@ python3 scripts/merge_v06_catalog.py \
 ```
 
 脚本规则：以 v0.6 目录为主、只保留天翼链接、按 `game_id` 去重、v0.6 缺失的旧目录条目补在后面（43 条，`platform=pc`），cover index 归一为 6 列。输出后重载插件即可看到新数据；平台/分类筛选条按数据自动生成，无需改代码。
+
+**可选远程 JSON 目录（v0.6.2）**：`FREEDECKCY_CATALOG_JSON` 可指向本地 JSON 或 `https://…` URL（NewFreedeck 兼容），远程缓存 6 小时、失败回退本地 CSV；默认不开启。格式/自托管说明见 [UPSTREAM_SERVER.md](UPSTREAM_SERVER.md)。
 
 **目录数据工作流（v0.3.1 起固定三步）**：
 
@@ -163,7 +165,7 @@ game_id,title,steam_appid,cover_url,cover_portrait_url,platform
 - 搜索后显示两行筛选条：平台条（「全部平台」+ 各平台计数）和分类条（「全部分类」+ Top12 分类计数）；平台条只在 `platforms` 数量 > 1 时显示（当前 11 个平台，所以可见）；
 - 手柄焦点顺序：搜索框 → 搜索按钮 → 平台条 → 分类条 → 卡片；
 - 请求同时带 `platform` 与 `category` 参数（`/api/tianyi/catalog`），可组合；
-- **GBA 可安装、其它模拟器平台只可浏览**（v0.6.0）：GBA 卡片正常打开安装确认（弹窗显示"模拟器：mGBA"）；其它非 PC 平台仍 flash 提示；后端 `_build_install_plan()` 只放行 `pc`/`gba`。GBA 调试见 §6.8，其它平台见 ROADMAP 9.8。
+- **GBA/PSP/NDS 可安装，其它平台只可浏览**（v0.7.0）：这三个平台的卡片会正常打开安装确认（弹窗显示对应模拟器名）；其它非 PC 平台仍 flash 提示；后端 `_build_install_plan()` 放行 `pc` + 注册表平台（`gba/psp/nds`）。模拟器调试见 §6.8，其它平台见 ROADMAP 9.8。
 
 ---
 
@@ -196,7 +198,15 @@ defaults/runtime/7z/<arch>/7zz
 defaults/runtime/node/<arch>/bin/node
 ```
 
-**mGBA（GBA 闭环，v0.6.0）**：GBA 安装需要 mGBA 运行时。内置 AppImage 用 `make emulator-runtime`（= `bash scripts/fetch_emulator.sh`）下载到 `defaults/runtime/mgba/<arch>/mGBA.AppImage`；运行时按 `FREEDECKCY_MGBA_BIN` → 已解包 AppRun（`~/.local/share/freedeckCY/emulators/<arch>/squashfs-root`）→ 内置 AppImage → 系统 `mgba/mgba-qt` → Flatpak `io.mgba.mGBA` 的顺序解析，首次使用内置 AppImage 会 `--appimage-extract` 解包（不依赖 FUSE，proot/DroidDeck 可用）。
+**模拟器运行时（GBA/PSP/NDS，v0.7.0）**：`py_modules/emulator_manager.py` 的 `EMULATORS` 注册表描述每个平台的官方资产、启动参数与 ROM 扩展名：
+
+| 平台 | 模拟器（版本） | 官方资产 | 获取方式 | ROM 扩展名 | 环境变量 |
+|---|---|---|---|---|---|
+| gba | mGBA 0.10.5 | AppImage（x64/arm64） | **随包内置**（`make emulator-runtime` 预置） | `.gba` | `FREEDECKCY_MGBA_BIN` |
+| psp | PPSSPP 1.20.4 | AppImage（anylinux x86_64/aarch64） | **首次安装按需下载** | `.iso/.cso/.pbp/.elf` | `FREEDECKCY_PPSSPP_BIN` |
+| nds | melonDS 1.1 | zip 内 AppImage（x86_64/aarch64） | **首次安装按需下载**（自动解 zip） | `.nds/.dsi/.srl` | `FREEDECKCY_MELONDS_BIN` |
+
+解析顺序：`FREEDECKCY_<PLATFORM>_BIN` → 已解包 AppRun（`~/.local/share/freedeckCY/emulators/<platform>/<arch>/squashfs-root`，GBA 兼容旧 `<arch>/squashfs-root`）→ 内置 AppImage（仅 GBA）→ 系统命令 → Flatpak（仅 mGBA）。都没有时 `emulator_status` 返回 `source=download`（PSP/NDS 即此状态），安装时 `ensure_emulator` 从 GitHub release 下载到 `emulators/<platform>/<arch>/` 并 `--appimage-extract` 解包（不依赖 FUSE，proot/DroidDeck 可用）。只有当前架构没有官方资产时才会在计划阶段拒绝。
 
 **ARM64 / DroidDeck**：运行时目录按 `platform.machine()` 归一（`x86_64`；`aarch64`/`arm64`→`aarch64`）选择，DroidDeck 上取 `defaults/runtime/aarch64/`。准备 arm64 运行时用 `make runtime ARCH=aarch64`（或 `ARCH=all` 同时两份），详见 §4.1 与 [DROIDDECK.md](DROIDDECK.md)。
 
@@ -213,6 +223,8 @@ defaults/runtime/node/<arch>/bin/node
 | `FREEDECKCY_PROTON_TOOL` | 覆盖 Proton 兼容工具名；`none` 表示不写映射（DroidDeck 默认 `droiddeck-proton-arm64`） |
 | `FREEDECKCY_CATALOG_JSON` | 运行时改读 NewFreedeck 兼容 JSON（默认 CSV，失败回退） |
 | `FREEDECKCY_MGBA_BIN` | 覆盖 mGBA 可执行文件/AppImage 路径（默认用内置 AppImage；也可指向系统 mGBA） |
+| `FREEDECKCY_PPSSPP_BIN` | 覆盖 PPSSPP 可执行文件/AppImage 路径（默认用已下载/系统版本） |
+| `FREEDECKCY_MELONDS_BIN` | 覆盖 melonDS 可执行文件/AppImage 路径（默认用已下载/系统版本） |
 | `FREEDECKCY_STATE_FILE` | 仅供 `clear_freedeckcy_tasks.sh`：覆盖 `state.json` 路径 |
 
 > 三个运行时都只在需要时才用到：不下载也不会导致插件启动失败，但会在下载/解压/云存档时分别报"下载组件不可用""解压组件不可用""未找到 node 运行时"。
@@ -253,6 +265,7 @@ PACKAGE_ARCH=all     bash scripts/package.sh   # → ...-universal.zip（x86_64 
 ```
 
 - `PACKAGE_ARCH` 取值：`x86_64`（默认，无后缀）/ `aarch64`（`-arm64`）/ `all`（`-universal`）；单架构打包会裁剪 `defaults/runtime/{aria2,7z,node,mgba}/*/<其它arch>`，避免包体积翻倍；打包脚本会检查 `mgba/<arch>/mGBA.AppImage`，缺失只警告（GBA 安装后无法启动）；
+- **只有 GBA 的 mGBA AppImage 随包内置**；PSP/NDS 的官方 AppImage 不打进包，首次安装时从 GitHub release 下载（需要网络），所以这两种平台首次安装必须联网；
 - 确认 arm64 二进制：`file defaults/runtime/aria2/aarch64/aria2c`（应显示 `ELF 64-bit … ARM aarch64`）、`ls defaults/runtime/7z/aarch64/7zz defaults/runtime/node/aarch64/bin/node defaults/runtime/mgba/aarch64/mGBA.AppImage`；缺哪个就重跑 `make runtime ARCH=aarch64` / `make emulator-runtime ARCH=aarch64`；
 - 打包前可先用 `bash scripts/fetch_runtime.sh --only 7z --arch aarch64 --force` 单独补一个组件；
 - 部署：把 `...-arm64.zip` 传到 DroidDeck，用 Decky 的 **Import plugin zip** 安装；首次使用、双 Steam 根与 ARM Proton 排障见 [DROIDDECK.md](DROIDDECK.md)。
@@ -278,7 +291,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **264 个用例**（`make test` 实测 `275 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **280 个用例**（`make test` 实测 `280 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -292,29 +305,29 @@ make test
 |---|---|
 | 日志 | `/tmp/freedeckcy.log`（`config.py` 写死；`RotatingFileHandler` 5 MB × 3 轮转；`tail -f /tmp/freedeckcy.log`） |
 | 状态 | `~/.local/share/freedeckCY/tianyi/state.json` |
-| 健康检查 | `curl -s http://127.0.0.1:59275/_healthz` → `{"status": "ok"}` |
+| 健康检查 | `curl -s http://127.0.0.1:59271/_healthz` → `{"status": "ok"}` |
 
 ### 6.2 常用命令
 
 ```bash
 # 健康检查 / 是否在跑
-curl -s http://127.0.0.1:59275/_healthz
-ss -ltnp | grep 59275
+curl -s http://127.0.0.1:59271/_healthz
+ss -ltnp | grep 59271
 
 # 看下载任务（本地 HTTP API，只绑回环）
-curl -s http://127.0.0.1:59275/api/tianyi/download/tasks | python3 -m json.tool
+curl -s http://127.0.0.1:59271/api/tianyi/download/tasks | python3 -m json.tool
 
 # 看面板状态（HTTP 路径，QAM 走的是 RPC）
-curl -s http://127.0.0.1:59275/api/tianyi/state | python3 -m json.tool
+curl -s http://127.0.0.1:59271/api/tianyi/state | python3 -m json.tool
 
 # 看设置与 Proton 解析结果（DroidDeck 上重点看这两个字段）
-curl -s http://127.0.0.1:59275/api/tianyi/settings | python3 -m json.tool
+curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool
 #   proton_tool          设置值（auto / none / 具体工具名）
 #   proton_tool_resolved 最终会写入 config.vdf 的工具名
 #   droiddeck_detected   是否检测到 DroidDeck
 
 # 手动验证安装计划（不会下载，只探测；需先登录天翼账号）
-curl -s -X POST http://127.0.0.1:59275/api/tianyi/install/prepare \
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/install/prepare \
   -H 'Content-Type: application/json' -d '{"game_id":"18194"}' | python3 -m json.tool
 
 # 过滤错误
@@ -335,7 +348,7 @@ grep -nE "ERROR|Traceback|失败" /tmp/freedeckcy.log | tail -50
 - aria2 运行时状态在 `~/.local/share/freedeckCY/tianyi/aria2/`：`aria2-runtime.json`（RPC 地址/secret/pid）、`aria2-runtime.lock`（flock，保证只起一个实例）、`aria2.session`、`aria2.log`。插件重载时会读 meta 并附着到仍存活的 aria2，所以 gid/进度通常不丢；判断"当前实例能否被附着"就看这两个 runtime 文件 + `ps` 里 pid 是否存活。
 - `aria2.log` 里能看到 RPC/下载错误（启动参数带 `--log`）；下载任务本身的错误同时记录在 `state.json` 的 `tasks[].error_reason`。
 - 如果 `ps aux | grep aria2c` 有残留但插件已重载，重启插件即可；`main.py` 的 `_unload()` 会停掉 aria2 和本地服务。
-- 本地 Web 服务固定监听 `127.0.0.1:59275`；运行状态与端口会持久化到 Decky settings，但没有 UI 改端口，通常不需要动。
+- 本地 Web 服务固定监听 `127.0.0.1:59271`；运行状态与端口会持久化到 Decky settings，但没有 UI 改端口，通常不需要动。
 
 ### 6.5 Steam 多库 / 自定义根目录
 
@@ -375,7 +388,7 @@ bash scripts/doctor.sh --help             # 查看参数
 | Steam | Steam 根目录、`libraryfolders.vdf` 里的库路径、`userdata` 用户目录 |
 | 状态文件 | `state.json` 大小/权限、登录态、任务数（error/waiting）、已安装记录、下载/安装目录 |
 | 日志 | `/tmp/freedeckcy.log` 大小与最近 5 条 `ERROR/Exception/失败` |
-| 本地服务 | 端口 59275 是否监听、`/_healthz` 是否 200 |
+| 本地服务 | 端口 59271 是否监听、`/_healthz` 是否 200 |
 | 网络 | `cloud.189.cn` 连通性与 HTTP 状态码 |
 
 说明：脚本**只读**，不改任何文件；支持 `FREEDECKCY_STATE_FILE` / `FREEDECKCY_STEAM_ROOT` / `FREEDECKCY_PORT` / `DECKY_PLUGIN_DIR` 覆盖默认路径。排障流程建议先让用户附上 `make doctor` 输出，再要日志。
@@ -388,21 +401,21 @@ bash scripts/doctor.sh --help             # 查看参数
 
 ```bash
 # 浏览全部资源（空 q）+ 排序（"" / title / size_desc / size_asc / platform）
-curl -s 'http://127.0.0.1:59275/api/tianyi/catalog?q=&page=1&page_size=5&sort=size_desc' | python3 -m json.tool
+curl -s 'http://127.0.0.1:59271/api/tianyi/catalog?q=&page=1&page_size=5&sort=size_desc' | python3 -m json.tool
 # 同时可按 platform/category 过滤
-curl -s 'http://127.0.0.1:59275/api/tianyi/catalog?q=&platform=fc&category=%E6%A8%A1%E6%8B%9F%E5%99%A8&page=1&page_size=5' | python3 -m json.tool
+curl -s 'http://127.0.0.1:59271/api/tianyi/catalog?q=&platform=fc&category=%E6%A8%A1%E6%8B%9F%E5%99%A8&page=1&page_size=5' | python3 -m json.tool
 
 # 已安装列表（含 exists/platform/cover/steam_appid）
-curl -s http://127.0.0.1:59275/api/tianyi/installed | python3 -m json.tool
+curl -s http://127.0.0.1:59271/api/tianyi/installed | python3 -m json.tool
 # 启动 / 打开目录 / 卸载（POST JSON）
-curl -s -X POST http://127.0.0.1:59275/api/tianyi/installed/launch      -H 'Content-Type: application/json' -d '{"game_id":"18194"}'
-curl -s -X POST http://127.0.0.1:59275/api/tianyi/installed/open-folder -H 'Content-Type: application/json' -d '{"game_id":"18194"}'
-curl -s -X POST http://127.0.0.1:59275/api/tianyi/installed/uninstall   -H 'Content-Type: application/json' -d '{"game_id":"18194","delete_files":true}'
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/installed/launch      -H 'Content-Type: application/json' -d '{"game_id":"18194"}'
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/installed/open-folder -H 'Content-Type: application/json' -d '{"game_id":"18194"}'
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/installed/uninstall   -H 'Content-Type: application/json' -d '{"game_id":"18194","delete_files":true}'
 
 # 诊断 JSON / 诊断 zip / 更新检查
-curl -s http://127.0.0.1:59275/api/tianyi/diagnostics | python3 -m json.tool
-curl -s -OJ http://127.0.0.1:59275/api/tianyi/diagnostics/export   # 保存 freedeckcy-diagnostics.zip
-curl -s http://127.0.0.1:59275/api/tianyi/update-check | python3 -m json.tool
+curl -s http://127.0.0.1:59271/api/tianyi/diagnostics | python3 -m json.tool
+curl -s -OJ http://127.0.0.1:59271/api/tianyi/diagnostics/export   # 保存 freedeckcy-diagnostics.zip
+curl -s http://127.0.0.1:59271/api/tianyi/update-check | python3 -m json.tool
 ```
 
 **库页快捷键**（浏览器/Steam Deck 手柄等价）：
@@ -427,34 +440,59 @@ curl -s http://127.0.0.1:59275/api/tianyi/update-check | python3 -m json.tool
 
 所有文本已脱敏：HOME 替换为 `~`，`cookie/authorization/token/sessionkey/accesstoken/uid/pwd` 的值替换为 `<redacted>`；日志关键字筛出的最近 20 条错误在 `recent_errors`。先看 `runtime.*.exists`、`steam.proton_tool`、`droiddeck`、`installed.missing_paths`，再对照 `log-tail.txt`。
 
-### 6.8 GBA 安装调试（v0.6.0）
+### 6.8 模拟器安装调试（GBA / PSP / NDS，v0.7.0）
 
-**前置检查**：mGBA 是否可用（解析顺序见 §3）：
+**平台与资产**（`EMULATORS` 注册表；完整字段见 ARCH §5.10）：
+
+| 平台 | 模拟器（版本） | 官方资产 / 启动参数 | 获取方式 |
+|---|---|---|---|
+| gba | mGBA 0.10.5 | `mGBA-0.10.5-appimage-{x64,arm64}.appimage`，`-f <rom>` | 随包内置（`make emulator-runtime`） |
+| psp | PPSSPP 1.20.4 | `PPSSPP-v1.20.4-anylinux-{x86_64,aarch64}.AppImage`，`--fullscreen <rom>` | 首次安装按需从 GitHub release 下载 |
+| nds | melonDS 1.1 | `melonDS-1.1-appimage-{x86_64,aarch64}.zip`（zip 内 AppImage），`<rom>` | 首次安装按需下载并解 zip |
+
+**前置检查**：GBA 先准备内置 mGBA，PSP/NDS 可以等到安装时自动下载：
 
 ```bash
-make emulator-runtime              # 本机架构（或 make emulator-runtime ARCH=all）
+make emulator-runtime              # 只影响 GBA（mGBA），本机架构；ARCH=all 两份
 ls -l defaults/runtime/mgba/x86_64/mGBA.AppImage
-curl -s http://127.0.0.1:59275/api/tianyi/diagnostics | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"]["emulators"]["mgba"])'
-# 期望 available=true、source=bundled/extracted/env/system/flatpak
+
+curl -s http://127.0.0.1:59271/api/tianyi/diagnostics | python3 -m json.tool
+# 看 data.emulators.{gba,psp,nds}：available / source（bundled/extracted/download/system/flatpak）
+#   GBA 正常：source=bundled（或 extracted/env/system/flatpak）
+#   PSP/NDS 未安装时：source=download，会带 asset/url/message
 ```
 
-**安装计划调试**（GBA 用 openpath 的 ROM 文件名在分享里分页查找）：
+**安装计划调试**（三个平台都用 openpath 的文件名在分享里分页查找）：
 
 ```bash
-curl -s -X POST http://127.0.0.1:59275/api/tianyi/install/prepare   -H 'Content-Type: application/json' -d '{"game_id":"<GBA 的 game_id>"}' | python3 -m json.tool
-# 关注返回的 platform="gba"、emulator="mgba"、emulator_info、rom_target、files[]（应只有 1 个 ROM）
+for gid in "<GBA game_id>" "<PSP game_id>" "<NDS game_id>"; do
+  curl -s -X POST http://127.0.0.1:59271/api/tianyi/install/prepare \
+    -H 'Content-Type: application/json' -d "{\"game_id\":\"$gid\"}" | python3 -m json.tool
+done
+# 关注 platform（gba/psp/nds）、emulator（mgba/ppsspp/melonds）、emulator_info、
+# emulator_info.source（download 表示安装时会自动下载）、rom_target、files[]（应只有 1 个目标文件）
 ```
 
 **安装完成后检查**：
 
 ```bash
 ls -l "<install_dir>/<游戏目录>/launch-freedeckcy.sh"
-cat "<install_dir>/<游戏目录>/launch-freedeckcy.sh"   # exec <mGBA> -f <rom>
-cat ~/.local/share/freedeckCY/tianyi/state.json | python3 -m json.tool | grep -A3 rom_path
-# installed_games 里应有 platform=gba、emulator=mgba、rom_path、launcher_path、steam_app_id
+cat "<install_dir>/<游戏目录>/launch-freedeckcy.sh"
+# gba: exec <mGBA> -f <rom>
+# psp: exec <PPSSPP> --fullscreen <rom>
+# nds: exec <melonDS> <rom>
+psp/nds 若自动下载：ls -l ~/.local/share/freedeckCY/emulators/<psp|nds>/<arch>/
+ls -l ~/.local/share/freedeckCY/emulators/<platform>/<arch>/squashfs-root/AppRun
+
+# 手工验证 wrapper（可脱离 Steam 直接跑）
+bash "<install_dir>/<游戏目录>/launch-freedeckcy.sh"
+
+# 已安装记录字段
+cat ~/.local/share/freedeckCY/tianyi/state.json | python3 -m json.tool | grep -A4 rom_path
+# installed_games: platform、emulator（mgba/ppsspp/melonds）、rom_path、launcher_path、steam_app_id
 ```
 
-Steam 里该条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:tianyi:<token>`，**Proton 映射为 none**（原生 Linux）。GBA 不走 `7z t` 之外的额外校验；日志关键字：`Auto add GBA to Steam`、`Resolve GBA cover failed`、`Auto add to Steam exception`。
+Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:tianyi:<token>`，**Proton 映射为 none**（原生 Linux）。日志关键字：`Auto add GBA to Steam`、`Resolve GBA cover failed`、`Auto add to Steam exception`。**PSP/NDS 不在包内**，首次安装需要联网下载（失败会在安装消息/日志里给出 HTTP 状态或解包错误）。
 
 ---
 
@@ -467,7 +505,7 @@ Steam 里该条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedec
 | 云存档提示 **缺少 node / 未找到 node 运行时** | 执行 `bash scripts/fetch_runtime.sh --only node`（等价于只补 node；`make runtime` 会全下）；或安装 node ≥ 18，或用 `FREEDECKCY_NODE_BIN` 指定。注意云存档上传**一定走 node**，SteamOS 默认不带 node |
 | 装完 **Steam 库里没有游戏** | ① 写 `shortcuts.vdf` 后必须**重启 Steam**；② 如果安装时 Steam 正在运行，Steam 退出时可能回写覆盖 `shortcuts.vdf` —— 重新安装该游戏一次即可（写前备份在 `shortcuts.vdf.freedeckcy-bak-<时间戳>`，可手工回滚）；③ 打开 `/tmp/freedeckcy.log` 搜"Steam 导入失败"或"回读校验失败"看具体原因；④ 多盘位 / Flatpak 环境可用 `FREEDECKCY_STEAM_ROOT` 指定根目录 |
 | 装完点启动 **没反应** | exe 定位是启发式的（openpath → 叶子名搜索 → 目录里第一个可执行文件）。检查安装目录里的 exe 是否正确，必要时改 CSV 的 `openpath` 或手工在 Steam 里改目标 |
-| **端口 59275 被占用** | 本地服务启动失败并提示"端口已被占用"。先找占用进程：`ss -ltnp \| grep 59275`；常见是上一个插件实例没退干净——重载/重启插件；或换掉其他占用进程 |
+| **端口 59271 被占用** | 本地服务启动失败并提示"端口已被占用"。先找占用进程：`ss -ltnp \| grep 59271`；常见是上一个插件实例没退干净——重载/重启插件；或换掉其他占用进程 |
 | **SD 卡 / 第二块盘上的游戏识别不到** | 当前版本会扫描 `libraryfolders.vdf` 与 Flatpak 路径；仍失败时：① 确认目标盘存在 `steamapps/compatdata/<appid>/pfx`；② 用 `FREEDECKCY_STEAM_ROOT` 指定 Steam 根；③ 看日志里的"读取 libraryfolders.vdf 失败" |
 | 云存档恢复覆盖错了 / 想回滚 | 恢复时会先把同名文件/目录改名为 `*.freedeckcy-bak-<YYmmdd_HHMMSS>`，到对应目录手工改回即可 |
 | 卸载后 **Proton 前缀还在占盘** | 卸载默认只删游戏文件。重新卸载时在确认框选「连 Proton 前缀一起删」；若按钮没出现，说明没解析到 AppID/前缀（先用 `make doctor` 看 Steam 段与 `state.json` 的 `steam_app_id`） |
@@ -483,16 +521,18 @@ Steam 里该条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedec
 | 报 **aria2 控制文件错误 / 文件被截断** | 半成品或旧会话损坏。代码会先隔离坏文件（`*.freedeckcy-stale-<时间戳>`）再 auto 重试一次；仍失败就移除任务重下 |
 | 多分卷游戏 **识别不出分卷** | 仅支持常见 6 类命名；非标准命名会被当普通文件。可手工把分卷改名成标准形式，或提 issue（见 ROADMAP "7z t 校验/归档识别增强"） |
 | **分卷/多包只下了一部分就报错** | 组内某包 `error` 时整组不会安装，已完成的分卷提示"同一安装计划中有分卷下载失败，移除失败任务后可继续安装"。移除失败的那条任务后，剩余分卷会自动继续安装；若是解压阶段失败，已解压文件会保留，移除任务后重新发起 |
-| 库页 **看不到平台筛选条** | 平台条只在 `platforms` 数量 > 1 时显示；确认加载的是 `freedeckcy_catalog.csv`（7084 条 / 11 平台）而不是回退的旧目录（全 PC）。可在日志看"已加载游戏目录 total=… platforms=…"或用 `curl '127.0.0.1:59275/api/tianyi/catalog?q=&page=1'` 看 `platforms` 字段 |
-| **点了非 PC 卡片只弹提示、装不了** | GBA 应可正常安装（mGBA，见 §6.8）；其它平台仍是预期行为：前端提示 + 后端 `_build_install_plan` 拒绝（只放行 PC/GBA）。GBA 报错多为 mGBA 缺失或 ROM 名不匹配 |
+| 库页 **看不到平台筛选条** | 平台条只在 `platforms` 数量 > 1 时显示；确认加载的是 `freedeckcy_catalog.csv`（7084 条 / 11 平台）而不是回退的旧目录（全 PC）。可在日志看"已加载游戏目录 total=… platforms=…"或用 `curl '127.0.0.1:59271/api/tianyi/catalog?q=&page=1'` 看 `platforms` 字段 |
+| **点了非 PC 卡片只弹提示、装不了** | GBA/PSP/NDS 应可正常安装（mGBA/PPSSPP/melonDS，见 §6.8）；其它平台仍是预期行为：前端提示 + 后端 `_build_install_plan` 拒绝（只放行 PC + 注册表平台）。报错多为模拟器缺失或 ROM 名不匹配 |
 | 目录里 **`/web/share?code=` 链接没被加载** | v0.3.0 起 `_is_valid_tianyi_url()` 与 `tianyi_client.parse_share_url()` 都支持该形式；检查链接是否带 `code=`、域名是否 `cloud.189.cn`。旧版本目录需重载插件生效 |
 | **已安装页签点卡片启动失败** | ① 看 flash 提示：`该游戏缺少 Steam AppID` 说明记录里没有 appid，去 Steam 库手动启动；② `当前环境没有 xdg-open/gio` 说明后端无法拉起外部程序（DroidDeck 桌面需有 xdg-open）；③ 用 `curl /api/tianyi/installed` 确认 `steam_appid` 与 `exists` |
-| **导出诊断没反应/下载失败** | 诊断 zip 由浏览器直接 `GET /api/tianyi/diagnostics/export` 下载；若浏览器拦截下载，用 `curl -s -OJ http://127.0.0.1:59275/api/tianyi/diagnostics/export` 手工保存；接口本身失败时看 `/tmp/freedeckcy.log` 的 traceback |
+| **导出诊断没反应/下载失败** | 诊断 zip 由浏览器直接 `GET /api/tianyi/diagnostics/export` 下载；若浏览器拦截下载，用 `curl -s -OJ http://127.0.0.1:59271/api/tianyi/diagnostics/export` 手工保存；接口本身失败时看 `/tmp/freedeckcy.log` 的 traceback |
 | **检查更新失败** | `update-check` 依赖 `api.github.com`：无网络、代理不通或 GitHub API 未认证限流（60 次/小时/IP）都会返回 `ok:false` + message；等一会儿或手工打开 Release 页；成功结果会缓存 1 小时，不必连续点 |
-| **GBA 安装报「未找到 mGBA」/ 计划直接失败** | 先 `make emulator-runtime`（或 `make emulator-runtime ARCH=aarch64`）；也可 `FREEDECKCY_MGBA_BIN=/path/to/mgba` 指向系统 mGBA / AppImage，或安装 Flatpak `io.mgba.mGBA`；诊断接口 `emulators.mgba` 会显示 available/source/message |
-| **GBA 计划报「分享中没有找到 ROM」** | 目录 CSV 的 `openpath` 文件名与分享内文件名不一致（或资源包已更新）：核对 CSV/分享文件名，大小写与后缀 `.gba` 要一致；接口报错会附已扫描文件示例 |
-| **mGBA AppImage 解包失败** | 首次使用会执行 `--appimage-extract`，失败时看日志与 `~/.local/share/freedeckCY/emulators/<arch>/` 权限/空间；可删掉该目录重试，或用 `FREEDECKCY_MGBA_BIN` 指向已解包的 `squashfs-root/AppRun`。AppImage 下载不完整（<8 MB）会报「mGBA 下载不完整」 |
-| **GBA 快捷方式点了不启动** | 检查 `launch-freedeckcy.sh` 与 ROM 是否都在安装目录（`find_rom_file` 只认 `.gba`）；`bash launch-freedeckcy.sh` 手工试跑；Steam 条目 Exe 必须是脚本路径、LaunchOptions 带 token（用于卸载定位），Proton 不应有映射 |
+| **GBA 计划报「未找到 mGBA」** | 先 `make emulator-runtime`（或 `make emulator-runtime ARCH=aarch64`）；也可 `FREEDECKCY_MGBA_BIN=/path/to/mgba` 指向系统 mGBA / AppImage，或安装 Flatpak `io.mgba.mGBA`；诊断接口 `emulators.gba` 会显示 available/source/message |
+| **PSP/NDS 安装时下载官方 AppImage 失败** | 首次安装需要访问 GitHub release（`api.github.com`/`objects.githubusercontent.com`）；检查网络/系统代理，失败后重装可再次触发下载。也可提前用 `FREEDECKCY_PPSSPP_BIN` / `FREEDECKCY_MELONDS_BIN` 指向系统或手工下载的 AppImage；诊断接口会显示对应平台的 source/url/message |
+| **模拟器计划报「分享中没有找到 ROM」** | 目录 CSV 的 `openpath` 文件名与分享内文件名不一致（或资源包已更新）：核对 CSV/分享文件名，大小写与扩展名要一致（gba `.gba`；psp `.iso/.cso/.pbp/.elf`；nds `.nds/.dsi/.srl`）；接口报错会附已扫描文件示例 |
+| **模拟器 AppImage 解包失败** | 首次使用会执行 `--appimage-extract`，失败时看日志与 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/` 权限/空间；可删掉该目录重试，或用对应 `FREEDECKCY_*_BIN` 指向已解包的 `squashfs-root/AppRun`。下载不完整（小于各平台 `min_bytes`）会删文件并报「<模拟器> 下载不完整」 |
+| **模拟器快捷方式点了不启动** | 检查 `launch-freedeckcy.sh` 与 ROM 是否都在安装目录（`find_rom_file` 只认注册表扩展名）；`bash launch-freedeckcy.sh` 手工试跑；Steam 条目 Exe 必须是脚本路径、LaunchOptions 带 token（用于卸载定位），Proton 不应有映射。PSP/NDS 还要确认首次下载/解包已完成 |
+| **PSP/NDS 找不到存档 / 没法管理存档** | 当前闭环只管"下载 ROM → 启动模拟器"，**不含 BIOS/存档管理**；存档由模拟器自身写入（通常在 `~/.local/share/PPSSPP` / `~/.local/share/melonDS` 或模拟器配置目录），插件不接管 |
 | **DroidDeck 里装完游戏，Steam 里看不到快捷方式** | DroidDeck 可能同时运行两个 Steam 客户端：`~/.droiddeck-x64/.local/share/Steam`（x64）与 `~/.local/share/Steam`（标准/ARM）。插件会优先写正在运行的那个（其 `steam.pid` 存在），但若判断错，可用 `FREEDECKCY_STEAM_ROOT` 锁定目标根，重装一次游戏并重启 Steam；`GET /api/tianyi/settings` 可确认 `droiddeck_detected` |
 | **游戏启动不了 / 提示兼容工具缺失（DroidDeck）** | 需要 ARM Proton：确认 Steam 里已装 `droiddeck-proton-arm64`（或 11 版）。插件默认写 `droiddeck-proton-arm64`；版本不匹配时用 `FREEDECKCY_PROTON_TOOL=droiddeck-proton-11-arm64`，或设成 `none` 后在 Steam 里手动选兼容工具；`settings` 接口的 `proton_tool_resolved` 是实际写入值 |
 | **下载/解压报“找不到二进制”（ARM 设备）** | `ls -l defaults/runtime/{aria2,7z,node}/aarch64/…` 检查 arm64 运行时是否打进包；缺则 `make runtime ARCH=aarch64` 后重新 `make package-droiddeck`；也可用 `FREEDECKCY_ARIA2_BIN` / `FREEDECKCY_7Z_BIN` / `FREEDECKCY_NODE_BIN` 指向系统 arm64 版本 |
@@ -511,10 +551,10 @@ Steam 里该条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedec
 - **资源源只有天翼云盘**：百度网盘、模拟器整合、用户资源池只存在于 GitHub Releases（v0.5 之后 / NewFreedeck），**本仓库没有实现**。
 - **仅支持 SteamOS / Linux（含 DroidDeck 的 proot 环境）**：依赖 `7zz`、Proton、Steam 的 Linux 目录结构；Windows / macOS 无法运行。Steam 根目录支持原生 / Flatpak / **DroidDeck 双客户端**，SD 卡/第二块盘通过 `libraryfolders.vdf` 扫描。
 - **作者已停止维护**：上游不再更新，接口失效只能自行修；release 与仓库版本存在代差（仓库落后）。
-- **仅早期版本**：`package.json` 版本 0.4.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
+- **仅早期版本**：`package.json` 版本 0.7.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
 - **DroidDeck 适配未真机验证**：ARM64 运行环境、FEX/ARM Proton、Android 存储映射都可能有差异；实测失败时优先参考 [DROIDDECK.md](DROIDDECK.md) 的排障与日志收集。
 - **目录数据需保持干净**：新增/合并目录后必须跑 `make normalize-catalog` 与 `make validate-catalog`（CI 对内置目录执行 `--strict`）；「模拟器」是清洗后的兜底分类，不是真实游戏分类。
-- **GBA 可安装，其它模拟器平台仍只可浏览**：v0.6.0 起 GBA 通过 mGBA 可安装/启动（原生 Linux 快捷方式，不写 Proton）；PS1/PS2/PS3/PSP/3DS/NDS/FC/MD/Switch 仍只提示/拒绝（见 ROADMAP 9.8）。GBA 只识别 `.gba`，不含 BIOS/存档管理与包内嵌套处理；mGBA 首次解包会额外占一份空间；ARM64/DroidDeck 上 mGBA 尚未真机验证。
+- **GBA/PSP/NDS 可安装，其它模拟器平台仍只可浏览**（v0.7.0）：GBA（mGBA，内置）、PSP（PPSSPP，按需下载）、NDS（melonDS，按需下载 zip）可安装/启动（原生 Linux 快捷方式，不写 Proton）；PS1 因 BIOS 依赖暂缓，PS2/PS3/3DS/FC/MD/Switch 仍只提示/拒绝（见 ROADMAP 9.8）。模拟器只识别注册表内扩展名，**不含 BIOS/存档管理**；PSP/NDS 首次安装需要联网；所有 AppImage 解包会额外占一份空间；ARM64/DroidDeck 上 PSP/NDS/mGBA 尚未真机验证。
 - **完整性校验是"大小 + 头部预检 + `7z t`（best-effort）"**：7z 不可用时自动跳过校验；没有哈希/签名校验；分卷识别只覆盖常见命名；云存档仍依赖 `node`。
 - **Steam 运行中写入仍可能被覆盖**：写前有备份且写后回读，但无法阻止运行中的 Steam 覆盖 `shortcuts.vdf`/`config.vdf`；装完建议重启 Steam（自动重启 Steam 在 ROADMAP §9）。
 - **compatdata 清理默认关闭**：卸载默认只删游戏文件；"连 Proton 前缀一起删"需要显式选择，避免误删存档。
@@ -550,8 +590,8 @@ Steam 里该条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedec
 | 改 Steam 多库 / Flatpak / DroidDeck 识别 | `py_modules/steam_shortcuts.py` 的 `_steam_root_candidates` / `is_droiddeck` / `_steam_library_paths` / `find_compat_user_dir` |
 | 改 Proton 工具解析 / 设置 | `py_modules/steam_shortcuts.py` 的 `detect_proton_tool` / `add_or_update_tianyi_shortcut(proton_tool=)`；设置项 `proton_tool` 贯穿 `tianyi_store` / `tianyi_service.update_settings` / `main.set_tianyi_settings` / `tianyi_http.handle_settings_*` |
 | 改打包架构 / ARM64 产物 | `scripts/package.sh` 的 `PACKAGE_ARCH`；`Makefile` 的 `package-droiddeck` / `runtime ARCH=` / `emulator-runtime ARCH=` |
-| 改模拟器支持 / GBA 闭环 | `py_modules/emulator_manager.py`（mGBA 解析/解包/ROM 查找/wrapper）；`tianyi_service._build_install_plan` 的平台校验、`_auto_register_emulator_to_steam`、`_finalize_group_install` 的 GBA 字段 |
-| 改 mGBA 运行时 | `scripts/fetch_emulator.sh`、`Makefile` 的 `emulator-runtime`、`defaults/runtime/mgba/<arch>/` |
+| 改模拟器支持 / 新增平台 | `py_modules/emulator_manager.py` 的 `EmulatorSpec` / `EMULATORS`（官方资产、launch_args、rom_extensions、env_var）；`tianyi_service._build_install_plan` 的平台校验、`_auto_register_emulator_to_steam`、`_finalize_group_install` 的模拟器字段 |
+| 改内置模拟器运行时 | `scripts/fetch_emulator.sh`（当前只预置 GBA/mGBA）、`Makefile` 的 `emulator-runtime`、`defaults/runtime/mgba/<arch>/` |
 | 改 QAM 面板 UI | `src/index.tsx`（`Content` / `SettingsPage`） |
 | 改游戏库橱窗 / 登录桥 | `defaults/tianyi_library_ui/{index.html,app.js,app.css,login_bridge.*}` |
 | 改本地 HTTP 接口 | `py_modules/tianyi_http.py`（`setup_routes` 与各 `handle_*`；新接口：installed / diagnostics / update-check） |
@@ -564,10 +604,10 @@ Steam 里该条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedec
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 260 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 280 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
-- [ ] 改动打包/运行时时验证两种架构：`make package`（x86_64）与 `make package-droiddeck`（aarch64），确认产物后缀与包内 `defaults/runtime/<arch>/`（含 `mgba/mGBA.AppImage`）正确；
+- [ ] 改动打包/运行时时验证两种架构：`make package`（x86_64）与 `make package-droiddeck`（aarch64），确认产物后缀与包内 `defaults/runtime/<arch>/`（含 `mgba/mGBA.AppImage`）正确；PSP/NDS 首次安装需联网下载，打包不内置；
 - [ ] 改了 `src/` → `pnpm build` 并提交 `dist/index.js(.map)`；
 - [ ] 没有新增 `__pycache__` / `*.pyc` / `.DS_Store` / `node_modules` 等产物；
 - [ ] 没有把 `defaults/runtime/` 下的大二进制提交进去（在 `.gitignore` 里）；

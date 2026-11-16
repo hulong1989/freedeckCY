@@ -1115,8 +1115,9 @@ createApp({
     async openInstallConfirm(item) {
       if (!item || !item.game_id) return;
       const platform = String(item.platform || "pc").toLowerCase();
-      if (platform !== "pc" && platform !== "gba") {
-        this.flash(`当前只支持 PC 与 GBA（mGBA）资源，${platform.toUpperCase()} 暂未接入模拟器`);
+      const emulatorPlatforms = new Set(["pc", "gba", "psp", "nds"]);
+      if (!emulatorPlatforms.has(platform)) {
+        this.flash(`当前支持 PC / GBA / PSP / NDS，${platform.toUpperCase()} 暂未接入模拟器`);
         return;
       }
       void this.fetchCoverForItem(item, { force: true });
