@@ -4894,6 +4894,7 @@ class TianyiService:
             raise TianyiApiError(message or "请先登录天翼账号")
 
         open_path = ""
+        platform = "pc"
         if not share_url:
             item = self.catalog.get_by_game_id(game_id)
             if not item:
@@ -4902,6 +4903,7 @@ class TianyiService:
             game_title = item.title
             game_id = item.game_id
             open_path = str(item.openpath or "")
+            platform = str(item.platform or "pc")
         else:
             normalized_share_url = str(share_url or "").strip()
             if not _is_tianyi_share_url(normalized_share_url):
@@ -4923,6 +4925,7 @@ class TianyiService:
                 game_title = str(matched_item.title or game_id or "自定义分享")
                 game_id = str(matched_item.game_id or game_id or normalized_share_url)
                 open_path = str(matched_item.openpath or "")
+                platform = str(matched_item.platform or "pc")
                 if "pwd=" not in normalized_share_url and str(matched_item.pwd or "").strip():
                     joiner = "&" if "?" in normalized_share_url else "?"
                     normalized_share_url = f"{normalized_share_url}{joiner}pwd={matched_item.pwd.strip()}"
@@ -4930,6 +4933,12 @@ class TianyiService:
             else:
                 game_title = game_id or "自定义分享"
                 game_id = game_id or normalized_share_url
+
+        if str(platform or "pc").strip().lower() != "pc":
+            raise ValueError(
+                f"当前版本未集成模拟器，暂不支持安装 {str(platform).upper()} 资源；"
+                "可在库页按平台浏览，模拟器支持见 ROADMAP"
+            )
 
         settings = self.store.settings
         target_download = (download_dir or settings.download_dir or self.plugin.downloads_dir).strip()
@@ -4989,6 +4998,7 @@ class TianyiService:
         return {
             "game_id": game_id,
             "game_title": game_title,
+            "platform": platform,
             "openpath": open_path,
             "share_url": share_url,
             "share_code": resolved.share_code,

@@ -170,6 +170,16 @@ body {
   color: #ffffff;
 }
 
+.platform-filter-chip.active {
+  border-color: #9fd0ff;
+  background: rgba(120, 200, 255, 0.14);
+  color: #eaf6ff;
+}
+
+.platform-filter-chip.active .chip-count {
+  color: #bfe3ff;
+}
+
 .filter-chip:focus-visible {
   outline: none;
 }

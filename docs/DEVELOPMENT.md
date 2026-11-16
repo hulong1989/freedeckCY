@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.2.0**：如何在本地跑起来、改代码、打补丁、排查故障。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.3.0**：如何在本地跑起来、改代码、打补丁、排查故障。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -20,7 +20,7 @@
 | `py_modules/aria2_manager.py` | aria2 子进程管理（运行时元数据 `aria2-runtime.json` + `flock` 让插件重载可附着存活实例）+ JSON-RPC（`addUri` / `changeUri` / `tellStatus` / `listDownloads` …） |
 | `py_modules/seven_zip_manager.py` | 7z 解压 / 压缩（带进度回调）；`test_archive()` 跑 `7z t` 做解压前校验（7z 不可用时 best-effort 跳过） |
 | `py_modules/steam_shortcuts.py` | 写 `shortcuts.vdf`（`DevkitGameID` token 去重、无变化不重写、写前备份 12 份、写后回读）、改 `config.vdf` 的 Proton 映射、下载 `grid` 封面、解析 appid；Steam 多库 / Flatpak 识别（`_steam_library_paths` / `find_compat_user_dir`，自定义用户名打分）；`find_compatdata_dirs()` 跨库定位待清理的 Proton 前缀 |
-| `py_modules/game_catalog.py` | 读 CSV 资源清单：校验、搜索、分页、按 `game_id` 查找；支持 `platform`/`cover_url`/`cover_portrait_url`/`steam_appid` 可选列与可选 `cover_index.csv` 合并（不覆盖已有值）；`list()` 支持 platform/category 过滤并返回 `platforms`/Top12 `categories` |
+| `py_modules/game_catalog.py` | 读 CSV 资源清单（16 列 / 7084 条 / 11 平台，新目录优先、旧目录回退）：校验、搜索、分页、按 `game_id` 查找；支持 `platform`/`cover_url`/`cover_portrait_url`/`steam_appid` 与 `cover_index.csv` 合并（不覆盖已有值）；`list()` 支持 platform/category 过滤并返回 `platforms`/Top12 `categories`；`_is_valid_tianyi_url()` 兼容 `/t/` 与 `/web/share?code=` |
 | `py_modules/archive_bundle.py` | 多分卷归档识别（`.7z.001`/`.partN.rar`/`.z01+zip`/`.r00+rar` 等 6 类）：`detect_archive_sets` / `build_bundle_index` / `looks_like_multi_volume_name` |
 | `py_modules/utils.py` | 端口占用检测、等待端口释放、局域网 IP 探测（历史遗留） |
 | `py_modules/vdf/` | 第三方 VDF 库（文本 + 二进制格式），`py_modules/vdf/__init__.py` 提供 `parse/loads/dumps/binary_dumps` 等 |
@@ -28,12 +28,12 @@
 | `backend/tianyi_cloud_upload.js` | 云盘上传（`upload`）、列版本（`list_versions`）、下载（`download_file`）的 ESM 实现 |
 | `backend/tianyi_cloud_upload.cjs` | 同一逻辑的 CommonJS 版，**只实现 `upload`**；仅在 `.js` 不存在时启用 |
 | `src/index.tsx` | 全部 React 代码：QAM 主面板、设置页、Steam 库页时长注入、全局游戏事件监听 |
-| `defaults/tianyi_library_ui/` | 本地 Vue 游戏库（分类筛选条、平台标签、手柄焦点序列）与二维码登录桥（免构建，直接改） |
+| `defaults/tianyi_library_ui/` | 本地 Vue 游戏库（**平台 + 分类双筛选条**、平台标签、非 PC 只提示不安装、手柄焦点序列）与二维码登录桥（免构建，直接改） |
 | `defaults/tianyi_catalog/gamebox_all_links_*.csv` | 随插件分发的资源清单（`game_id,title,categories,down_url,pwd,openpath,filesize_z` 等） |
 | `scripts/fetch_runtime.sh` | 下载 aria2c / 7zz / node 到 `defaults/runtime/`（`make runtime` 调用它） |
 | `scripts/package.sh` | 组装 Decky 插件 zip 到 `dist-artifacts/`（`make package` 调用它） |
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
-| `tests/` | pytest 单测（227 个用例）：目录解析/平台筛选、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（231 个用例）：目录解析/平台筛选/全量目录、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
 
@@ -86,15 +86,35 @@ pnpm watch      # 开发时可选：文件变化自动重打包
 - 本地网页地址：QAM 里"打开游戏库"按钮会调 `get_tianyi_library_url`，形如 `http://127.0.0.1:59271/tianyi/library`；
 - 建议在桌面浏览器的无痕窗口里直接访问上述地址调试（只在回环地址监听，必须在本机访问）。
 
-### 2.5 资源清单与封面索引
+### 2.5 目录数据、封面索引与筛选
 
-**资源清单** `defaults/tianyi_catalog/gamebox_all_links_*.csv`（或 `FREEDECKCY_GAME_CATALOG_CSV` 指定文件）：
+**目录文件优先级**（`game_catalog.resolve_default_catalog_path()`）：`FREEDECKCY_GAME_CATALOG_CSV` → `defaults/tianyi_catalog/freedeckcy_catalog.csv`（v0.3.0 主用，**7084 条有效 / 11 平台**）→ 旧版 `gamebox_all_links_20260221_234730.csv`（回退，2845 行 / 2685 条）→ `defaults/tianyi_catalog.csv`。改完 CSV 后重载插件生效（`initialize()` 全量读入内存）。
 
-- 必须包含 `title` 与天翼分享链接 `down_url`，否则该行记为 invalid；
-- v0.2.0 起支持 4 个可选列：`platform`（默认 `pc`）、`cover_url`（横版封面）、`cover_portrait_url`（竖版封面）、`steam_appid`；
-- 当前仓库内置清单 2845 行 / **有效 2685 条，全部为 PC**；改完 CSV 后重载插件即可生效（`initialize()` 全量读入内存）。
+**目录 CSV 16 列**：
 
-**封面索引（可选）**：`defaults/tianyi_catalog/cover_index.csv`（或 `FREEDECKCY_COVER_INDEX_CSV`）。**仓库目前不包含这个文件**，缺失时封面回退到在线解析，不影响启动。表头建议：
+```text
+game_id,title,category_parent,categories,package_name,server,down_url,shorturl,
+pwd,openpath,filesize_z,list_filesize,platform,cover_url,cover_portrait_url,steam_appid
+```
+
+- `down_url` 支持 `https://cloud.189.cn/t/<code>?pwd=...` 和 `https://cloud.189.cn/web/share?code=...`（后者必须带 `code=`，FC/GBA/MD 等资源常用）；`title` 或链接缺失的行会被计为 invalid；
+- `platform` 当前取值：`pc` / `fc` / `nds` / `psp` / `gba` / `3ds` / `ps2` / `ps1` / `ps3` / `md` / `switch`（缺省归一为 `pc`，别名 `steam/windows/win`→`pc`、`ns/nsx`→`switch`）；
+- 平台分布：PC 2540、FC 1475、NDS 722、PSP 575、GBA 553、3DS 305、PS2 250、PS1 194、PS3 194、MD 191、Switch 85。
+
+**从上游 v0.6 合并目录（可复现）**：数据来自 v0.6 的 `freedeck_catalog.csv`（7041 行 / 28 列）+ 旧目录独有条目，用仓库根 `scripts/merge_v06_catalog.py` 生成：
+
+```bash
+# 需要本地有上游 v0.6 解包（本项目不随仓库分发该数据）
+python3 scripts/merge_v06_catalog.py \
+  --v06-dir ../0.6/freedeck-plugin/defaults/tianyi_catalog \
+  --base defaults/tianyi_catalog/gamebox_all_links_20260221_234730.csv \
+  --out defaults/tianyi_catalog/freedeckcy_catalog.csv \
+  --cover-out defaults/tianyi_catalog/cover_index.csv
+```
+
+脚本规则：以 v0.6 目录为主、只保留天翼链接、按 `game_id` 去重、v0.6 缺失的旧目录条目补在后面（43 条，`platform=pc`），cover index 归一为 6 列。输出后重载插件即可看到新数据；平台/分类筛选条按数据自动生成，无需改代码。
+
+**封面索引** `defaults/tianyi_catalog/cover_index.csv`（仓库已内置 **3470 行**，`FREEDECKCY_COVER_INDEX_CSV` 可覆盖）：
 
 ```csv
 game_id,title,steam_appid,cover_url,cover_portrait_url,platform
@@ -102,11 +122,17 @@ game_id,title,steam_appid,cover_url,cover_portrait_url,platform
 ```
 
 - 列名兼容：横版 `cover_url` / `landscape_cover_url` / `cover`；竖版 `cover_portrait_url` / `square_cover_url` / `portrait_url` / `portrait`；appid `steam_appid` / `app_id` / `appid`；
-- 匹配顺序：先按 `game_id` 精确匹配，其次按标题（去空白、小写）匹配；
-- **只补空值，不覆盖目录 CSV 已有值**；`platform` 也会被索引补齐；
-- 只有 `steam_appid` 时，插件会合成 Steam CDN 封面（横版 `header.jpg`、竖版 `library_600x900.jpg`），无需填 cover URL。
+- 匹配顺序：先 `game_id` 精确匹配，其次标题（去空白、小写）；**只补空值，不覆盖目录 CSV 已有值**；合并后 **6823 / 7084 条资源自带封面**；
+- 只有 `steam_appid` 时，插件合成 Steam CDN 封面（横版 `header.jpg`、竖版 `library_600x900.jpg`），无需填 cover URL。
 
-封面解析顺序（`resolve_catalog_cover`）：目录/索引静态封面 → 内存/磁盘缓存 → Steam 商店搜索 → ProtonDB 等级。缓存文件 `~/.local/share/freedeckCY/tianyi/cover_cache.json`（0600、原子写），正缓存 7 天、负缓存 30 分钟；删掉它并重载插件即可强制重新解析。
+**封面解析顺序**（`resolve_catalog_cover`）：目录/索引静态封面 → 内存/磁盘缓存 → Steam 商店搜索 → ProtonDB 等级。缓存文件 `~/.local/share/freedeckCY/tianyi/cover_cache.json`（0600、原子写），正缓存 7 天、负缓存 30 分钟；删掉它并重载插件即可强制重新解析。
+
+**平台 / 分类筛选（v0.3.0 UI 已接）**：
+
+- 搜索后显示两行筛选条：平台条（「全部平台」+ 各平台计数）和分类条（「全部分类」+ Top12 分类计数）；平台条只在 `platforms` 数量 > 1 时显示（当前 11 个平台，所以可见）；
+- 手柄焦点顺序：搜索框 → 搜索按钮 → 平台条 → 分类条 → 卡片；
+- 请求同时带 `platform` 与 `category` 参数（`/api/tianyi/catalog`），可组合；
+- **非 PC 只可浏览、不可安装**：点击非 PC 卡片只 flash 提示「当前版本未集成模拟器」，不打开安装弹窗；即使绕过前端，后端 `_build_install_plan()` 也会对 `platform != pc` 抛错拒绝。这是当前产品决策（模拟器未集成，见 ROADMAP 9.8）。
 
 ---
 
@@ -164,7 +190,7 @@ make package PACKAGE_ARGS="--out-dir /tmp/freedeckcy-build"
 bash scripts/package.sh --help          # 查看全部参数
 ```
 
-- 版本号取自 `package.json` 的 `version` 字段（当前为 `0.2.0`）；
+- 版本号取自 `package.json` 的 `version` 字段（当前为 `0.3.0`）；
 - zip 根目录直接是插件结构（不额外套目录）：`main.py`、`plugin.json`、`package.json`、`LICENSE`、`README.md`，以及 `dist/`、`py_modules/`、`backend/`、`defaults/`；
 - 打包脚本会排除 `__pycache__`、`*.pyc`、`.DS_Store`、`node_modules`、`.git`、`tests`、`scripts`、`.github`、`docs`、`gl`、`dist-artifacts`（白名单之外的一律不打包）；
 - 默认复用已提交的 `dist/index.js`，不会强制跑 `pnpm build`；需要重新构建前端时用 `bash scripts/package.sh --build-ui`（要求 PATH 里有 pnpm）；
@@ -194,7 +220,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **227 个用例**（`make test` 实测 `227 passed`）。其中 `tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **231 个用例**（`make test` 实测 `231 passed`）。其中 `tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -317,7 +343,10 @@ bash scripts/doctor.sh --help             # 查看参数
 | 报 **aria2 控制文件错误 / 文件被截断** | 半成品或旧会话损坏。代码会先隔离坏文件（`*.freedeckcy-stale-<时间戳>`）再 auto 重试一次；仍失败就移除任务重下 |
 | 多分卷游戏 **识别不出分卷** | 仅支持常见 6 类命名；非标准命名会被当普通文件。可手工把分卷改名成标准形式，或提 issue（见 ROADMAP "7z t 校验/归档识别增强"） |
 | **分卷/多包只下了一部分就报错** | 组内某包 `error` 时整组不会安装，已完成的分卷提示"同一安装计划中有分卷下载失败，移除失败任务后可继续安装"。移除失败的那条任务后，剩余分卷会自动继续安装；若是解压阶段失败，已解压文件会保留，移除任务后重新发起 |
-| 库页 **看不到平台筛选** | 当前前端只渲染分类筛选条（「全部」+ Top12 分类），没有平台 chip；且内置目录全是 PC（2685 条有效），所以看不到平台切换是正常现象，不代表能切模拟器。后端 `platform` 参数与 `platforms` 计数已具备 |
+| 库页 **看不到平台筛选条** | 平台条只在 `platforms` 数量 > 1 时显示；确认加载的是 `freedeckcy_catalog.csv`（7084 条 / 11 平台）而不是回退的旧目录（全 PC）。可在日志看"已加载游戏目录 total=… platforms=…"或用 `curl '127.0.0.1:59271/api/tianyi/catalog?q=&page=1'` 看 `platforms` 字段 |
+| **点了非 PC 卡片只弹提示、装不了** | 预期行为：模拟器未集成，非 PC 资源当前只可浏览（前端提示 + 后端 `_build_install_plan` 拒绝）。模拟器支持见 ROADMAP 9.8 |
+| 目录里 **`/web/share?code=` 链接没被加载** | v0.3.0 起 `_is_valid_tianyi_url()` 与 `tianyi_client.parse_share_url()` 都支持该形式；检查链接是否带 `code=`、域名是否 `cloud.189.cn`。旧版本目录需重载插件生效 |
+| 封面索引 **未命中（封面仍靠在线解析）** | ① 确认 `cover_index.csv` 已随仓库存在/路径正确；② 索引按 `game_id` 或标题匹配，标题需与目录一致（空白归一化后比较）；③ 删除 `cover_cache.json` 后重载插件让新索引生效 |
 | 封面 **不显示 / 显示的是错图** | ① 检查 `cover_index.csv` 是否存在/表头是否含 `game_id` 或 `title`（文件可选，缺失就走在线解析）；② `steam_appid` 不对会合成错误的 CDN 图，删掉该行或修正 appid；③ 在线解析失败会写负缓存 30 分钟，删 `~/.local/share/freedeckCY/tianyi/cover_cache.json` 后重载插件立即重试 |
 | 改了封面索引 **不生效** | 索引只在 `initialize()` 加载目录时合并；重载插件（或重新进入插件）后生效。确认文件路径（`FREEDECKCY_COVER_INDEX_CSV` 或 `defaults/tianyi_catalog/cover_index.csv`）与列名兼容 |
 | 封面缓存 **太大 / 想清空** | 缓存是普通 JSON，直接删 `~/.local/share/freedeckCY/tianyi/cover_cache.json` 并重载插件；正缓存 7 天、负缓存 30 分钟，过期项启动时自动丢弃 |
@@ -330,8 +359,8 @@ bash scripts/doctor.sh --help             # 查看参数
 - **资源源只有天翼云盘**：百度网盘、模拟器整合、用户资源池只存在于 GitHub Releases（v0.5 之后 / NewFreedeck），**本仓库没有实现**。
 - **仅支持 SteamOS / Linux**：依赖 `7zz`、Proton、Steam 的 Linux 目录结构；Windows / macOS 无法运行。Steam 根目录支持原生 / Flatpak，SD 卡/第二块盘通过 `libraryfolders.vdf` 扫描。
 - **作者已停止维护**：上游不再更新，接口失效只能自行修；release 与仓库版本存在代差（仓库落后）。
-- **仅早期版本**：`package.json` 版本 0.2.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
-- **内置目录只有 PC**：当前 CSV 有效 2685 条、`platform` 全为 `pc`，没有模拟器目录；库页分类筛选可用，但**平台筛选 UI 尚未接**（后端参数已具备）。`cover_index.csv` 是可选文件，仓库默认不内置。
+- **仅早期版本**：`package.json` 版本 0.3.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
+- **非 PC 平台只可浏览、不可安装**：目录已有 11 个平台共 7084 条资源（PC 2540 + 模拟器 4544），前端平台筛选可用，但模拟器未集成——非 PC 卡片点击只提示，后端安装计划直接拒绝（当前产品决策，见 ROADMAP 9.8）。
 - **完整性校验是"大小 + 头部预检 + `7z t`（best-effort）"**：7z 不可用时自动跳过校验；没有哈希/签名校验；分卷识别只覆盖常见命名；云存档仍依赖 `node`。
 - **Steam 运行中写入仍可能被覆盖**：写前有备份且写后回读，但无法阻止运行中的 Steam 覆盖 `shortcuts.vdf`/`config.vdf`；装完建议重启 Steam（自动重启 Steam 在 ROADMAP §9）。
 - **compatdata 清理默认关闭**：卸载默认只删游戏文件；"连 Proton 前缀一起删"需要显式选择，避免误删存档。
@@ -348,7 +377,8 @@ bash scripts/doctor.sh --help             # 查看参数
 | 想改什么 | 去哪 |
 |---|---|
 | 改资源清单 / 加游戏 | `defaults/tianyi_catalog/*.csv`（字段见 `game_catalog.py` 的 `GameCatalog.load`；新增可选列 `platform`/`cover_url`/`cover_portrait_url`/`steam_appid`） |
-| 改平台/分类筛选 | `py_modules/game_catalog.py` 的 `list()`（platform/category）、`platform_counts()`、`category_counts()`；HTTP 入口 `tianyi_http.handle_catalog`；前端 `defaults/tianyi_library_ui/app.js` 的 `filterChips` / `selectCategory` |
+| 改平台/分类筛选 | `py_modules/game_catalog.py` 的 `list()`（platform/category）、`platform_counts()`、`category_counts()`；HTTP 入口 `tianyi_http.handle_catalog`；前端 `defaults/tianyi_library_ui/app.js` 的 `platformChips` / `filterChips` / `selectPlatform` / `selectCategory` |
+| 更新/扩充目录数据 | `scripts/merge_v06_catalog.py`（从 v0.6 目录生成）或直接改 `defaults/tianyi_catalog/freedeckcy_catalog.csv`（16 列）；封面补在 `cover_index.csv`（可选） |
 | 改封面解析/缓存 | `py_modules/tianyi_service.py` 的 `resolve_catalog_cover` / `_catalog_entry_cover` / `_load_cover_cache` / `_save_cover_cache`；索引合并见 `game_catalog._merge_cover_index` |
 | 换资源源 / 接其他网盘 | `py_modules/tianyi_client.py`（协议层）+ `backend/`（Node 兜底）；需要同时改 `game_catalog.py` 的链接校验 |
 | 改解压 / 安装目录规则 | `py_modules/tianyi_service.py` 的 `_resolve_install_target_dir` / `_extract_archive_to_dir` / `_merge_extracted_content` |
@@ -372,7 +402,7 @@ bash scripts/doctor.sh --help             # 查看参数
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 227 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 231 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了 `src/` → `pnpm build` 并提交 `dist/index.js(.map)`；
 - [ ] 没有新增 `__pycache__` / `*.pyc` / `.DS_Store` / `node_modules` 等产物；

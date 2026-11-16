@@ -704,3 +704,28 @@ def test_uninstall_preview_and_compatdata_cleanup(service, tmp_path, monkeypatch
     assert result["compatdata"]["removed_paths"]
     assert not (sd_library / "steamapps" / "compatdata" / "123456").exists()
     assert not install_dir.exists()
+
+
+def test_non_pc_platform_install_is_rejected(service, tmp_path, monkeypatch):
+    """模拟器资源当前只可浏览，安装应得到明确提示而不是去下整包。"""
+    csv_path = tmp_path / "switch_catalog.csv"
+    csv_path.write_text(
+        "game_id,title,categories,down_url,pwd,openpath,platform,filesize_z,list_filesize\n"
+        "9001,SwitchGame,角色扮演,https://cloud.189.cn/t/abcdef,1234,SwitchGame/mario.nsp,switch,1000,1 KB\n",
+        encoding="utf-8-sig",
+    )
+    catalog = svc_module.GameCatalog(str(csv_path))
+    catalog.load()
+    service.catalog = catalog
+
+    async def _login_ok():
+        return True, "tester", ""
+
+    monkeypatch.setattr(service, "check_login_state", _login_ok)
+
+    try:
+        asyncio.run(service._build_install_plan(game_id="9001"))
+    except ValueError as exc:
+        assert "模拟器" in str(exc)
+    else:
+        raise AssertionError("非 PC 资源不应生成安装计划")

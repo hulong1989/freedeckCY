@@ -331,7 +331,8 @@ def test_normalize_title(raw, expected: str) -> None:
         ("https://cloud.189.cn/t/abc", True),
         ("http://cloud.189.cn/t/abc", True),
         ("  https://cloud.189.cn/t/abc  ", True),  # 首尾空白被忽略
-        ("https://cloud.189.cn/web/share?code=x", False),  # 非 /t/ 分享链接
+        ("https://cloud.189.cn/web/share?code=x", True),  # 网页版分享链接
+        ("https://cloud.189.cn/web/share", False),  # 缺少 code
         ("https://example.com/t/abc", False),
         ("https://cloud.189.cn.evil.com/t/abc", False),
         ("", False),

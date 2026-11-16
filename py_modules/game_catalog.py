@@ -86,9 +86,13 @@ def _first_value(row: Dict[str, object], fields: tuple, default: str = "") -> st
 
 
 def _is_valid_tianyi_url(url: str) -> bool:
-    """判断是否是支持的天翼分享链接。"""
-    value = (url or "").strip()
-    return value.startswith("https://cloud.189.cn/t/") or value.startswith("http://cloud.189.cn/t/")
+    """判断是否是支持的天翼分享链接（/t/ 或 /web/share?code=）。"""
+    value = (url or "").strip().lower()
+    if not (value.startswith("https://cloud.189.cn/") or value.startswith("http://cloud.189.cn/")):
+        return False
+    if "/t/" in value:
+        return True
+    return "/web/share" in value and "code=" in value
 
 
 def _pick_existing(candidates: List[Path]) -> str:
@@ -114,10 +118,12 @@ def resolve_default_catalog_path() -> str:
     plugin_dir = getattr(decky, "DECKY_PLUGIN_DIR", None)
     if plugin_dir:
         root = Path(plugin_dir)
+        candidates.append(root / "defaults" / "tianyi_catalog" / "freedeckcy_catalog.csv")
         candidates.append(root / "defaults" / "tianyi_catalog" / "gamebox_all_links_20260221_234730.csv")
         candidates.append(root / "defaults" / "tianyi_catalog.csv")
 
     cwd = Path.cwd()
+    candidates.append(cwd / "defaults" / "tianyi_catalog" / "freedeckcy_catalog.csv")
     candidates.append(cwd / "exports" / "gamebox_all_links_20260221_234730.csv")
     candidates.append(cwd / "gamebox_all_links_20260221_234730.csv")
 
@@ -257,8 +263,7 @@ class GameCatalog:
                 entry.cover_portrait_url = record.get("cover_portrait_url", "") or ""
             if entry.steam_appid <= 0:
                 entry.steam_appid = _safe_int(record.get("steam_appid", "0"))
-            if record.get("platform"):
-                entry.platform = _normalize_platform(record.get("platform"), entry.platform)
+            # 平台以主目录为准，封面索引只补封面/appid，避免索引里的平台标注覆盖主表
 
     def summary(self) -> Dict[str, object]:
         """返回目录摘要。"""

@@ -38,6 +38,8 @@ createApp({
       list: { total: 0, page: 1, page_size: 50, items: [] },
       categories: [],
       activeCategory: "",
+      platforms: [],
+      activePlatform: "",
       query: "",
       activeQuery: "",
       showResults: false,
@@ -68,8 +70,21 @@ createApp({
       if (total <= 0 || pageSize <= 0) return 1;
       return Math.max(1, Math.ceil(total / pageSize));
     },
+    platformChips() {
+      const chips = [{ value: "", label: "全部平台", count: 0 }];
+      for (const item of this.platforms || []) {
+        const value = String(item && item.value ? item.value : "").trim();
+        if (!value) continue;
+        chips.push({
+          value,
+          label: String((item && item.label) || value),
+          count: Number((item && item.count) || 0),
+        });
+      }
+      return chips;
+    },
     filterChips() {
-      const chips = [{ value: "", label: "全部", count: 0 }];
+      const chips = [{ value: "", label: "全部分类", count: 0 }];
       for (const item of this.categories || []) {
         const value = String(item && item.value ? item.value : "").trim();
         if (!value) continue;
@@ -305,12 +320,24 @@ createApp({
         // 状态读取失败不阻断搜索流程。
       }
     },
-    filterChipCount() {
+    platformChipCount() {
+      if (!this.showResults) return 0;
+      return this.platformChips.length > 1 ? this.platformChips.length : 0;
+    },
+    categoryChipCount() {
       if (!this.showResults) return 0;
       return this.filterChips.length > 1 ? this.filterChips.length : 0;
     },
+    filterChipCount() {
+      return this.platformChipCount() + this.categoryChipCount();
+    },
     cardStartIndex() {
       return 2 + this.filterChipCount();
+    },
+    selectPlatform(value) {
+      const next = String(value || "").trim();
+      this.activePlatform = next;
+      void this.reloadList(1);
     },
     selectCategory(value) {
       const next = String(value || "").trim();
@@ -351,9 +378,12 @@ createApp({
       } else if (index === 1) {
         el = document.getElementById("search-button");
       } else {
-        const chipCount = this.filterChipCount();
-        if (chipCount > 0 && index < 2 + chipCount) {
-          el = document.querySelector(`.filter-chip[data-chip-index="${index - 2}"]`);
+        const platformCount = this.platformChipCount();
+        const categoryCount = this.categoryChipCount();
+        if (platformCount > 0 && index < 2 + platformCount) {
+          el = document.querySelector(`.platform-filter-chip[data-platform-index="${index - 2}"]`);
+        } else if (categoryCount > 0 && index < 2 + platformCount + categoryCount) {
+          el = document.querySelector(`.filter-chip[data-chip-index="${index - 2 - platformCount}"]`);
         } else {
           const cardIndex = index - this.cardStartIndex();
           el = document.querySelector(`.game-card[data-card-index="${cardIndex}"]`);
@@ -386,20 +416,27 @@ createApp({
       const total = this.getFocusableCount();
       if (total <= 0) return;
 
-      const chipStart = 2;
-      const chipCount = this.filterChipCount();
-      const chipEnd = chipStart + chipCount - 1;
+      const platformStart = 2;
+      const platformCount = this.platformChipCount();
+      const platformEnd = platformStart + platformCount - 1;
+      const categoryStart = platformStart + platformCount;
+      const categoryCount = this.categoryChipCount();
+      const categoryEnd = categoryStart + categoryCount - 1;
       const cardStart = this.cardStartIndex();
+      const hasPlatforms = platformCount > 0;
+      const hasCategories = categoryCount > 0;
       const hasCards = total > cardStart;
-      const hasChips = chipCount > 0;
       const columns = this.getCardColumns();
       let next = this.focusedIndex;
 
+      const inPlatforms = hasPlatforms && next >= platformStart && next <= platformEnd;
+      const inCategories = hasCategories && next >= categoryStart && next <= categoryEnd;
+
       if (direction === "left") {
-        if (hasChips && next > chipStart && next <= chipEnd) {
-          next -= 1;
-        } else if (hasChips && next === chipStart) {
-          next = 1;
+        if (inPlatforms) {
+          next = next > platformStart ? next - 1 : 1;
+        } else if (inCategories) {
+          next = next > categoryStart ? next - 1 : hasPlatforms ? platformEnd : 1;
         } else if (next > cardStart) {
           next -= 1;
         } else if (next === 1) {
@@ -408,23 +445,27 @@ createApp({
       } else if (direction === "right") {
         if (next === 0) {
           next = 1;
-        } else if (hasChips && next >= chipStart && next < chipEnd) {
-          next += 1;
-        } else if (hasChips && next === chipEnd) {
-          next = hasCards ? cardStart : next;
+        } else if (inPlatforms) {
+          if (next < platformEnd) next += 1;
+          else if (hasCategories) next = categoryStart;
+          else if (hasCards) next = cardStart;
+        } else if (inCategories) {
+          if (next < categoryEnd) next += 1;
+          else if (hasCards) next = cardStart;
         } else if (next >= cardStart && next < total - 1) {
           next += 1;
         }
       } else if (direction === "up") {
-        if (next >= cardStart) {
-          const up = next - columns;
-          if (up >= cardStart) {
-            next = up;
-          } else {
-            next = hasChips ? chipStart : 0;
-          }
-        } else if (hasChips && next >= chipStart && next <= chipEnd) {
+        if (inPlatforms) {
           next = 0;
+        } else if (inCategories) {
+          next = hasPlatforms ? platformStart : 0;
+        } else if (next >= cardStart) {
+          const up = next - columns;
+          if (up >= cardStart) next = up;
+          else if (hasCategories) next = categoryStart;
+          else if (hasPlatforms) next = platformStart;
+          else next = 0;
         } else if (next === 1) {
           next = 0;
         }
@@ -432,9 +473,14 @@ createApp({
         if (next === 0) {
           next = 1;
         } else if (next === 1) {
-          next = hasChips ? chipStart : hasCards ? cardStart : 1;
-        } else if (hasChips && next >= chipStart && next <= chipEnd) {
-          next = hasCards ? cardStart : next;
+          if (hasPlatforms) next = platformStart;
+          else if (hasCategories) next = categoryStart;
+          else if (hasCards) next = cardStart;
+        } else if (inPlatforms) {
+          if (hasCategories) next = categoryStart;
+          else if (hasCards) next = cardStart;
+        } else if (inCategories) {
+          if (hasCards) next = cardStart;
         } else if (next >= cardStart) {
           next = Math.min(total - 1, next + columns);
         }
@@ -456,9 +502,15 @@ createApp({
         await this.reloadList(1);
         return;
       }
-      const chipCount = this.filterChipCount();
-      if (chipCount > 0 && index < 2 + chipCount) {
-        const chip = this.filterChips[index - 2];
+      const platformCount = this.platformChipCount();
+      if (platformCount > 0 && index < 2 + platformCount) {
+        const chip = this.platformChips[index - 2];
+        this.selectPlatform(chip ? chip.value : "");
+        return;
+      }
+      const categoryCount = this.categoryChipCount();
+      if (categoryCount > 0 && index < 2 + platformCount + categoryCount) {
+        const chip = this.filterChips[index - 2 - platformCount];
         this.selectCategory(chip ? chip.value : "");
         return;
       }
@@ -602,6 +654,7 @@ createApp({
         page,
         page_size: this.settings.page_size,
         category: this.activeCategory || "",
+        platform: this.activePlatform || "",
       });
       if (result.status !== "success") {
         this.flash(result.message || "搜索失败");
@@ -612,8 +665,10 @@ createApp({
 
       this.list = Object.assign({ total: 0, page: 1, page_size: 50, items: [] }, result.data || {});
       this.categories = Array.isArray(this.list.categories) ? this.list.categories : this.categories;
+      this.platforms = Array.isArray(this.list.platforms) ? this.list.platforms : this.platforms;
       const categoryLabel = this.activeCategory ? `，分类「${this.activeCategory}」` : "";
-      this.hintText = `已显示“${q}”的搜索结果${categoryLabel}`;
+      const platformLabel = this.activePlatform ? `，平台「${this.activePlatform.toUpperCase()}」` : "";
+      this.hintText = `已显示“${q}”的搜索结果${platformLabel}${categoryLabel}`;
       if (!this.list.items || this.list.items.length === 0) {
         this.setFocusIndex(0, { scroll: false });
       } else {
@@ -826,6 +881,11 @@ createApp({
     },
     async openInstallConfirm(item) {
       if (!item || !item.game_id) return;
+      const platform = String(item.platform || "pc").toLowerCase();
+      if (platform !== "pc") {
+        this.flash(`当前版本未集成模拟器，暂不支持安装 ${platform.toUpperCase()} 资源`);
+        return;
+      }
       void this.fetchCoverForItem(item, { force: true });
       this.installDialog.visible = true;
       this.installDialog.loading = true;

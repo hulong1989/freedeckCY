@@ -19,6 +19,12 @@ CSV_HEADER = (
 )
 
 
+def _tmp_dir() -> Path:
+    import tempfile
+
+    return Path(tempfile.mkdtemp(prefix="catalog-test-"))
+
+
 def _write_catalog(tmp_path: Path, rows: list[str]) -> str:
     path = tmp_path / "catalog.csv"
     path.write_text(CSV_HEADER + "\n".join(rows) + "\n", encoding="utf-8-sig")
@@ -197,3 +203,31 @@ def test_static_cover_from_catalog_appid(tmp_path):
     assert cover["cover_url"].endswith("/777/header.jpg")
     assert cover["square_cover_url"].endswith("/777/library_600x900_2x.jpg")
     assert service._catalog_entry_cover("404") == {}
+
+
+def test_default_catalog_loads_merged_file_with_platforms():
+    """仓库自带的合并目录应包含多平台与封面索引。"""
+    from game_catalog import resolve_default_catalog_path, resolve_default_cover_index_path
+
+    catalog = GameCatalog(
+        resolve_default_catalog_path(),
+        cover_index_path=resolve_default_cover_index_path(),
+    )
+    catalog.load()
+
+    assert len(catalog.entries) > 6000
+    platforms = {row["value"] for row in catalog.platform_counts()}
+    assert {"pc", "fc", "nds", "psp", "gba", "ps1", "ps2", "ps3", "md", "switch"} <= platforms
+    assert catalog.cover_index_total > 3000
+    assert sum(1 for entry in catalog.entries if entry.cover_url) > 3000
+
+
+def test_web_share_url_is_accepted():
+    from game_catalog import _is_valid_tianyi_url
+    from tianyi_client import parse_share_url
+
+    url = "https://cloud.189.cn/web/share?code=3MzqU3YjMn6v&pwd=lqe3"
+    assert _is_valid_tianyi_url(url) is True
+    code, pwd = parse_share_url(url)
+    assert code == "3MzqU3YjMn6v"
+    assert pwd == "lqe3"

@@ -192,13 +192,21 @@ def parse_share_url(share_url: str) -> Tuple[str, str]:
     if host not in {"cloud.189.cn", "www.cloud.189.cn"}:
         raise TianyiApiError("链接格式无效，仅支持 cloud.189.cn 分享链接")
     path_parts = [part for part in (parsed.path or "").split("/") if part]
+    qs = parse_qs(parsed.query or "", keep_blank_values=True)
+    pwd = (qs.get("pwd", [""])[0] or "").strip()
+
+    # 新版网页分享：https://cloud.189.cn/web/share?code=XXXX
+    if path_parts[:2] == ["web", "share"]:
+        share_code = (qs.get("code", [""])[0] or "").strip()
+        if not share_code:
+            raise TianyiApiError("链接格式无效，缺少 shareCode")
+        return share_code, pwd
+
     if len(path_parts) < 2 or path_parts[0] != "t":
         raise TianyiApiError("链接格式无效，缺少 shareCode")
     share_code = path_parts[1].strip()
     if not share_code:
         raise TianyiApiError("链接格式无效，shareCode 为空")
-    qs = parse_qs(parsed.query or "", keep_blank_values=True)
-    pwd = (qs.get("pwd", [""])[0] or "").strip()
     return share_code, pwd
 
 
