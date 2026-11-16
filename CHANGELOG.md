@@ -2,6 +2,27 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.14.0
+
+### 新增
+
+- **百度网盘（官方 OpenAPI）**：
+  - 移植 v0.6 的 `baidu_client.py` / `baidu_openapi_client.py`，安装计划与下载任务支持 `baidu_openapi` 来源。
+  - QAM「设置 → 百度网盘（官方 OpenAPI）」：填写 App Key/Secret Key、获取授权链接、粘贴授权码、清除授权；token 过期自动 refresh。
+  - 安装时自动解析公开分享、转存到 `/FreedeckTmp`、获取 dlink，aria2 使用 `Referer: https://pan.baidu.com/disk/home` + `UA: pan.baidu.com` 下载；安装完成后清理转存文件。
+  - 支持 `FREEDECKCY_BAIDU_OPENAPI_APP_KEY` / `SECRET_KEY` / `REFRESH_TOKEN` 环境变量。
+- **仓库提交/目录支持百度链接**：`submissions` 接受 `pan.baidu.com` / `yun.baidu.com`，合并时 `server=b`；目录校验与加载同时支持天翼/百度。
+- 新增 HTTP API：`/api/tianyi/baidu/openapi/{app,authorize-url,exchange,clear}`。
+
+### 变更
+
+- 任务记录新增 `provider` / `share_url` / `share_ctx`；重新获取直链按来源分支。
+- 测试 314 → 326（新增百度来源识别、token 刷新、安装计划、任务头、授权码交换、百度提交等用例）。
+
+### 说明
+
+- 只接官方 OpenAPI，不实现 BDUSS/Cookie 网页抓取或 CDP；用户需自行在百度网盘开放平台创建应用并授权。
+
 ## v0.13.0
 
 ### 新增

@@ -22,7 +22,7 @@
 | `name` | ✅ | 中文名 |
 | `english_name` |  | 英文名/原名，合并时生成 `中文/英文` 标题 |
 | `platform` | ✅ | `pc/gba/psp/nds/ps1/fc/md/3ds/ps2/ps3/switch` |
-| `share_url` | ✅ | `https://cloud.189.cn/...` 分享链接 |
+| `share_url` | ✅ | 天翼云盘 `https://cloud.189.cn/...` 或百度网盘 `https://pan.baidu.com/s/...` |
 | `access_code` |  | 提取码；链接里已有 `pwd=` 可留空 |
 | `share_user_version` |  | 原版资源池字段，整合包/分享版本 |
 | `executable_name` |  | PC 可执行文件名，模拟器可留空 |
@@ -51,6 +51,7 @@ make validate-catalog                          # 再跑目录体检
 
 - **只提交分享链接**，不要上传游戏文件、破解补丁、账号 Cookie。
 - 链接必须可访问、提取码正确；失效链接会被关闭。
+- 百度网盘需要先在插件「设置 → 百度网盘（官方 OpenAPI）」完成应用配置与授权；未授权时安装会提示。
 - `openpath` 必须能在分享里唯一定位文件/目录，否则安装器无法匹配。
 - 同一 `shareCode` 不能重复提交；目录已有的会被拒绝。
 - 提交即表示你确认有权分享该资源；维护者可拒绝/删除任何侵权或违规内容。

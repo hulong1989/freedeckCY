@@ -31,6 +31,17 @@ from yarl import URL
 import config
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
+from baidu_openapi_client import (
+    BaiduOpenApiError,
+    build_baidu_oauth_authorize_url,
+    delete_baidu_openapi_transfer_file,
+    exchange_baidu_oauth_code,
+    fetch_baidu_openapi_download_url,
+    fetch_baidu_openapi_user_info,
+    is_baidu_openapi_auth_error,
+    refresh_baidu_oauth_token,
+    resolve_baidu_openapi_share_url,
+)
 from emulator_setup import setup_emulator
 from emulator_manager import (
     available_platforms,
@@ -206,6 +217,28 @@ def _is_tianyi_share_url(url: str) -> bool:
     if host in _TIANYI_SHARE_HOSTS:
         return True
     return host.endswith(".189.cn")
+
+
+_BAIDU_SHARE_HOSTS = {"pan.baidu.com", "yun.baidu.com", "eyun.baidu.com"}
+
+
+def _is_baidu_share_url(url: str) -> bool:
+    try:
+        parsed = urlparse(str(url or "").strip())
+    except Exception:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    host = str(parsed.hostname or "").strip().lower()
+    return any(host == candidate or host.endswith("." + candidate) for candidate in _BAIDU_SHARE_HOSTS)
+
+
+def _share_provider(url: str) -> str:
+    if _is_tianyi_share_url(url):
+        return "tianyi"
+    if _is_baidu_share_url(url):
+        return "baidu_openapi"
+    return ""
 
 
 class ArchiveRepairScheduled(RuntimeError):
@@ -796,6 +829,7 @@ class TianyiService:
             "settings": asdict(self.store.settings),
             "library_url": library_url,
             "login_capture": await self.get_login_capture_status(),
+            "baidu_openapi_login": self._baidu_openapi_payload(),
             "power_diagnostics": power_diagnostics,
         }
 
@@ -838,6 +872,142 @@ class TianyiService:
         # 登录态有效时刷新账号名。
         self.store.set_login(cookie, account)
         return True, account, "登录态有效"
+
+    def _baidu_openapi_payload(self) -> Dict[str, Any]:
+        state = self.store.baidu_openapi
+        return {
+            "configured": state.configured,
+            "logged_in": state.logged_in,
+            "user_account": state.user_account,
+            "expires_at": state.expires_at,
+            "message": "已授权" if state.logged_in else ("已配置应用，待授权" if state.configured else "未配置"),
+        }
+
+    def _baidu_openapi_credentials(self) -> tuple[str, str]:
+        state = self.store.baidu_openapi
+        app_key = str(state.app_key or os.getenv("FREEDECKCY_BAIDU_OPENAPI_APP_KEY", "") or "").strip()
+        secret_key = str(state.secret_key or os.getenv("FREEDECKCY_BAIDU_OPENAPI_SECRET_KEY", "") or "").strip()
+        return app_key, secret_key
+
+    async def get_baidu_openapi_authorize_url(self) -> Dict[str, Any]:
+        app_key, secret_key = self._baidu_openapi_credentials()
+        if not app_key or not secret_key:
+            raise BaiduOpenApiError("请先填写百度网盘开放平台 App Key 与 Secret Key")
+        return {
+            "url": build_baidu_oauth_authorize_url(app_key=app_key),
+            "redirect_uri": "oob",
+            "message": "在浏览器授权后把页面显示的授权码粘贴回来",
+        }
+
+    async def set_baidu_openapi_app(self, app_key: str = "", secret_key: str = "") -> Dict[str, Any]:
+        normalized_key = str(app_key or "").strip()
+        normalized_secret = str(secret_key or "").strip()
+        if not normalized_key and not normalized_secret:
+            self.store.baidu_openapi = type(self.store.baidu_openapi)()
+            await asyncio.to_thread(self.store.save)
+            self._invalidate_panel_cache(all_data=True)
+            return {"ok": True, **self._baidu_openapi_payload()}
+        if not normalized_key or not normalized_secret:
+            raise BaiduOpenApiError("App Key 与 Secret Key 必须同时填写")
+        state = self.store.baidu_openapi
+        if state.app_key != normalized_key or state.secret_key != normalized_secret:
+            state.access_token = ""
+            state.refresh_token = ""
+            state.expires_at = 0
+            state.user_account = ""
+        state.app_key = normalized_key
+        state.secret_key = normalized_secret
+        state.updated_at = _now_wall_ts()
+        await asyncio.to_thread(self.store.save)
+        self._invalidate_panel_cache(all_data=True)
+        return {"ok": True, **self._baidu_openapi_payload()}
+
+    async def exchange_baidu_openapi_code(self, code: str = "") -> Dict[str, Any]:
+        normalized_code = str(code or "").strip()
+        if not normalized_code:
+            raise BaiduOpenApiError("请填写授权码")
+        app_key, secret_key = self._baidu_openapi_credentials()
+        if not app_key or not secret_key:
+            raise BaiduOpenApiError("请先配置 App Key 与 Secret Key")
+        tokens = await exchange_baidu_oauth_code(app_key=app_key, secret_key=secret_key, code=normalized_code)
+        access_token = str(tokens.get("access_token", "") or "").strip()
+        refresh_token = str(tokens.get("refresh_token", "") or "").strip()
+        if not access_token or not refresh_token:
+            raise BaiduOpenApiError("百度授权返回的 access_token/refresh_token 为空")
+        user_account = ""
+        try:
+            user_info = await fetch_baidu_openapi_user_info(access_token=access_token)
+            user_account = str(user_info.get("netdisk_name") or user_info.get("user_name") or user_info.get("uk") or "").strip()
+        except Exception as exc:
+            config.logger.warning("Baidu OpenAPI user info failed: %s", exc)
+        state = self.store.baidu_openapi
+        state.app_key = app_key
+        state.secret_key = secret_key
+        state.access_token = access_token
+        state.refresh_token = refresh_token
+        state.expires_at = _safe_int(tokens.get("expires_at"), 0)
+        state.user_account = user_account
+        state.updated_at = _now_wall_ts()
+        await asyncio.to_thread(self.store.save)
+        self._invalidate_panel_cache(all_data=True)
+        return {"ok": True, "user_account": user_account, "message": "百度网盘授权成功", **self._baidu_openapi_payload()}
+
+    async def clear_baidu_openapi_login(self) -> Dict[str, Any]:
+        state = self.store.baidu_openapi
+        state.access_token = ""
+        state.refresh_token = ""
+        state.expires_at = 0
+        state.user_account = ""
+        state.updated_at = _now_wall_ts()
+        await asyncio.to_thread(self.store.save)
+        self._invalidate_panel_cache(all_data=True)
+        return {"ok": True, **self._baidu_openapi_payload()}
+
+    async def check_baidu_openapi_login_state(self) -> Dict[str, Any]:
+        state = self.store.baidu_openapi
+        app_key, secret_key = self._baidu_openapi_credentials()
+        configured = bool(app_key and secret_key)
+        if not configured:
+            return {"configured": False, "logged_in": False, "user_account": "", "expires_at": 0, "message": "未配置百度开放平台应用"}
+        if not state.logged_in:
+            return {"configured": True, "logged_in": False, "user_account": "", "expires_at": 0, "message": "已配置应用，待授权"}
+        token = state.access_token
+        try:
+            if state.expires_at and state.expires_at <= _now_wall_ts() + 60:
+                token = await self._ensure_baidu_openapi_access_token(force_refresh=True)
+            account = state.user_account
+            if not account:
+                info = await fetch_baidu_openapi_user_info(access_token=token)
+                account = str(info.get("netdisk_name") or info.get("user_name") or info.get("uk") or "").strip()
+                state.user_account = account
+                await asyncio.to_thread(self.store.save)
+            return {"configured": True, "logged_in": True, "user_account": account, "expires_at": state.expires_at, "message": "登录态有效"}
+        except Exception as exc:
+            return {"configured": True, "logged_in": False, "user_account": state.user_account, "expires_at": state.expires_at, "message": f"百度授权失效：{exc}"}
+
+    async def _ensure_baidu_openapi_access_token(self, force_refresh: bool = False) -> str:
+        state = self.store.baidu_openapi
+        app_key, secret_key = self._baidu_openapi_credentials()
+        if not app_key or not secret_key:
+            raise BaiduOpenApiError("请先在设置中配置百度网盘开放平台 App Key/Secret Key")
+        if not state.logged_in:
+            raise BaiduOpenApiError("请先完成百度网盘授权（设置 → 百度网盘 OpenAPI）")
+        now = _now_wall_ts()
+        if not force_refresh and state.access_token and (not state.expires_at or state.expires_at > now + 300):
+            return state.access_token
+        refresh_token = str(state.refresh_token or os.getenv("FREEDECKCY_BAIDU_OPENAPI_REFRESH_TOKEN", "") or "").strip()
+        if not refresh_token:
+            raise BaiduOpenApiError("百度 refresh_token 为空，请重新授权")
+        tokens = await refresh_baidu_oauth_token(app_key=app_key, secret_key=secret_key, refresh_token=refresh_token)
+        access_token = str(tokens.get("access_token", "") or "").strip()
+        if not access_token:
+            raise BaiduOpenApiError("百度刷新 access_token 失败")
+        state.access_token = access_token
+        state.refresh_token = str(tokens.get("refresh_token", "") or refresh_token).strip()
+        state.expires_at = _safe_int(tokens.get("expires_at"), 0)
+        state.updated_at = now
+        await asyncio.to_thread(self.store.save)
+        return access_token
 
     async def save_manual_cookie(self, cookie: str, user_account: str = "") -> Dict[str, Any]:
         """手动保存 cookie。"""
@@ -5145,10 +5315,6 @@ class TianyiService:
         install_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
         """构建安装计划与空间探针信息。"""
-        login_ok, _, message = await self.check_login_state()
-        if not login_ok:
-            raise TianyiApiError(message or "请先登录天翼账号")
-
         open_path = ""
         platform = "pc"
         if not share_url:
@@ -5162,8 +5328,8 @@ class TianyiService:
             platform = str(item.platform or "pc")
         else:
             normalized_share_url = str(share_url or "").strip()
-            if not _is_tianyi_share_url(normalized_share_url):
-                raise ValueError("只支持天翼云盘分享链接（cloud.189.cn）")
+            if not _share_provider(normalized_share_url):
+                raise ValueError("只支持天翼云盘（cloud.189.cn）或百度网盘（pan.baidu.com）分享链接")
             matched_item = None
             for entry in self.catalog.entries:
                 if game_id and str(entry.game_id) != str(game_id):
@@ -5220,16 +5386,32 @@ class TianyiService:
             rom_target = os.path.basename(str(open_path or "").replace("\\", "/")).strip()
             if not rom_target:
                 raise ValueError("资源缺少 ROM 文件名（openpath），无法从分享中定位文件")
-        try:
-            resolved = await resolve_share(
-                share_url,
-                self.store.login.cookie,
-                target_name=rom_target,
-            )
-        except TianyiApiError as exc:
-            diagnostics = dict(getattr(exc, "diagnostics", {}) or {})
-            diagnostics.setdefault("stage", "resolve_share")
-            raise TianyiApiError(str(exc), diagnostics=diagnostics) from exc
+        provider = _share_provider(share_url)
+        if not provider:
+            raise ValueError("分享链接来源不受支持")
+        share_ctx: Dict[str, Any] = {}
+        if provider == "tianyi":
+            login_ok, _, message = await self.check_login_state()
+            if not login_ok:
+                raise TianyiApiError(message or "请先登录天翼账号")
+            try:
+                resolved = await resolve_share(
+                    share_url,
+                    self.store.login.cookie,
+                    target_name=rom_target,
+                )
+            except TianyiApiError as exc:
+                diagnostics = dict(getattr(exc, "diagnostics", {}) or {})
+                diagnostics.setdefault("stage", "resolve_share")
+                raise TianyiApiError(str(exc), diagnostics=diagnostics) from exc
+        else:
+            try:
+                await self._ensure_baidu_openapi_access_token()
+                resolved, share_ctx = await resolve_baidu_openapi_share_url(share_url=share_url)
+            except BaiduOpenApiError as exc:
+                diagnostics = dict(getattr(exc, "diagnostics", {}) or {})
+                diagnostics.setdefault("stage", "baidu_resolve_share")
+                raise TianyiApiError(f"百度网盘解析失败：{exc}", diagnostics=diagnostics) from exc
         if emulator:
             target_key = os.path.basename(rom_target).lower()
             matched = [
@@ -5289,6 +5471,8 @@ class TianyiService:
         return {
             "game_id": game_id,
             "game_title": game_title,
+            "provider": provider,
+            "share_ctx": share_ctx,
             "platform": platform,
             "emulator": emulator,
             "emulator_info": emulator_info,
@@ -5321,10 +5505,56 @@ class TianyiService:
             "files": plan_files,
         }
 
+    def _compact_baidu_share_ctx(self, share_ctx: Dict[str, Any]) -> Dict[str, Any]:
+        """持久化任务时去掉 dlink（内含 access_token），只保留重新取链所需字段。"""
+        if not isinstance(share_ctx, dict):
+            return {}
+        result = {
+            key: value
+            for key, value in share_ctx.items()
+            if key not in {"files", "dlink"} and not str(key).startswith("_")
+        }
+        files: Dict[str, Any] = {}
+        raw_files = share_ctx.get("files")
+        if isinstance(raw_files, dict):
+            for file_id, meta in raw_files.items():
+                if not isinstance(meta, dict):
+                    continue
+                files[str(file_id)] = {
+                    key: value
+                    for key, value in meta.items()
+                    if key not in {"dlink"} and not str(key).startswith("_")
+                }
+        result["files"] = files
+        return result
+
+    async def _fetch_baidu_direct_url(self, share_ctx: Dict[str, Any], file_id: str) -> str:
+        access_token = await self._ensure_baidu_openapi_access_token()
+        try:
+            return await fetch_baidu_openapi_download_url(
+                access_token=access_token,
+                share_ctx=share_ctx,
+                file_id=file_id,
+            )
+        except BaiduOpenApiError as exc:
+            if not is_baidu_openapi_auth_error(exc):
+                raise
+            access_token = await self._ensure_baidu_openapi_access_token(force_refresh=True)
+            return await fetch_baidu_openapi_download_url(
+                access_token=access_token,
+                share_ctx=share_ctx,
+                file_id=file_id,
+            )
+
     async def _create_tasks_from_plan(self, *, plan: Dict[str, Any], split: int) -> List[TianyiTaskRecord]:
         """根据安装计划创建 aria2 下载任务。"""
         await self.aria2.ensure_running()
-        access_token = await fetch_access_token(self.store.login.cookie)
+        provider = str(plan.get("provider", "tianyi") or "tianyi").strip()
+        share_ctx = plan.get("share_ctx") if isinstance(plan.get("share_ctx"), dict) else {}
+        share_url = str(plan.get("share_url", "") or "").strip()
+        access_token = ""
+        if provider == "tianyi":
+            access_token = await fetch_access_token(self.store.login.cookie)
 
         share_id = str(plan.get("share_id", "")).strip()
         share_code = str(plan.get("share_code", "")).strip()
@@ -5348,19 +5578,31 @@ class TianyiService:
             name = str(file_item.get("name", "")).strip() or f"file-{file_id}"
             file_size = max(0, _safe_int(file_item.get("size"), 0))
 
-            direct_url = await fetch_download_url(
-                self.store.login.cookie,
-                access_token,
-                share_id,
-                file_id,
-            )
-            gid = await self.aria2.add_uri(
-                direct_url=direct_url,
-                cookie=self.store.login.cookie,
-                download_dir=target_dir,
-                out_name=name,
-                split=split,
-            )
+            if provider == "baidu_openapi":
+                direct_url = await self._fetch_baidu_direct_url(share_ctx, file_id)
+                gid = await self.aria2.add_uri(
+                    direct_url=direct_url,
+                    cookie="",
+                    download_dir=target_dir,
+                    out_name=name,
+                    split=split,
+                    referer="https://pan.baidu.com/disk/home",
+                    user_agent="pan.baidu.com",
+                )
+            else:
+                direct_url = await fetch_download_url(
+                    self.store.login.cookie,
+                    access_token,
+                    share_id,
+                    file_id,
+                )
+                gid = await self.aria2.add_uri(
+                    direct_url=direct_url,
+                    cookie=self.store.login.cookie,
+                    download_dir=target_dir,
+                    out_name=name,
+                    split=split,
+                )
             now = _now_wall_ts()
             created.append(
                 TianyiTaskRecord(
@@ -5382,6 +5624,9 @@ class TianyiService:
                     group_id=group_id,
                     group_total=group_total,
                     platform=str(plan.get("platform", "pc") or "pc"),
+                    provider=provider,
+                    share_url=share_url,
+                    share_ctx=self._compact_baidu_share_ctx(share_ctx) if provider == "baidu_openapi" else {},
                     created_at=now,
                     updated_at=now,
                 )
@@ -5555,10 +5800,14 @@ class TianyiService:
 
         每个任务每个进程默认只尝试一次，避免接口异常时在刷新循环里反复请求。
         """
-        if str(task.share_id or "").strip() == "" or str(task.file_id or "").strip() == "":
-            return False
+        provider = str(task.provider or "tianyi").strip() or "tianyi"
+        file_id = str(task.file_id or "").strip()
+        share_ctx = task.share_ctx if isinstance(task.share_ctx, dict) else {}
         cookie = str(self.store.login.cookie or "").strip()
-        if not cookie:
+        if provider == "tianyi":
+            if str(task.share_id or "").strip() == "" or file_id == "" or not cookie:
+                return False
+        elif not file_id or not share_ctx:
             return False
         if consume_attempt:
             if int(self._readd_attempts.get(task.task_id, 0)) >= 1:
@@ -5566,10 +5815,13 @@ class TianyiService:
             self._readd_attempts[task.task_id] = 1
 
         try:
-            access_token = await fetch_access_token(cookie)
-            direct_url = await fetch_download_url(
-                cookie, access_token, str(task.share_id or ""), str(task.file_id or "")
-            )
+            if provider == "baidu_openapi":
+                direct_url = await self._fetch_baidu_direct_url(share_ctx, file_id)
+            else:
+                access_token = await fetch_access_token(cookie)
+                direct_url = await fetch_download_url(
+                    cookie, access_token, str(task.share_id or ""), file_id
+                )
         except Exception as exc:
             config.logger.warning("重新获取直链失败 task=%s: %s", task.task_id, exc)
             return False
@@ -5592,11 +5844,14 @@ class TianyiService:
         split = max(1, min(64, int(self.store.settings.split_count or 16)))
         add_kwargs = {
             "direct_url": direct_url,
-            "cookie": cookie,
+            "cookie": "" if provider == "baidu_openapi" else cookie,
             "download_dir": str(task.download_dir or "").strip(),
             "out_name": str(task.file_name or "").strip(),
             "split": split,
         }
+        if provider == "baidu_openapi":
+            add_kwargs["referer"] = "https://pan.baidu.com/disk/home"
+            add_kwargs["user_agent"] = "pan.baidu.com"
         try:
             gid = await self.aria2.add_uri(**add_kwargs)
         except Exception as exc:
@@ -6301,6 +6556,7 @@ class TianyiService:
                 if failed == 0 and not repaired_members:
                     # 用整组（含此前已装好的分卷）计算体积/写记录，避免部分修复后体积只剩一个包
                     await self._finalize_group_install(lead=lead, members=all_members, target_dir=target_dir)
+                    await self._cleanup_baidu_transfer_files(all_members)
                 elif repaired_members:
                     title = str(lead.game_title or lead.file_name or "游戏")
                     lead.install_message = "归档校验失败，正在重新下载，完成后会自动安装"
@@ -6341,6 +6597,24 @@ class TianyiService:
                         member.post_processed = True
                         member.updated_at = _now_wall_ts()
                     self._invalidate_panel_cache(tasks=True)
+
+    async def _cleanup_baidu_transfer_files(self, members: Sequence[TianyiTaskRecord]) -> None:
+        """安装结束后清理百度网盘转存目录，避免占满用户网盘。"""
+        for member in members:
+            if str(member.provider or "") != "baidu_openapi":
+                continue
+            share_ctx = member.share_ctx if isinstance(member.share_ctx, dict) else {}
+            if not share_ctx:
+                continue
+            try:
+                access_token = await self._ensure_baidu_openapi_access_token()
+                await delete_baidu_openapi_transfer_file(
+                    access_token=access_token,
+                    share_ctx=share_ctx,
+                    file_id=str(member.file_id or ""),
+                )
+            except Exception as exc:
+                config.logger.warning("清理百度转存文件失败 task=%s: %s", member.task_id, exc)
 
     async def _wait_payload_settled(
         self,

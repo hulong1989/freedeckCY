@@ -105,23 +105,44 @@ class ShareUrlError(ValueError):
     pass
 
 
+def _share_provider(share_url: str) -> str:
+    try:
+        host = str(urlparse(str(share_url or "").strip()).hostname or "").lower()
+    except Exception:
+        return ""
+    if host in {"cloud.189.cn", "www.cloud.189.cn"} or host.endswith(".189.cn"):
+        return "tianyi"
+    if host in {"pan.baidu.com", "yun.baidu.com", "eyun.baidu.com"}:
+        return "baidu"
+    return ""
+
+
 def _parse_share_url(share_url: str) -> Tuple[str, str]:
     raw = str(share_url or "").strip()
     parsed = urlparse(raw)
     host = (parsed.netloc or "").lower()
-    if host not in {"cloud.189.cn", "www.cloud.189.cn"}:
-        raise ShareUrlError("仅支持 cloud.189.cn 分享链接")
     parts = [part for part in (parsed.path or "").split("/") if part]
     query = parse_qs(parsed.query or "", keep_blank_values=True)
     pwd = str((query.get("pwd") or [""])[0] or "").strip()
-    if parts[:2] == ["web", "share"]:
-        code = str((query.get("code") or [""])[0] or "").strip()
-        if not code:
+    if host in {"cloud.189.cn", "www.cloud.189.cn"}:
+        if parts[:2] == ["web", "share"]:
+            code = str((query.get("code") or [""])[0] or "").strip()
+            if not code:
+                raise ShareUrlError("链接缺少 shareCode")
+            return code, pwd
+        if len(parts) < 2 or parts[0] != "t":
             raise ShareUrlError("链接缺少 shareCode")
-        return code, pwd
-    if len(parts) < 2 or parts[0] != "t":
-        raise ShareUrlError("链接缺少 shareCode")
-    return parts[1], pwd
+        return parts[1], pwd
+    if host in {"pan.baidu.com", "yun.baidu.com", "eyun.baidu.com"}:
+        if "s" in parts:
+            index = parts.index("s")
+            if index + 1 < len(parts) and parts[index + 1]:
+                return parts[index + 1], pwd
+        surl = str((query.get("surl") or [""])[0] or "").strip()
+        if surl:
+            return surl, pwd
+        raise ShareUrlError("百度链接缺少 shareCode/surl")
+    raise ShareUrlError("仅支持 cloud.189.cn 或 pan.baidu.com 分享链接")
 
 
 def _share_code(share_url: str) -> str:
@@ -176,7 +197,7 @@ def validate_submission(
     if not platform:
         errors.append(f"platform 无效，可选：{', '.join(ALLOWED_PLATFORMS)}")
     if not share_url:
-        errors.append("缺少 share_url（天翼云盘分享链接）")
+        errors.append("缺少 share_url（天翼云盘或百度网盘分享链接）")
     else:
         try:
             _parse_share_url(share_url)
@@ -323,7 +344,7 @@ def build_catalog_row(data: Dict[str, Any], game_id: str) -> Dict[str, str]:
             "category_parent": _normalize_text(data.get("category_parent")) or "5",
             "categories": normalize_categories(data.get("categories", ""), platform) or "未分类",
             "package_name": "",
-            "server": "t",
+            "server": "b" if _share_provider(share_url) == "baidu" else "t",
             "down_url": share_url,
             "shorturl": share_code,
             "pwd": pwd,

@@ -1,0 +1,10 @@
+{
+  "name": "示例百度资源",
+  "english_name": "Example Baidu Game",
+  "platform": "pc",
+  "share_url": "https://pan.baidu.com/s/1AbCdEf123456",
+  "access_code": "x9k2",
+  "openpath": "Example Game/ExampleGame.7z",
+  "categories": "动作冒险",
+  "notes": "示例文件；百度网盘需要先在插件里配置 OpenAPI 授权"
+}

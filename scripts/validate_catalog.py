@@ -4,7 +4,7 @@
 检查项：
   - 必需列 / 行数 / 平台分布
   - game_id、down_url 重复
-  - 链接是否为支持的天翼分享格式
+  - 链接是否为支持的天翼/百度分享格式
   - 标题、分类为空
   - 分类里是否混入平台名
   - 封面覆盖率（可选 cover_index.csv）
@@ -49,6 +49,18 @@ def _is_tianyi_url(url: str) -> bool:
     if not (value.startswith("https://cloud.189.cn/") or value.startswith("http://cloud.189.cn/")):
         return False
     return "/t/" in value or ("/web/share" in value and "code=" in value)
+
+
+def _is_baidu_url(url: str) -> bool:
+    value = str(url or "").strip().lower()
+    if not (value.startswith("https://pan.baidu.com/") or value.startswith("http://pan.baidu.com/")):
+        if not (value.startswith("https://yun.baidu.com/") or value.startswith("http://yun.baidu.com/")):
+            return False
+    return "/s/" in value or "surl=" in value
+
+
+def _is_supported_share_url(url: str) -> bool:
+    return _is_tianyi_url(url) or _is_baidu_url(url)
 
 
 def _load_cover_ids(path: str) -> set:
@@ -117,7 +129,7 @@ def main() -> int:
             empty_title += 1
         if not category:
             empty_category += 1
-        if not _is_tianyi_url(down_url):
+        if not _is_supported_share_url(down_url):
             bad_url += 1
         if str(row.get("cover_url") or "").strip() or str(row.get("cover_portrait_url") or "").strip():
             with_cover += 1

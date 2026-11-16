@@ -42,9 +42,9 @@ body:
   - type: input
     id: share_url
     attributes:
-      label: 天翼云盘分享链接
-      description: 仅支持 cloud.189.cn 分享链接
-      placeholder: https://cloud.189.cn/t/xxxxxxxx
+      label: 分享链接
+      description: 支持天翼云盘（cloud.189.cn）或百度网盘（pan.baidu.com）
+      placeholder: https://cloud.189.cn/t/xxxxxxxx 或 https://pan.baidu.com/s/xxxxxxxx
     validations:
       required: true
   - type: input

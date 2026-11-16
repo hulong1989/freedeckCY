@@ -57,6 +57,27 @@ class TianyiLoginState:
 
 
 @dataclass
+class BaiduOpenApiLoginState:
+    """百度网盘官方 OpenAPI 授权状态。"""
+
+    app_key: str = ""
+    secret_key: str = ""
+    access_token: str = ""
+    refresh_token: str = ""
+    expires_at: int = 0
+    user_account: str = ""
+    updated_at: int = 0
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.app_key.strip() and self.secret_key.strip())
+
+    @property
+    def logged_in(self) -> bool:
+        return bool(self.access_token.strip() and self.refresh_token.strip())
+
+
+@dataclass
 class TianyiSettings:
     """下载相关设置。"""
 
@@ -102,6 +123,10 @@ class TianyiTaskRecord:
     group_total: int = 0
     # 目录平台（PC / gba / ...），安装完成后据此选择模拟器注册方式
     platform: str = "pc"
+    # 下载来源：tianyi / baidu_openapi
+    provider: str = "tianyi"
+    share_url: str = ""
+    share_ctx: Dict[str, Any] = field(default_factory=dict)
     created_at: int = field(default_factory=_now_ts)
     updated_at: int = field(default_factory=_now_ts)
 
@@ -131,6 +156,10 @@ class TianyiTaskRecord:
             file_size=max(0, _to_int(data.get("file_size", 0), 0)),
             group_id=str(data.get("group_id", "") or ""),
             group_total=max(0, _to_int(data.get("group_total", 0), 0)),
+            platform=str(data.get("platform", "pc") or "pc"),
+            provider=str(data.get("provider", "tianyi") or "tianyi"),
+            share_url=str(data.get("share_url", "") or ""),
+            share_ctx=dict(data.get("share_ctx", {}) or {}) if isinstance(data.get("share_ctx"), dict) else {},
             created_at=_to_int(data.get("created_at", _now_ts()), _now_ts()),
             updated_at=_to_int(data.get("updated_at", _now_ts()), _now_ts()),
         )
@@ -188,6 +217,7 @@ class TianyiStateStore:
         self._state_file = state_file
         self._lock = threading.RLock()
         self.login = TianyiLoginState()
+        self.baidu_openapi = BaiduOpenApiLoginState()
         self.settings = TianyiSettings()
         self.tasks: List[TianyiTaskRecord] = []
         self.installed_games: List[TianyiInstalledGame] = []
@@ -210,6 +240,7 @@ class TianyiStateStore:
                 raw = json.load(f)
 
             login_raw = raw.get("login") if isinstance(raw, dict) else {}
+            baidu_raw = raw.get("baidu_openapi") if isinstance(raw, dict) else {}
             settings_raw = raw.get("settings") if isinstance(raw, dict) else {}
             tasks_raw = raw.get("tasks") if isinstance(raw, dict) else []
             installed_raw = raw.get("installed_games") if isinstance(raw, dict) else []
@@ -222,6 +253,17 @@ class TianyiStateStore:
                     cookie=str(login_raw.get("cookie", "")),
                     user_account=str(login_raw.get("user_account", "")),
                     updated_at=_to_int(login_raw.get("updated_at", 0), 0),
+                )
+
+            if isinstance(baidu_raw, dict):
+                self.baidu_openapi = BaiduOpenApiLoginState(
+                    app_key=str(baidu_raw.get("app_key", "") or ""),
+                    secret_key=str(baidu_raw.get("secret_key", "") or ""),
+                    access_token=str(baidu_raw.get("access_token", "") or ""),
+                    refresh_token=str(baidu_raw.get("refresh_token", "") or ""),
+                    expires_at=_to_int(baidu_raw.get("expires_at", 0), 0),
+                    user_account=str(baidu_raw.get("user_account", "") or ""),
+                    updated_at=_to_int(baidu_raw.get("updated_at", 0), 0),
                 )
 
             if isinstance(fingerprints_raw, dict):
@@ -289,6 +331,7 @@ class TianyiStateStore:
             _chmod_private(state_dir, 0o700)
             payload = {
                 "login": asdict(self.login),
+                "baidu_openapi": asdict(self.baidu_openapi),
                 "settings": asdict(self.settings),
                 "tasks": [asdict(t) for t in self.tasks],
                 "installed_games": [asdict(g) for g in self.installed_games],

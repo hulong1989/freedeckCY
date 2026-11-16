@@ -122,3 +122,20 @@ def test_merge_submissions_stops_on_errors(tmp_path):
     assert result["ok"] is False
     assert (submissions / "bad.json").is_file()
     assert len(submission.load_catalog(catalog)) == 0
+
+
+def test_validate_baidu_submission_and_server(tmp_path):
+    catalog = _write_catalog(tmp_path)
+    data = _submission(
+        name="百度测试",
+        english_name="Baidu Test",
+        share_url="https://pan.baidu.com/s/1AbCdEf123456",
+        access_code="x9k2",
+    )
+    normalized, errors, _warnings = submission.validate_submission(data, catalog_share_codes=set())
+    assert errors == []
+    assert submission._share_provider(normalized["share_url"]) == "baidu"
+    row = submission.build_catalog_row(normalized, "9")
+    assert row["server"] == "b"
+    assert row["shorturl"] == "1AbCdEf123456"
+    assert row["pwd"] == "x9k2"

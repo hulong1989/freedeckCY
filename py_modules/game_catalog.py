@@ -120,6 +120,21 @@ def _first_value(row: Dict[str, object], fields: tuple, default: str = "") -> st
     return default
 
 
+def _is_valid_baidu_url(url: str) -> bool:
+    try:
+        parsed = urlparse(str(url or "").strip())
+    except Exception:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    host = str(parsed.hostname or "").strip().lower()
+    return host in {"pan.baidu.com", "yun.baidu.com", "eyun.baidu.com"} or host.endswith(".pan.baidu.com")
+
+
+def _is_valid_share_url(url: str) -> bool:
+    return _is_valid_tianyi_url(url) or _is_valid_baidu_url(url)
+
+
 def _is_valid_tianyi_url(url: str) -> bool:
     """判断是否是支持的天翼分享链接（/t/ 或 /web/share?code=）。"""
     value = (url or "").strip().lower()
@@ -216,7 +231,7 @@ def _entry_from_json_item(item: object) -> Optional[GameCatalogEntry]:
         str(item.get("title") or item.get("title_zh") or item.get("title_en") or "")
     )
     down_url = str(item.get("down_url") or "").strip()
-    if not title or not _is_valid_tianyi_url(down_url):
+    if not title or not _is_valid_share_url(down_url):
         return None
     platform = _normalize_platform(item.get("platform"))
     size_bytes = _safe_int(item.get("size_bytes") or item.get("filesize_z") or 0)
@@ -445,7 +460,7 @@ class GameCatalog:
 
                 title = _normalize_title(str(row.get("title", "") or ""))
                 down_url = (row.get("down_url") or "").strip()
-                if not title or not _is_valid_tianyi_url(down_url):
+                if not title or not _is_valid_share_url(down_url):
                     self.invalid_rows += 1
                     continue
 

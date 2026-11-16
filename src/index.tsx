@@ -11,6 +11,7 @@ import {
   SliderField,
   Tabs,
   ToggleField,
+  TextField,
   showModal,
   staticClasses,
 } from "@decky/ui";
@@ -88,8 +89,17 @@ interface SettingsState {
   cloud_save_auto_upload: boolean;
 }
 
+interface BaiduOpenApiLoginState {
+  configured: boolean;
+  logged_in: boolean;
+  user_account: string;
+  expires_at: number;
+  message: string;
+}
+
 interface PanelState {
   login: LoginState;
+  baidu_openapi_login?: BaiduOpenApiLoginState;
   installed: InstalledState;
   tasks: TaskItem[];
   settings: SettingsState;
@@ -312,6 +322,14 @@ const getTianyiLibraryUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_l
 const getTianyiLoginUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_login_url");
 const setTianyiSettings = callable<[SettingsPayload], ApiResponse<SettingsState>>("set_tianyi_settings");
 const clearTianyiLogin = callable<[], ApiResponse<ClearLoginResponse>>("clear_tianyi_login");
+const getBaiduOpenapiAuthorizeUrl = callable<[], ApiResponse<UrlResponse>>("get_baidu_openapi_authorize_url");
+const setBaiduOpenapiApp = callable<[Record<string, string>], ApiResponse<BaiduOpenApiLoginState>>(
+  "set_baidu_openapi_app",
+);
+const exchangeBaiduOpenapiCode = callable<[Record<string, string>], ApiResponse<BaiduOpenApiLoginState>>(
+  "exchange_baidu_openapi_code",
+);
+const clearBaiduOpenapiLogin = callable<[], ApiResponse<BaiduOpenApiLoginState>>("clear_baidu_openapi_login");
 const startTianyiCloudSaveUpload = callable<[], ApiResponse<CloudSaveUploadStartData>>("start_tianyi_cloud_save_upload");
 const getTianyiCloudSaveUploadStatus = callable<[], ApiResponse<CloudSaveUploadStatusData>>(
   "get_tianyi_cloud_save_upload_status",
@@ -436,8 +454,17 @@ const PAGE_SIZE_OPTIONS = [20, 30, 50, 80, 100, 150, 200].map((value) => ({
   label: `${value} / 页`,
 }));
 
+const EMPTY_BAIDU_OPENAPI_STATE: BaiduOpenApiLoginState = {
+  configured: false,
+  logged_in: false,
+  user_account: "",
+  expires_at: 0,
+  message: "未配置",
+};
+
 const EMPTY_STATE: PanelState = {
   login: { logged_in: false, user_account: "", message: "" },
+  baidu_openapi_login: EMPTY_BAIDU_OPENAPI_STATE,
   installed: { total: 0, preview: [] },
   tasks: [],
   settings: EMPTY_SETTINGS,
@@ -608,6 +635,15 @@ function TaskProgressRow(task: TaskItem) {
       ) : null}
     </div>
   );
+}
+
+function getTextFieldValue(eventOrValue: unknown): string {
+  if (typeof eventOrValue === "string") return eventOrValue;
+  if (eventOrValue && typeof eventOrValue === "object" && "target" in eventOrValue) {
+    const target = (eventOrValue as { target?: { value?: unknown } }).target;
+    return String(target?.value ?? "");
+  }
+  return String(eventOrValue ?? "");
 }
 
 function openExternalUrl(rawUrl: string): void {
@@ -1569,6 +1605,11 @@ function SettingsPage() {
   const [activeTab, setActiveTab] = useState<string>("paths");
   const [settings, setSettings] = useState<SettingsState>(EMPTY_SETTINGS);
   const [login, setLogin] = useState<LoginState>(EMPTY_STATE.login);
+  const [baiduLogin, setBaiduLogin] = useState<BaiduOpenApiLoginState>(EMPTY_BAIDU_OPENAPI_STATE);
+  const [baiduAppKey, setBaiduAppKey] = useState<string>("");
+  const [baiduSecretKey, setBaiduSecretKey] = useState<string>("");
+  const [baiduAuthCode, setBaiduAuthCode] = useState<string>("");
+  const [baiduBusy, setBaiduBusy] = useState<boolean>(false);
   const [cloudSaveUploadState, setCloudSaveUploadState] = useState<CloudSaveUploadState>(EMPTY_CLOUD_SAVE_STATE);
   const [cloudSaveRestoreState, setCloudSaveRestoreState] = useState<CloudSaveRestoreState>(EMPTY_CLOUD_SAVE_RESTORE_STATE);
   const [startingCloudSaveUpload, setStartingCloudSaveUpload] = useState<boolean>(false);
@@ -1685,6 +1726,7 @@ function SettingsPage() {
     const next = Object.assign({}, EMPTY_SETTINGS, result.data.settings || {});
     setSettings(next);
     setLogin(result.data.login || EMPTY_STATE.login);
+    setBaiduLogin(result.data.baidu_openapi_login || EMPTY_BAIDU_OPENAPI_STATE);
     setSplitDraft(Math.max(1, Math.min(64, Number(next.split_count || 16))));
   }, []);
 
@@ -1869,6 +1911,68 @@ function SettingsPage() {
       setClearingLogin(false);
     }
   }, [clearingLogin, refreshCloudSaveRestoreStatus, refreshCloudSaveUploadStatus, refreshSettings]);
+
+  const onSaveBaiduApp = useCallback(async () => {
+    if (baiduBusy) return;
+    setBaiduBusy(true);
+    try {
+      const result = await setBaiduOpenapiApp({ app_key: baiduAppKey, secret_key: baiduSecretKey });
+      if (result.status !== "success") throw new Error(result.message || "保存百度应用失败");
+      setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
+      toaster.toast({ title: "freedeckCY", body: "百度开放平台应用已保存" });
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBaiduBusy(false);
+    }
+  }, [baiduAppKey, baiduBusy, baiduSecretKey]);
+
+  const onBaiduAuthorize = useCallback(async () => {
+    if (baiduBusy) return;
+    setBaiduBusy(true);
+    try {
+      const result = await getBaiduOpenapiAuthorizeUrl();
+      if (result.status !== "success") throw new Error(result.message || "获取百度授权链接失败");
+      const url = String(result.url || result.data?.url || "");
+      if (!url) throw new Error("百度授权链接为空");
+      openExternalUrl(url);
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBaiduBusy(false);
+    }
+  }, [baiduBusy]);
+
+  const onExchangeBaiduCode = useCallback(async () => {
+    if (baiduBusy) return;
+    setBaiduBusy(true);
+    try {
+      const result = await exchangeBaiduOpenapiCode({ code: baiduAuthCode });
+      if (result.status !== "success") throw new Error(result.message || "百度授权失败");
+      setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
+      setBaiduAuthCode("");
+      toaster.toast({ title: "freedeckCY", body: "百度网盘授权成功" });
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBaiduBusy(false);
+    }
+  }, [baiduAuthCode, baiduBusy]);
+
+  const onClearBaiduLogin = useCallback(async () => {
+    if (baiduBusy) return;
+    setBaiduBusy(true);
+    try {
+      const result = await clearBaiduOpenapiLogin();
+      if (result.status !== "success") throw new Error(result.message || "清除百度授权失败");
+      setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
+      toaster.toast({ title: "freedeckCY", body: "已清除百度网盘授权" });
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBaiduBusy(false);
+    }
+  }, [baiduBusy]);
 
   const onStartCloudSaveUpload = useCallback(async () => {
     if (startingCloudSaveUpload) return;
@@ -2205,6 +2309,61 @@ function SettingsPage() {
                   disabled={clearingLogin || saving || !login.logged_in}
                 >
                   {clearingLogin ? "注销中..." : "注销天翼云账号"}
+                </ButtonItem>
+              </PanelSectionRow>
+            </PanelSection>
+
+            <PanelSection title="百度网盘（官方 OpenAPI）">
+              <PanelSectionRow>
+                <div style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                  {baiduLogin.logged_in
+                    ? `已授权：${baiduLogin.user_account || "百度账号"}`
+                    : baiduLogin.configured
+                      ? "已配置应用，待授权"
+                      : "未配置（去百度网盘开放平台创建应用）"}
+                </div>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <TextField
+                  label="App Key"
+                  value={baiduAppKey}
+                  onChange={(event) => setBaiduAppKey(getTextFieldValue(event))}
+                />
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <TextField
+                  label="Secret Key"
+                  value={baiduSecretKey}
+                  bIsPassword={true}
+                  onChange={(event) => setBaiduSecretKey(getTextFieldValue(event))}
+                />
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <ButtonItem layout="below" onClick={onSaveBaiduApp} disabled={baiduBusy}>
+                  保存应用
+                </ButtonItem>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <ButtonItem layout="below" onClick={onBaiduAuthorize} disabled={baiduBusy || !baiduLogin.configured}>
+                  获取授权链接
+                </ButtonItem>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <TextField
+                  label="授权码"
+                  description="粘贴百度返回的授权码"
+                  value={baiduAuthCode}
+                  onChange={(event) => setBaiduAuthCode(getTextFieldValue(event))}
+                />
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <ButtonItem layout="below" onClick={onExchangeBaiduCode} disabled={baiduBusy || !baiduAuthCode.trim()}>
+                  完成授权
+                </ButtonItem>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <ButtonItem layout="below" onClick={onClearBaiduLogin} disabled={baiduBusy || !baiduLogin.logged_in}>
+                  清除百度授权
                 </ButtonItem>
               </PanelSectionRow>
             </PanelSection>

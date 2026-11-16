@@ -207,6 +207,48 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def get_baidu_openapi_authorize_url(self) -> dict:
+        """百度网盘开放平台授权链接。"""
+        try:
+            data = await self._get_tianyi_service().get_baidu_openapi_authorize_url()
+            return {"status": "success", "url": str(data.get("url", "") or ""), "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "url": "", "data": {}}
+
+    async def set_baidu_openapi_app(
+        self,
+        payload=None,
+        app_key: str = "",
+        secret_key: str = "",
+    ) -> dict:
+        """保存百度开放平台 App Key/Secret Key。"""
+        try:
+            if isinstance(payload, dict):
+                app_key = str(payload.get("app_key", app_key) or "")
+                secret_key = str(payload.get("secret_key", secret_key) or "")
+            data = await self._get_tianyi_service().set_baidu_openapi_app(app_key, secret_key)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def exchange_baidu_openapi_code(self, payload=None, code: str = "") -> dict:
+        """用授权码换取百度 OpenAPI token。"""
+        try:
+            if isinstance(payload, dict):
+                code = str(payload.get("code", code) or "")
+            data = await self._get_tianyi_service().exchange_baidu_openapi_code(code)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def clear_baidu_openapi_login(self) -> dict:
+        """清除百度 OpenAPI 授权。"""
+        try:
+            data = await self._get_tianyi_service().clear_baidu_openapi_login()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def set_tianyi_settings(
         self,
         payload=None,

@@ -93,6 +93,10 @@ const getTianyiLibraryUrl = callable("get_tianyi_library_url");
 const getTianyiLoginUrl = callable("get_tianyi_login_url");
 const setTianyiSettings = callable("set_tianyi_settings");
 const clearTianyiLogin = callable("clear_tianyi_login");
+const getBaiduOpenapiAuthorizeUrl = callable("get_baidu_openapi_authorize_url");
+const setBaiduOpenapiApp = callable("set_baidu_openapi_app");
+const exchangeBaiduOpenapiCode = callable("exchange_baidu_openapi_code");
+const clearBaiduOpenapiLogin = callable("clear_baidu_openapi_login");
 const startTianyiCloudSaveUpload = callable("start_tianyi_cloud_save_upload");
 const getTianyiCloudSaveUploadStatus = callable("get_tianyi_cloud_save_upload_status");
 const listTianyiCloudSaveRestoreOptions = callable("list_tianyi_cloud_save_restore_options");
@@ -185,8 +189,16 @@ const PAGE_SIZE_OPTIONS = [20, 30, 50, 80, 100, 150, 200].map((value) => ({
     data: value,
     label: `${value} / 页`,
 }));
+const EMPTY_BAIDU_OPENAPI_STATE = {
+    configured: false,
+    logged_in: false,
+    user_account: "",
+    expires_at: 0,
+    message: "未配置",
+};
 const EMPTY_STATE = {
     login: { logged_in: false, user_account: "", message: "" },
+    baidu_openapi_login: EMPTY_BAIDU_OPENAPI_STATE,
     installed: { total: 0, preview: [] },
     tasks: [],
     settings: EMPTY_SETTINGS,
@@ -323,6 +335,15 @@ function TaskProgressRow(task) {
                         background: colors.fill,
                         transition: "width 860ms linear",
                     } }) }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "11px", color: "#c9c9c9" }, children: [SP_JSX.jsx("span", { children: `进度 ${progress.toFixed(1)}%` }), SP_JSX.jsx("span", { children: `速度 ${formatSpeed(task.speed)}` })] }), installStatus ? (SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#bcbcbc", lineHeight: 1.4 }, children: `安装：${installStatusText(installStatus)}${installMessage ? ` | ${installMessage}` : ""}` })) : null, errorReason ? (SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#ff8e8e", lineHeight: 1.4 }, children: `错误：${errorReason}` })) : null] }));
+}
+function getTextFieldValue(eventOrValue) {
+    if (typeof eventOrValue === "string")
+        return eventOrValue;
+    if (eventOrValue && typeof eventOrValue === "object" && "target" in eventOrValue) {
+        const target = eventOrValue.target;
+        return String(target?.value ?? "");
+    }
+    return String(eventOrValue ?? "");
 }
 function openExternalUrl(rawUrl) {
     const url = String(rawUrl || "").trim();
@@ -1238,6 +1259,11 @@ function SettingsPage() {
     const [activeTab, setActiveTab] = SP_REACT.useState("paths");
     const [settings, setSettings] = SP_REACT.useState(EMPTY_SETTINGS);
     const [login, setLogin] = SP_REACT.useState(EMPTY_STATE.login);
+    const [baiduLogin, setBaiduLogin] = SP_REACT.useState(EMPTY_BAIDU_OPENAPI_STATE);
+    const [baiduAppKey, setBaiduAppKey] = SP_REACT.useState("");
+    const [baiduSecretKey, setBaiduSecretKey] = SP_REACT.useState("");
+    const [baiduAuthCode, setBaiduAuthCode] = SP_REACT.useState("");
+    const [baiduBusy, setBaiduBusy] = SP_REACT.useState(false);
     const [cloudSaveUploadState, setCloudSaveUploadState] = SP_REACT.useState(EMPTY_CLOUD_SAVE_STATE);
     const [cloudSaveRestoreState, setCloudSaveRestoreState] = SP_REACT.useState(EMPTY_CLOUD_SAVE_RESTORE_STATE);
     const [startingCloudSaveUpload, setStartingCloudSaveUpload] = SP_REACT.useState(false);
@@ -1338,6 +1364,7 @@ function SettingsPage() {
         const next = Object.assign({}, EMPTY_SETTINGS, result.data.settings || {});
         setSettings(next);
         setLogin(result.data.login || EMPTY_STATE.login);
+        setBaiduLogin(result.data.baidu_openapi_login || EMPTY_BAIDU_OPENAPI_STATE);
         setSplitDraft(Math.max(1, Math.min(64, Number(next.split_count || 16))));
     }, []);
     const refreshCloudSaveUploadStatus = SP_REACT.useCallback(async () => {
@@ -1537,6 +1564,81 @@ function SettingsPage() {
             setClearingLogin(false);
         }
     }, [clearingLogin, refreshCloudSaveRestoreStatus, refreshCloudSaveUploadStatus, refreshSettings]);
+    const onSaveBaiduApp = SP_REACT.useCallback(async () => {
+        if (baiduBusy)
+            return;
+        setBaiduBusy(true);
+        try {
+            const result = await setBaiduOpenapiApp({ app_key: baiduAppKey, secret_key: baiduSecretKey });
+            if (result.status !== "success")
+                throw new Error(result.message || "保存百度应用失败");
+            setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
+            toaster.toast({ title: "freedeckCY", body: "百度开放平台应用已保存" });
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBaiduBusy(false);
+        }
+    }, [baiduAppKey, baiduBusy, baiduSecretKey]);
+    const onBaiduAuthorize = SP_REACT.useCallback(async () => {
+        if (baiduBusy)
+            return;
+        setBaiduBusy(true);
+        try {
+            const result = await getBaiduOpenapiAuthorizeUrl();
+            if (result.status !== "success")
+                throw new Error(result.message || "获取百度授权链接失败");
+            const url = String(result.url || result.data?.url || "");
+            if (!url)
+                throw new Error("百度授权链接为空");
+            openExternalUrl(url);
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBaiduBusy(false);
+        }
+    }, [baiduBusy]);
+    const onExchangeBaiduCode = SP_REACT.useCallback(async () => {
+        if (baiduBusy)
+            return;
+        setBaiduBusy(true);
+        try {
+            const result = await exchangeBaiduOpenapiCode({ code: baiduAuthCode });
+            if (result.status !== "success")
+                throw new Error(result.message || "百度授权失败");
+            setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
+            setBaiduAuthCode("");
+            toaster.toast({ title: "freedeckCY", body: "百度网盘授权成功" });
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBaiduBusy(false);
+        }
+    }, [baiduAuthCode, baiduBusy]);
+    const onClearBaiduLogin = SP_REACT.useCallback(async () => {
+        if (baiduBusy)
+            return;
+        setBaiduBusy(true);
+        try {
+            const result = await clearBaiduOpenapiLogin();
+            if (result.status !== "success")
+                throw new Error(result.message || "清除百度授权失败");
+            setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
+            toaster.toast({ title: "freedeckCY", body: "已清除百度网盘授权" });
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBaiduBusy(false);
+        }
+    }, [baiduBusy]);
     const onStartCloudSaveUpload = SP_REACT.useCallback(async () => {
         if (startingCloudSaveUpload)
             return;
@@ -1770,7 +1872,11 @@ function SettingsPage() {
             title: "账号",
             content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u5929\u7FFC\u4E91\u8D26\u53F7", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: login.logged_in
                                         ? `当前已登录：${login.user_account || "未知账号"}`
-                                        : "当前未登录" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E91\u5B58\u6863\u4E0A\u4F20", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "\u6E38\u620F\u9000\u51FA\u540E\u81EA\u52A8\u4E0A\u4F20", description: "\u540E\u53F0\u68C0\u6D4B\u6E38\u620F\u8FDB\u7A0B\uFF0C\u9000\u51FA\u540E\u81EA\u52A8\u6253\u5305\u4E0A\u4F20\uFF1B\u9ED8\u8BA4\u5F00\u542F", checked: Boolean(settings.cloud_save_auto_upload), onChange: (value) => savePatch({ cloud_save_auto_upload: value }), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveUpload, disabled: saving || clearingLogin || startingCloudSaveUpload || !login.logged_in || cloudSaveUploadState.running, children: startingCloudSaveUpload
+                                        : "当前未登录" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8\uFF08\u5B98\u65B9 OpenAPI\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduLogin.logged_in
+                                        ? `已授权：${baiduLogin.user_account || "百度账号"}`
+                                        : baiduLogin.configured
+                                            ? "已配置应用，待授权"
+                                            : "未配置（去百度网盘开放平台创建应用）" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "App Key", value: baiduAppKey, onChange: (event) => setBaiduAppKey(getTextFieldValue(event)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "Secret Key", value: baiduSecretKey, bIsPassword: true, onChange: (event) => setBaiduSecretKey(getTextFieldValue(event)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onSaveBaiduApp, disabled: baiduBusy, children: "\u4FDD\u5B58\u5E94\u7528" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onBaiduAuthorize, disabled: baiduBusy || !baiduLogin.configured, children: "\u83B7\u53D6\u6388\u6743\u94FE\u63A5" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u6388\u6743\u7801", description: "\u7C98\u8D34\u767E\u5EA6\u8FD4\u56DE\u7684\u6388\u6743\u7801", value: baiduAuthCode, onChange: (event) => setBaiduAuthCode(getTextFieldValue(event)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onExchangeBaiduCode, disabled: baiduBusy || !baiduAuthCode.trim(), children: "\u5B8C\u6210\u6388\u6743" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearBaiduLogin, disabled: baiduBusy || !baiduLogin.logged_in, children: "\u6E05\u9664\u767E\u5EA6\u6388\u6743" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E91\u5B58\u6863\u4E0A\u4F20", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "\u6E38\u620F\u9000\u51FA\u540E\u81EA\u52A8\u4E0A\u4F20", description: "\u540E\u53F0\u68C0\u6D4B\u6E38\u620F\u8FDB\u7A0B\uFF0C\u9000\u51FA\u540E\u81EA\u52A8\u6253\u5305\u4E0A\u4F20\uFF1B\u9ED8\u8BA4\u5F00\u542F", checked: Boolean(settings.cloud_save_auto_upload), onChange: (value) => savePatch({ cloud_save_auto_upload: value }), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveUpload, disabled: saving || clearingLogin || startingCloudSaveUpload || !login.logged_in || cloudSaveUploadState.running, children: startingCloudSaveUpload
                                         ? "启动中..."
                                         : cloudSaveUploadState.running
                                             ? "上传进行中..."

@@ -65,6 +65,9 @@ class ResolvedFile:
     name: str
     size: int
     is_folder: bool
+    # 百度网盘会带网盘内路径；天翼解析默认留空
+    path: str = ""
+    folder_path: str = ""
 
     def to_dict(self) -> Dict[str, object]:
         """转字典给前端使用。"""
