@@ -30,6 +30,7 @@ from game_catalog import GameCatalog, resolve_default_catalog_path
 from seven_zip_manager import SevenZipError, SevenZipManager
 from steam_shortcuts import (
     add_or_update_tianyi_shortcut,
+    find_compatdata_dirs,
     list_tianyi_shortcuts_sync,
     remove_tianyi_shortcut,
     resolve_tianyi_shortcut_sync,
@@ -179,6 +180,28 @@ def _is_tianyi_share_url(url: str) -> bool:
     if host in _TIANYI_SHARE_HOSTS:
         return True
     return host.endswith(".189.cn")
+
+
+class ArchiveRepairScheduled(RuntimeError):
+    """归档校验失败后已安排重新下载，调用方不应把任务标记为已处理。"""
+
+
+def _dir_size_bytes(path: str) -> int:
+    """递归统计目录大小（符号链接不跟随），失败时返回已统计部分。"""
+    root = str(path or "").strip()
+    if not root or not os.path.isdir(root):
+        return 0
+    total = 0
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for name in filenames:
+            file_path = os.path.join(dirpath, name)
+            try:
+                if os.path.islink(file_path):
+                    continue
+                total += max(0, int(os.path.getsize(file_path)))
+            except Exception:
+                continue
+    return total
 
 
 def _is_within_dir(path: str, base: str) -> bool:
@@ -4445,14 +4468,62 @@ class TianyiService:
             if cancelled:
                 raise asyncio.CancelledError()
 
+    def _resolve_record_app_id(self, record: TianyiInstalledGame) -> int:
+        """已安装记录对应的 Steam AppID（缺失时回查快捷方式）。"""
+        app_id = max(0, _safe_int(record.steam_app_id, 0))
+        if app_id > 0:
+            return app_id
+        try:
+            result = resolve_tianyi_shortcut_sync(game_id=str(record.game_id or ""))
+        except Exception:
+            result = {}
+        return max(0, _safe_int(result.get("appid_unsigned"), 0))
+
+    def _can_remove_compatdata_dir(self, path: str, app_id: int) -> bool:
+        """只允许删除 <library>/steamapps/compatdata/<appid> 这种结构。"""
+        resolved = os.path.realpath(os.path.expanduser(str(path or "").strip()))
+        if not resolved or os.path.islink(resolved) or not os.path.isdir(resolved):
+            return False
+        parts = resolved.replace("\\", "/").split("/")
+        if len(parts) < 4:
+            return False
+        return parts[-3] == "steamapps" and parts[-2] == "compatdata" and parts[-1] == str(int(app_id))
+
+    async def preview_uninstall(self, *, game_id: str = "", install_path: str = "") -> Dict[str, Any]:
+        """卸载前预览：安装目录与 Proton 前缀各占多少空间。"""
+        record = self._find_installed_record(game_id=str(game_id or "").strip(), install_path=str(install_path or "").strip())
+        if record is None:
+            raise ValueError("未找到已安装游戏记录")
+
+        resolved_path = os.path.realpath(os.path.expanduser(str(record.install_path or "").strip()))
+        install_size = await asyncio.to_thread(_dir_size_bytes, resolved_path)
+        app_id = self._resolve_record_app_id(record)
+        compat_dirs: List[str] = []
+        compat_size = 0
+        if app_id > 0:
+            compat_dirs = await asyncio.to_thread(find_compatdata_dirs, app_id)
+            for compat_dir in compat_dirs:
+                compat_size += await asyncio.to_thread(_dir_size_bytes, compat_dir)
+
+        return {
+            "game_id": str(record.game_id or ""),
+            "title": str(record.game_title or ""),
+            "install_path": str(record.install_path or ""),
+            "install_size_bytes": int(install_size),
+            "steam_app_id": int(app_id),
+            "compatdata_paths": list(compat_dirs),
+            "compatdata_size_bytes": int(compat_size),
+        }
+
     async def uninstall_installed_game(
         self,
         *,
         game_id: str = "",
         install_path: str = "",
         delete_files: bool = True,
+        delete_compatdata: bool = False,
     ) -> Dict[str, Any]:
-        """卸载已安装游戏（删除文件并移除记录）。"""
+        """卸载已安装游戏（删除文件并移除记录），可选回收 Proton 前缀。"""
         target_game_id = str(game_id or "").strip()
         target_install_path = str(install_path or "").strip()
         if not target_game_id and not target_install_path:
@@ -4480,6 +4551,35 @@ class TianyiService:
                     removed_files = True
                 except Exception as exc:
                     raise RuntimeError(f"删除安装文件失败: {exc}") from exc
+
+        compatdata_cleanup: Dict[str, Any] = {
+            "requested": bool(delete_compatdata),
+            "app_id": 0,
+            "paths": [],
+            "removed_paths": [],
+            "freed_bytes": 0,
+        }
+        compatdata_warning = ""
+        if bool(delete_compatdata):
+            app_id = self._resolve_record_app_id(record)
+            compatdata_cleanup["app_id"] = int(app_id)
+            if app_id > 0:
+                compat_dirs = await asyncio.to_thread(find_compatdata_dirs, app_id)
+                compatdata_cleanup["paths"] = list(compat_dirs)
+                for compat_dir in compat_dirs:
+                    if not self._can_remove_compatdata_dir(compat_dir, app_id):
+                        compatdata_warning = "Proton 前缀路径校验失败，已跳过删除"
+                        continue
+                    size_bytes = await asyncio.to_thread(_dir_size_bytes, compat_dir)
+                    try:
+                        await asyncio.to_thread(shutil.rmtree, compat_dir)
+                    except Exception as exc:
+                        compatdata_warning = f"删除 Proton 前缀失败: {exc}"
+                        continue
+                    compatdata_cleanup["removed_paths"].append(compat_dir)
+                    compatdata_cleanup["freed_bytes"] += int(size_bytes)
+            else:
+                compatdata_warning = "未找到 Steam AppID，跳过 Proton 前缀清理"
 
         removed = await asyncio.to_thread(
             self.store.remove_installed_game,
@@ -4539,12 +4639,15 @@ class TianyiService:
             "files_deleted": bool(removed_files),
             "installed": summary,
             "steam": steam_cleanup,
+            "compatdata": compatdata_cleanup,
         }
         warnings: List[str] = []
         if persist_warning:
             warnings.append(f"卸载记录回退保存失败：{persist_warning}")
         if steam_warning:
             warnings.append(steam_warning)
+        if compatdata_warning:
+            warnings.append(compatdata_warning)
         if warnings:
             response["warning"] = "；".join(warnings)
         return response
@@ -5300,6 +5403,48 @@ class TianyiService:
         self._invalidate_panel_cache(tasks=True)
         return _task_to_view(task)
 
+    async def retry_task(self, task_id: str) -> Dict[str, Any]:
+        """重试失败/中断的任务：重置状态并重新获取直链。
+
+        文件已完整时跳过下载，直接重新进入安装流程。
+        """
+        task = self._find_task(task_id)
+        if task is None:
+            raise ValueError("任务不存在")
+        if str(task.status or "") in {"active", "waiting", "paused"}:
+            raise ValueError("任务尚未结束，无需重试")
+
+        self._readd_attempts.pop(task.task_id, None)
+        self._task_sync_misses.pop(task.task_id, None)
+        task.post_processed = False
+        task.install_status = "pending"
+        task.install_message = "正在重试..."
+        task.error_reason = ""
+        task.progress = 0.0
+        task.speed = 0
+        task.updated_at = _now_wall_ts()
+
+        if self._file_matches_expected_size(task):
+            task.status = "complete"
+            task.progress = 100.0
+            task.install_message = "文件已完整，重新安装..."
+            self.store.save()
+            self._maybe_schedule_group_post_process(task)
+            self._invalidate_panel_cache(tasks=True)
+            return _task_to_view(task)
+
+        if not await self._readd_task_download(task):
+            task.install_status = "failed"
+            task.install_message = "重试失败：无法重新获取下载直链"
+            task.updated_at = _now_wall_ts()
+            self.store.save()
+            self._invalidate_panel_cache(tasks=True)
+            raise RuntimeError("重试失败：无法重新获取下载直链（登录可能已失效）")
+
+        self.store.save()
+        self._invalidate_panel_cache(tasks=True)
+        return _task_to_view(task)
+
     def _find_task(self, task_id: str) -> Optional[TianyiTaskRecord]:
         """查找任务对象。"""
         target = (task_id or "").strip()
@@ -5464,7 +5609,8 @@ class TianyiService:
 
         lock = self._install_lock_for(target_dir)
         async with lock:
-            members = [item for item in self._install_group_members(task) if not item.post_processed]
+            all_members = self._install_group_members(task)
+            members = [item for item in all_members if not item.post_processed]
             if not members:
                 return
 
@@ -5477,6 +5623,7 @@ class TianyiService:
                     bundle_errors[path] = f"分卷不完整，缺少: {missing_text}"
 
             cancelled = False
+            repaired_members: set[str] = set()
             try:
                 failed = 0
                 for member in members:
@@ -5492,9 +5639,18 @@ class TianyiService:
                         member.updated_at = _now_wall_ts()
                         continue
                     else:
-                        ok, message = await self._install_payload(
-                            member, target_dir, bundle_index=bundle_index
-                        )
+                        try:
+                            ok, message = await self._install_payload(
+                                member, target_dir, bundle_index=bundle_index
+                            )
+                        except ArchiveRepairScheduled as exc:
+                            # 归档校验失败后已安排重新下载：不标记失败/已处理，
+                            # 等重下完成会重新进入安装流程。
+                            member.install_status = "waiting"
+                            member.install_message = str(exc)
+                            member.updated_at = _now_wall_ts()
+                            repaired_members.add(member.task_id)
+                            continue
 
                     member.install_status = "installed" if ok else "failed"
                     member.install_message = "安装完成" if ok else message
@@ -5502,9 +5658,17 @@ class TianyiService:
                     if not ok:
                         failed += 1
 
-                lead = members[0]
-                if failed == 0:
-                    await self._finalize_group_install(lead=lead, members=members, target_dir=target_dir)
+                lead = all_members[0] if all_members else members[0]
+                if failed == 0 and not repaired_members:
+                    # 用整组（含此前已装好的分卷）计算体积/写记录，避免部分修复后体积只剩一个包
+                    await self._finalize_group_install(lead=lead, members=all_members, target_dir=target_dir)
+                elif repaired_members:
+                    title = str(lead.game_title or lead.file_name or "游戏")
+                    lead.install_message = "归档校验失败，正在重新下载，完成后会自动安装"
+                    for member in members:
+                        if member.task_id in repaired_members:
+                            continue
+                        member.install_message = f"「{title}」有文件正在重新下载，已暂停 Steam 注册"
                 else:
                     title = str(lead.game_title or lead.file_name or "游戏")
                     if len(members) == 1:
@@ -5532,6 +5696,9 @@ class TianyiService:
                 if not cancelled:
                     # 标记放在工作结束之后：解压中崩溃时任务仍未处理，下次启动会被重新拾起。
                     for member in members:
+                        if member.task_id in repaired_members:
+                            member.post_processed = False
+                            continue
                         member.post_processed = True
                         member.updated_at = _now_wall_ts()
                     self._invalidate_panel_cache(tasks=True)
@@ -5601,6 +5768,28 @@ class TianyiService:
             return False, "下载内容疑似网页错误页（登录可能已失效），请重新登录后移除任务重下"
         return True, ""
 
+    async def _schedule_archive_repair(self, task: TianyiTaskRecord, reason: str) -> bool:
+        """归档校验失败：隔离坏文件并用原直链重下一次（每任务仅一次）。"""
+        if int(self._readd_attempts.get(task.task_id, 0)) >= 1:
+            return False
+        self._readd_attempts[task.task_id] = 1
+        try:
+            await self.aria2.remove(task.gid)
+        except Exception:
+            pass
+        self._quarantine_download_file(task, "archive-invalid")
+        if not await self._readd_task_download(task, consume_attempt=False):
+            return False
+        task.status = "waiting"
+        task.progress = 0.0
+        task.speed = 0
+        task.post_processed = False
+        task.install_status = "waiting"
+        task.install_message = f"{reason}，已自动重新下载"
+        task.updated_at = _now_wall_ts()
+        config.logger.info("Archive validation failed, re-download scheduled task=%s", task.task_id)
+        return True
+
     async def _install_payload(
         self,
         task: TianyiTaskRecord,
@@ -5633,6 +5822,13 @@ class TianyiService:
             ok, reason = self._precheck_archive_payload(local_path)
             if not ok:
                 return False, reason
+
+            # 解压前用 `7z t` 做完整性校验；失败先自动重下一次。
+            verified, verify_reason = await asyncio.to_thread(self.seven_zip.test_archive, local_path)
+            if not verified:
+                if await self._schedule_archive_repair(task, verify_reason):
+                    raise ArchiveRepairScheduled(task.install_message)
+                return False, verify_reason
 
             # 解压前先检查剩余空间（多分卷按所有分卷之和估算）。
             archive_size = 0

@@ -1,11 +1,12 @@
-# freedeckcyCY 开发/打包快捷入口
+# freedeckCY 开发/打包快捷入口
 #
 # 常用：
 #   make runtime                 # 下载本机架构运行所需的 aria2/7z/node 到 defaults/runtime
 #   make runtime ARCH=all        # 同时下载 x86_64 与 aarch64
-#   make package                 # 生成 dist-artifacts/freedeckcyCY-v<version>.zip
+#   make package                 # 生成 dist-artifacts/freedeckCY-v<version>.zip
 #   make package PACKAGE_ARGS=--build-ui
 #   make test                    # 使用 .venv/bin/pytest 运行测试
+#   make doctor                  # 环境诊断（只读）
 #   make clean                   # 清理 dist-artifacts 与 Python 缓存
 #
 # 所有目标都从仓库根目录执行。
@@ -23,17 +24,18 @@ PYTEST := $(ROOT)/.venv/bin/pytest
 REQUIREMENTS_DEV := requirements-dev.txt
 
 .DEFAULT_GOAL := help
-.PHONY: runtime package test clean help
+.PHONY: runtime package test doctor clean help
 
 help:
-	@echo "freedeckcyCY 构建入口"
+	@echo "freedeckCY 构建入口"
 	@echo ""
 	@echo "用法: make <target> [变量=值]"
 	@echo ""
 	@echo "目标:"
 	@echo "  runtime    下载 aria2c / 7zz / node 到 defaults/runtime/（幂等，可重复执行）"
-	@echo "  package    组装 Decky 插件 zip 到 dist-artifacts/freedeckcyCY-v<version>.zip"
+	@echo "  package    组装 Decky 插件 zip 到 dist-artifacts/freedeckCY-v<version>.zip"
 	@echo "  test       使用 .venv/bin/pytest 运行测试（未安装则提示安装 dev 依赖）"
+	@echo "  doctor     环境诊断：运行时/Steam/state/日志/端口/网络（只读）"
 	@echo "  clean      删除 dist-artifacts/ 与 __pycache__/*.pyc（默认保留 defaults/runtime）"
 	@echo "  help       显示本帮助"
 	@echo ""
@@ -56,6 +58,9 @@ runtime:
 
 package:
 	@cd "$(ROOT)" && bash scripts/package.sh $(PACKAGE_ARGS)
+
+doctor:
+	@cd "$(ROOT)" && bash scripts/doctor.sh
 
 test:
 	@cd "$(ROOT)" || exit 1; \

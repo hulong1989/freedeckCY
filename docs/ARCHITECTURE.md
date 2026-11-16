@@ -1,6 +1,6 @@
 # freedeckCY 架构说明
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 2026-11 第二轮补全后的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.1.1**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -18,11 +18,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 这是阅读本仓库最容易踩的坑：**GitHub Releases 里的成品功能远多于仓库代码**。
 
-> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 重新起步（与上游 0.2–0.3 不连续）。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
+> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.1.1**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.1.0`，纯天翼云盘 + CSV 目录 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步 |
+| 本仓库 `main` | `package.json` 版本 `0.1.1`，纯天翼云盘 + CSV 目录 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步，v0.1.1 完成"四件套"（见下） |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -31,6 +31,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 - **仓库代码只是早期版本**：releases 里的百度网盘、模拟器、资源池等模块在 `main` 上完全不存在。不要在本仓库里寻找它们。
 - **仓库缺运行时二进制**：`aria2_manager.py` / `seven_zip_manager.py` / `tianyi_client.py` 会优先查找 `defaults/runtime/` 下的 `aria2c`、`7zz`、`node`，但仓库本身不提交这些文件（已在 `.gitignore` 中）。插件可以不带它们启动，但要完整跑通下载/安装/云存档，克隆后必须先执行 `make runtime` 补齐，否则会分别报"下载组件不可用 / 解压组件不可用 / 未找到 node 运行时"。release zip 约 50 MB 与源码约 1 MB 的差值，主要就是这些二进制。
 - **作者已停止维护**：NewFreedeck v0.1 的发布说明原文是"目前我没有精力与时间继续维护，抱歉，所以可以根据我整理的 skill 自行修改，最后可以给我推 pr"。
+- **当前版本 v0.1.1 的"四件套"**：① 卸载可选回收 Proton 前缀（默认不删）；② 解压前 `7z t` 校验 + 校验失败自动重下一次；③ 失败任务「重试」按钮；④ `make doctor` 环境诊断（只读）。细节见 §6.6–§6.8 / DEVELOPMENT §6.6。
 - **本仓库由模板 / 旧项目改造而来**：`defaults/defaults.txt` 仍是 Decky 模板说明文件，`config.py` 里保留了 `Decky-send` 命名的回退路径。`package.json` 里指向上游模板的 `repository` / `bugs` / `homepage` 已移除，`license` 改为 BSD-3-Clause（与 `LICENSE` 一致）。
 
 > 本次补全统一了源码行尾为 LF（`.gitattributes` 约束），所以用 `git diff` 看提交时可能出现“整文件重写”的假象，实际逻辑改动见各文件 diff 的 `-w` 视图。
@@ -43,16 +44,17 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 |---|---|---|
 | 插件运行时 | Decky Loader（Python 3 + asyncio） | `main.py`、`decky.pyi` |
 | 本地 Web 服务 | **aiohttp**，仅监听 `127.0.0.1:59271` | `py_modules/server_manager.py` |
-| 业务内核 | 单个巨型类 `TianyiService`（约 7200 行） | `py_modules/tianyi_service.py` |
+| 业务内核 | 单个巨型类 `TianyiService`（约 7400 行） | `py_modules/tianyi_service.py` |
 | 天翼 API 客户端 | aiohttp + 自写 MD5 签名 / XML/JSONP 兼容解析 | `py_modules/tianyi_client.py` |
 | 状态持久化 | 单个 JSON 全量重写；状态目录 0700 / 文件 0600 | `py_modules/tianyi_store.py` → `~/.local/share/freedeckCY/tianyi/state.json` |
 | 日志 | `RotatingFileHandler`（5 MB × 3，`propagate=False`） | `py_modules/config.py` → `/tmp/freedeckcy.log` |
 | 下载器 | 内置 / 系统 **aria2c**，JSON-RPC 控制 | `py_modules/aria2_manager.py` |
-| 解压 | 内置 / 系统 **7zz**（`.7z/.rar` 等），其余走 `shutil` | `py_modules/seven_zip_manager.py` |
+| 解压 | 内置 / 系统 **7zz**（`.7z/.rar` 等；解压前 `7z t` 校验，best-effort），其余走 `shutil` | `py_modules/seven_zip_manager.py` |
 | Steam 集成 | 自实现 VDF 读写 + 二进制 `shortcuts.vdf` | `py_modules/steam_shortcuts.py`、`py_modules/vdf/` |
 | QAM 前端 | **React 19 + TypeScript**，`@decky/api` + `@decky/ui`，Rollup 打包 | `src/index.tsx` → `dist/index.js` |
 | 本地网页前端 | **Vue 3 全局构建**（无构建步骤，直接引入 `vue.global.prod.js`） | `defaults/tianyi_library_ui/` |
 | 云盘上传 / 分享兜底 | **Node ≥ 18**，子进程 stdin/stdout JSON 协议 | `backend/*.js`、`backend/*.cjs` |
+| 环境诊断 | 只读 bash 脚本（运行时/Steam/state/日志/端口/网络） | `scripts/doctor.sh`（`make doctor`） |
 
 运行时一共会拉起 **4 类进程**：Decky 的 Python 进程、`aria2c`、`7zz`、偶尔的 `node`。
 
@@ -62,11 +64,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 ```text
 repo/
-├── main.py                     # 插件入口：Plugin 类，22 个可调用 RPC，大部分薄转发给 TianyiService / server_manager
+├── main.py                     # 插件入口：Plugin 类，24 个可调用 RPC，大部分薄转发给 TianyiService / server_manager
 ├── plugin.json                 # Decky 元信息（api_version=1, flags=[]，publish 描述已更新）
-├── package.json                # 版本 0.1.0；build=rollup；前端依赖
+├── package.json                # 版本 0.1.1；build=rollup；前端依赖
 ├── decky.pyi                   # Decky Python API 类型存根
-├── Makefile                    # runtime / package / test / clean / help 目标（见 DEVELOPMENT.md）
+├── Makefile                    # runtime / package / test / doctor / clean / help 目标（见 DEVELOPMENT.md）
 ├── requirements-dev.txt        # 开发与 CI 依赖（pytest 等，运行期依赖由 Decky 自带）
 ├── .gitignore                  # 忽略 __pycache__、defaults/runtime/、node_modules、dist-artifacts 等
 ├── .gitattributes              # 行尾统一为 LF，二进制资源按原样处理
@@ -81,14 +83,14 @@ repo/
 │   ├── runtime/                # 运行期二进制（不提交，由 make runtime 下载到 .gitignore 的目录）
 │   └── defaults.txt            # Decky 模板说明文件（原样保留）
 ├── py_modules/
-│   ├── tianyi_service.py       # ★ 业务内核：下载/安装（分卷、自愈）/云存档/登录/时长
+│   ├── tianyi_service.py       # ★ 业务内核：下载/安装（分卷、校验、自愈、重试）/卸载/云存档/登录/时长
 │   ├── tianyi_client.py        # ★ 天翼云盘协议：分享解析、直链、token、上传（调 Node）
 │   ├── tianyi_http.py          # 本地 HTTP 路由与 handler（34 条路由）
 │   ├── tianyi_store.py         # 数据类 + state.json 读写（目录 0700 / 文件 0600）
 │   ├── server_manager.py       # aiohttp 生命周期 + 本地 API 安全边界（Host/Origin）+ 设置备份 + /_healthz
 │   ├── aria2_manager.py        # aria2 子进程 + 运行时元数据/flock 复用 + JSON-RPC（addUri/changeUri/listDownloads…）
-│   ├── seven_zip_manager.py    # 7z 解压 / 压缩
-│   ├── steam_shortcuts.py      # shortcuts.vdf / config.vdf / grid 封面；多库/Flatpak、写前备份、DevkitGameID 去重
+│   ├── seven_zip_manager.py    # 7z 解压 / 压缩 / `7z t` 校验（test_archive）
+│   ├── steam_shortcuts.py      # shortcuts.vdf / config.vdf / grid 封面；多库/Flatpak、写前备份、DevkitGameID 去重、find_compatdata_dirs
 │   ├── game_catalog.py         # CSV → 内存目录（校验、搜索、分页）
 │   ├── archive_bundle.py       # 多分卷归档识别（.7z.001 / .partN.rar / .z01+zip / .r00+rar）
 │   ├── utils.py                # 端口占用检测、局域网 IP 探测
@@ -100,8 +102,9 @@ repo/
 │   └── tianyi_cloud_upload.cjs     # 同上，CommonJS 版，只实现 upload
 ├── scripts/
 │   ├── fetch_runtime.sh        # 下载 aria2c / 7zz / node 到 defaults/runtime/
-│   └── package.sh              # 组装 Decky 插件 zip 到 dist-artifacts/
-├── tests/                      # pytest 单测（215 个用例，不联网、不碰 Steam 目录）
+│   ├── package.sh              # 组装 Decky 插件 zip 到 dist-artifacts/
+│   └── doctor.sh               # 环境诊断（只读）：运行时/Steam/state/日志/端口/网络
+├── tests/                      # pytest 单测（220 个用例，不联网、不碰 Steam 目录）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP）
 ├── .github/workflows/ci.yml    # CI：pytest + pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -127,7 +130,7 @@ Steam Deck (Game Mode)
 │        ├── GameCatalog         ──▶ defaults/tianyi_catalog/*.csv
 │        ├── ArchiveBundle       ──▶ 多分卷归档识别（主卷 / 缺失分卷 / bundled）
 │        ├── Aria2Manager        ──▶ aria2c 子进程（运行时元数据 + flock 复用，JSON-RPC 控制）
-│        ├── SevenZipManager     ──▶ 7zz 子进程（解压/打包）
+│        ├── SevenZipManager     ──▶ 7zz 子进程（解压/打包；解压前 `7z t` 校验）
 │        ├── SteamShortcuts      ──▶ ~/.steam/.../shortcuts.vdf、config.vdf、userdata/*/grid/
 │        └── TianyiClient        ──▶ cloud.189.cn / api.cloud.189.cn（Cookie + MD5/AES/RSA 签名）
 │
@@ -161,11 +164,11 @@ Steam Deck (Game Mode)
 | 交互特点 | 900 ms / 6 s / 30 s 三档轮询 | 手柄支持（160 ms 轮询、方向键导航，为掌机设计） |
 | 怎么打开 | 插件自带 | 调 RPC 拿 URL → `SteamClient.Browser.OpenUrl`（Steam 内置浏览器），不是 iframe/webview |
 
-QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `PanelSection` 组成，代码在 [src/index.tsx:2447](../src/index.tsx) `Content()` 到文件末尾；设置页是 `Tabs` 四页（路径 / 安装 / 下载 / 账号），在 [src/index.tsx:1533](../src/index.tsx) `SettingsPage()`。
+QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `PanelSection` 组成，代码在 [src/index.tsx:2475](../src/index.tsx) `Content()` 到文件末尾；设置页是 `Tabs` 四页（路径 / 安装 / 下载 / 账号），在 [src/index.tsx:1561](../src/index.tsx) `SettingsPage()`。
 
 ### 5.4 前端调用面
 
-**RPC（[src/index.tsx:297](../src/index.tsx) 起，全部 `callable("...")`，共 18 个天翼 RPC）**
+**RPC（[src/index.tsx:308](../src/index.tsx) 起，全部 `callable("...")`，共 20 个天翼 RPC）**
 
 | RPC | 用途 |
 |---|---|
@@ -175,8 +178,9 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 | `get_tianyi_library_url` / `get_tianyi_login_url` | 拿本地页面 URL |
 | `set_tianyi_settings` / `clear_tianyi_login` | 设置 / 注销 |
 | `start_tianyi_cloud_save_upload` / `list_..._options` / `list_..._entries` / `plan_..._restore` / `apply_..._restore` | 云存档五连 |
-| `pause_tianyi_task` / `resume_tianyi_task` / `remove_tianyi_task` | 暂停 / 继续 / 移除下载任务 |
-| `uninstall_tianyi_installed_game` | 卸载（删目录 + 记录） |
+| `pause_tianyi_task` / `resume_tianyi_task` / `remove_tianyi_task` / `retry_tianyi_task` | 暂停 / 继续 / 移除 / 重试下载任务 |
+| `uninstall_tianyi_installed_game` | 卸载（删目录 + 记录；可选 `delete_compatdata` 回收 Proton 前缀） |
+| `preview_tianyi_uninstall` | 卸载预览（安装目录 / compatdata 占用） |
 | `record_tianyi_game_action` | 启动/退出事件上报（计时用） |
 
 **HTTP API 分组（`py_modules/tianyi_http.py` 的 `setup_routes()`，34 条路由）**：3 条页面/静态资源（`/tianyi/library`、`/tianyi/library/login-bridge`、静态文件兜底），以及 `login/*`（qr、capture、manual、clear）、`catalog`、`catalog/cover`、`settings`、`install/prepare|start`、`download/create|tasks|pause|resume|remove`、`cloud-save/*`、`state`。
@@ -220,6 +224,9 @@ _post_process_completed_task()               ← 按安装目录加锁，整组�
    │    └─ 只解主卷；其余任务标记 install_status="bundled"
    ├─ 每个要解压的包：等 .aria2 释放且大小稳定两次（_wait_payload_settled）
    │    → 预检空文件/HTML 错误页（_precheck_archive_payload）
+   │    → `7z t` 完整性校验（best-effort：7z 缺失/不可执行时跳过，见 6.6）
+   │         └─ 失败 → 隔离坏包 + 原直链自动重下一次（每任务一次）；
+   │                  不置 post_processed，重下完成后自动重新安装
    │    → 空间检查 → 7zz 强制解压（分卷必须走 7z）→ staging 合并
    ├─ 全部成功 → _finalize_group_install()
    │    ├─ 写 TianyiInstalledGame 记录（体积 = 组内各包之和）
@@ -246,25 +253,29 @@ Steam 库里出现游戏（写完后备份 + 回读校验；需重启 Steam 生�
 | 环节 | 代码位置 |
 |---|---|
 | HTTP 入口 prepare / start | [tianyi_http.py:426](../py_modules/tianyi_http.py) `handle_prepare_install` / [tianyi_http.py:447](../py_modules/tianyi_http.py) `handle_start_install` |
-| 安装计划 + 空间探针 | [tianyi_service.py:4669](../py_modules/tianyi_service.py) `_build_install_plan()` |
-| 创建下载任务 | [tianyi_service.py:4807](../py_modules/tianyi_service.py) `_create_tasks_from_plan()` |
-| 任务状态同步 | [tianyi_service.py:5109](../py_modules/tianyi_service.py) `refresh_tasks()` |
-| 安装调度 / 目录级互斥 | [tianyi_service.py:5220](../py_modules/tianyi_service.py) `_schedule_post_process_task()` / [tianyi_service.py:5454](../py_modules/tianyi_service.py) `_post_process_completed_task()` / [tianyi_service.py:5433](../py_modules/tianyi_service.py) `_install_lock_for()` |
-| 解压 / 合并 staging | [tianyi_service.py:6003](../py_modules/tianyi_service.py) `_extract_archive_to_dir()` / [tianyi_service.py:6049](../py_modules/tianyi_service.py) `_merge_extracted_content()` |
-| 写 Steam 快捷方式 / Proton / 封面 | [steam_shortcuts.py:363](../py_modules/steam_shortcuts.py) `_upsert_shortcut_sync()`、[steam_shortcuts.py:494](../py_modules/steam_shortcuts.py) `_set_proton_mapping_sync()`、[steam_shortcuts.py:744](../py_modules/steam_shortcuts.py) `_apply_grid_assets()` |
-| 非 Steam appid | [steam_shortcuts.py:356](../py_modules/steam_shortcuts.py) `_generate_non_steam_app_id()` |
+| 安装计划 + 空间探针 | [tianyi_service.py:4772](../py_modules/tianyi_service.py) `_build_install_plan()` |
+| 创建下载任务 | [tianyi_service.py:4910](../py_modules/tianyi_service.py) `_create_tasks_from_plan()` |
+| 任务状态同步 | [tianyi_service.py:5212](../py_modules/tianyi_service.py) `refresh_tasks()` |
+| 安装调度 / 目录级互斥 | [tianyi_service.py:5323](../py_modules/tianyi_service.py) `_schedule_post_process_task()` / [tianyi_service.py:5599](../py_modules/tianyi_service.py) `_post_process_completed_task()` / [tianyi_service.py:5578](../py_modules/tianyi_service.py) `_install_lock_for()` |
+| 解压 / 合并 staging | [tianyi_service.py:6199](../py_modules/tianyi_service.py) `_extract_archive_to_dir()` / [tianyi_service.py:6245](../py_modules/tianyi_service.py) `_merge_extracted_content()` |
+| 写 Steam 快捷方式 / Proton / 封面 | [steam_shortcuts.py:382](../py_modules/steam_shortcuts.py) `_upsert_shortcut_sync()`、[steam_shortcuts.py:513](../py_modules/steam_shortcuts.py) `_set_proton_mapping_sync()`、[steam_shortcuts.py:763](../py_modules/steam_shortcuts.py) `_apply_grid_assets()` |
+| 非 Steam appid | [steam_shortcuts.py:375](../py_modules/steam_shortcuts.py) `_generate_non_steam_app_id()` |
 | aria2 下单 | [aria2_manager.py:452](../py_modules/aria2_manager.py) `add_uri()` |
 | 分享解析 / 直链 | [tianyi_client.py:1070](../py_modules/tianyi_client.py) `resolve_share()`、[tianyi_client.py:1585](../py_modules/tianyi_client.py) `fetch_access_token()`、[tianyi_client.py:1628](../py_modules/tianyi_client.py) `fetch_download_url()` |
-| 后台维护 | [tianyi_service.py:455](../py_modules/tianyi_service.py) `maintenance_tick()` |
+| 后台维护 | [tianyi_service.py:478](../py_modules/tianyi_service.py) `maintenance_tick()` |
 | 多分卷归档识别 | [archive_bundle.py:88](../py_modules/archive_bundle.py) `detect_archive_sets()` / [archive_bundle.py:228](../py_modules/archive_bundle.py) `build_bundle_index()` |
-| 解压前 settle / 预检 | [tianyi_service.py:5539](../py_modules/tianyi_service.py) `_wait_payload_settled()` / [tianyi_service.py:5583](../py_modules/tianyi_service.py) `_precheck_archive_payload()` |
-| 分卷只解主卷 / bundled | [tianyi_service.py:5454](../py_modules/tianyi_service.py) `_post_process_completed_task()` / [tianyi_service.py:5604](../py_modules/tianyi_service.py) `_install_payload()` |
-| 坏文件隔离 / 自愈 | [tianyi_service.py:5011](../py_modules/tianyi_service.py) `_quarantine_download_file()` |
+| 解压前 settle / 预检 | [tianyi_service.py:5706](../py_modules/tianyi_service.py) `_wait_payload_settled()` / [tianyi_service.py:5750](../py_modules/tianyi_service.py) `_precheck_archive_payload()` |
+| 分卷只解主卷 / bundled | [tianyi_service.py:5599](../py_modules/tianyi_service.py) `_post_process_completed_task()` / [tianyi_service.py:5793](../py_modules/tianyi_service.py) `_install_payload()` |
+| 坏文件隔离 / 自愈 | [tianyi_service.py:5114](../py_modules/tianyi_service.py) `_quarantine_download_file()` |
 | aria2 运行时复用（meta+flock） | [aria2_manager.py:158](../py_modules/aria2_manager.py) `_read_runtime_meta()` / [aria2_manager.py:248](../py_modules/aria2_manager.py) `_attach_existing()` / [aria2_manager.py:205](../py_modules/aria2_manager.py) `_try_acquire_owner_lock()` |
 | 直链原地换链 | [aria2_manager.py:510](../py_modules/aria2_manager.py) `replace_uri()` |
-| 重启恢复（gid 丢失） | [tianyi_service.py:4975](../py_modules/tianyi_service.py) `_try_recover_task()` / [tianyi_service.py:4900](../py_modules/tianyi_service.py) `_file_matches_expected_size()` / [tianyi_service.py:5031](../py_modules/tianyi_service.py) `_readd_task_download()` |
-| 分卷分组安装 | [tianyi_service.py:4930](../py_modules/tianyi_service.py) `_install_group_members()` / [tianyi_service.py:4946](../py_modules/tianyi_service.py) `_maybe_schedule_group_post_process()` / [tianyi_service.py:5604](../py_modules/tianyi_service.py) `_install_payload()` / [tianyi_service.py:5692](../py_modules/tianyi_service.py) `_finalize_group_install()` |
-| 下载完整性校验 | [tianyi_service.py:4911](../py_modules/tianyi_service.py) `_verify_downloaded_file()` |
+| 重启恢复（gid 丢失） | [tianyi_service.py:5078](../py_modules/tianyi_service.py) `_try_recover_task()` / [tianyi_service.py:5003](../py_modules/tianyi_service.py) `_file_matches_expected_size()` / [tianyi_service.py:5134](../py_modules/tianyi_service.py) `_readd_task_download()` |
+| 分卷分组安装 | [tianyi_service.py:5033](../py_modules/tianyi_service.py) `_install_group_members()` / [tianyi_service.py:5049](../py_modules/tianyi_service.py) `_maybe_schedule_group_post_process()` / [tianyi_service.py:5793](../py_modules/tianyi_service.py) `_install_payload()` / [tianyi_service.py:5888](../py_modules/tianyi_service.py) `_finalize_group_install()` |
+| 下载完整性校验 | [tianyi_service.py:5014](../py_modules/tianyi_service.py) `_verify_downloaded_file()` |
+| 归档 `7z t` 校验 | [seven_zip_manager.py:66](../py_modules/seven_zip_manager.py) `test_archive()` |
+| 校验失败自动重下 | [tianyi_service.py:5771](../py_modules/tianyi_service.py) `_schedule_archive_repair()` / [tianyi_service.py:185](../py_modules/tianyi_service.py) `ArchiveRepairScheduled` |
+| 失败任务重试 | [tianyi_service.py:5406](../py_modules/tianyi_service.py) `retry_task()` |
+| 卸载预览 / compatdata 回收 | [tianyi_service.py:4492](../py_modules/tianyi_service.py) `preview_uninstall()` / [tianyi_service.py:4482](../py_modules/tianyi_service.py) `_can_remove_compatdata_dir()` / [steam_shortcuts.py:115](../py_modules/steam_shortcuts.py) `find_compatdata_dirs()` |
 | aria2 全量列表（恢复用） | [aria2_manager.py:534](../py_modules/aria2_manager.py) `list_downloads()` |
 
 **几个容易误解的点**
@@ -278,7 +289,7 @@ Steam 库里出现游戏（写完后备份 + 回读校验；需重启 Steam 生�
 
 ### 6.1 重启恢复：gid 变化与直链过期
 
-插件重载现在会附着到仍存活的 aria2（见 6.4），**gid 通常不变**；但**设备重启**后 aria2 会话重建、gid 会变，直链也可能过期。`state.json` 里存的旧 gid 查不到时，`refresh_tasks()` 对查询失败的任务按以下顺序恢复（[tianyi_service.py:4975](../py_modules/tianyi_service.py) `_try_recover_task()` / [tianyi_service.py:4900](../py_modules/tianyi_service.py) `_file_matches_expected_size()` / [tianyi_service.py:5031](../py_modules/tianyi_service.py) `_readd_task_download()`）：
+插件重载现在会附着到仍存活的 aria2（见 6.4），**gid 通常不变**；但**设备重启**后 aria2 会话重建、gid 会变，直链也可能过期。`state.json` 里存的旧 gid 查不到时，`refresh_tasks()` 对查询失败的任务按以下顺序恢复（[tianyi_service.py:5078](../py_modules/tianyi_service.py) `_try_recover_task()` / [tianyi_service.py:5003](../py_modules/tianyi_service.py) `_file_matches_expected_size()` / [tianyi_service.py:5134](../py_modules/tianyi_service.py) `_readd_task_download()`）：
 
 ```text
 aria2.tellStatus(旧 gid) 失败（GID not found / aria2 未运行）
@@ -296,12 +307,12 @@ aria2.tellStatus(旧 gid) 失败（GID not found / aria2 未运行）
 
 ### 6.2 分卷 / 多包安装语义
 
-同一安装计划（`install/prepare` 返回的多个文件）在创建任务时共享一个 `group_id`，`group_total` 记录包数。**"代表任务" = 组内 `created_at` 最早的那个**（[tianyi_service.py:4930](../py_modules/tianyi_service.py) `_install_group_members()` 按 `(created_at, task_id)` 排序），Steam 注册与已安装记录都以它为准。
+同一安装计划（`install/prepare` 返回的多个文件）在创建任务时共享一个 `group_id`，`group_total` 记录包数。**"代表任务" = 组内 `created_at` 最早的那个**（[tianyi_service.py:5033](../py_modules/tianyi_service.py) `_install_group_members()` 按 `(created_at, task_id)` 排序），Steam 注册与已安装记录都以它为准。
 
 - **下载阶段**：`_maybe_schedule_group_post_process()` 只在整组任务全部 `complete` 后才调度安装。
   - 组内某包 `error`：不安装；已完成的包显示"同一安装计划中有分卷下载失败，移除失败任务后可继续安装"；
   - 用户移除失败任务后（`removed` 状态不参与分组），剩余的 complete 分卷会被重新调度安装。
-- **安装阶段**：逐包解压到同一目标目录（目录级互斥串行），全部成功才 [tianyi_service.py:5692](../py_modules/tianyi_service.py) `_finalize_group_install()`：
+- **安装阶段**：逐包解压到同一目标目录（目录级互斥串行），全部成功才 [tianyi_service.py:5888](../py_modules/tianyi_service.py) `_finalize_group_install()`：
   - 写一条已安装记录，`size_bytes` = 组内各包 `file_size` 之和；
   - 只注册一次 Steam 快捷方式 / Proton / 封面（用代表任务）；
   - `auto_delete_package` 为真时删除组内全部压缩包；
@@ -347,11 +358,44 @@ ensure_running()
 
 ### 6.5 Steam 写入策略（token / 增量 / 备份 / 回读）
 
-- **token 去重**：新条目同时写 `LaunchOptions="freedeckcy:tianyi:<token>"` 与 `DevkitGameID=<token>`；匹配时读 `DevkitGameID` 或旧 `LaunchOptions` 任一（[steam_shortcuts.py:344](../py_modules/steam_shortcuts.py) `_shortcut_tokens()`），避免用户手动改启动项后重复建条目；启动前缀常量 `FREEDECKCY_LAUNCH_PREFIX`。
+- **token 去重**：新条目同时写 `LaunchOptions="freedeckcy:tianyi:<token>"` 与 `DevkitGameID=<token>`；匹配时读 `DevkitGameID` 或旧 `LaunchOptions` 任一（[steam_shortcuts.py:363](../py_modules/steam_shortcuts.py) `_shortcut_tokens()`），避免用户手动改启动项后重复建条目；启动前缀常量 `FREEDECKCY_LAUNCH_PREFIX`。
 - **差异写入**：目标条目字段全部一致且文件存在时返回 `action="unchanged"`，不重写文件。
-- **写前备份**：`shortcuts.vdf` / `config.vdf` 写入前复制为 `*.freedeckcy-bak-<YYYYmmdd_HHMMSS>`（[steam_shortcuts.py:311](../py_modules/steam_shortcuts.py) `_backup_file()`），同类备份只保留最近 **12** 份；`config.vdf` 的 Proton 映射改写同样先备份。
+- **写前备份**：`shortcuts.vdf` / `config.vdf` 写入前复制为 `*.freedeckcy-bak-<YYYYmmdd_HHMMSS>`（[steam_shortcuts.py:330](../py_modules/steam_shortcuts.py) `_backup_file()`），同类备份只保留最近 **12** 份；`config.vdf` 的 Proton 映射改写同样先备份。
 - **写后校验**：`shortcuts.vdf` 写完重新读回，确认 token 真的落盘，否则返回失败（防"以为写成功"）。
 - **compatdata 用户名打分**：`find_compat_user_dir()` 先试 `steamuser` / `deck` / `root`，再对自定义 Wine 用户名按 `AppData`(+3)/`Documents`(+2)/`Saved Games`(+2) 打分挑选（参考 v0.6 同类实现）。
+
+### 6.6 归档校验与自动重下（`7z t`，best-effort）
+
+v0.1.1 起，解压前会先用 `7z t` 做完整性校验（`seven_zip.test_archive()`，默认超时 900 s）：
+
+- **best-effort 边界**：7z 找不到、或 7z 无法执行（例如 macOS 上跑 Linux 版 7zz 会 `Exec format error`）时，返回 `(True, "跳过校验: …")`，**不阻断安装**——后续解压阶段才会暴露真实错误。所以"没有 7z"不等于"不能装"，但解压仍需要可用 7z。
+- **只有真正校验失败才自动修复**（7z 返回非 0 或超时）→ `_schedule_archive_repair()`：
+  1. `aria2.remove(gid)` 停掉旧任务；
+  2. `_quarantine_download_file(task, "archive-invalid")` 把坏包改名为 `*.freedeckcy-archive-invalid-<ts>`（避免 aria2 续传垃圾数据）；
+  3. 用原直链重新下载（`changeUri` 原地换链优先，失败再 `addUri`）；
+  4. 任务置 `status=waiting`、`install_status=waiting`、`post_processed=false`，**不注册 Steam**。
+- 每任务每进程只自动重下一次；重下完成后后台维护会再次进入安装。第二次仍校验失败 → `install_status=failed`，改用任务行「重试」按钮（见 6.7）。
+- 日志关键字：`Archive validation failed, re-download scheduled`；大包 `7z t` 会多读一遍文件，属预期开销。
+
+### 6.7 任务重试（v0.1.1）
+
+QAM 任务行在 `status=error` 或 `install_status=failed` 时显示「重试」，走 `retry_task()`：
+
+1. 重置状态：`post_processed=false`、`install_status=pending`、清空 `_readd_attempts` / `_task_sync_misses`，让"每任务每进程一次"的限制不再挡住人工重试；
+2. **文件已完整**（`_file_matches_expected_size()` 通过）→ 直接判 `complete` 并重新调度安装，**不重新下载**；
+3. **文件不完整/缺失** → 重新获取直链（`changeUri`/`addUri`）回到下载队列；取直链失败（如登录态失效）→ 任务改 `install_status=failed` 并提示"重试失败：无法重新获取下载直链"；
+4. 重试是显式人工动作，后台维护不会自动触发。
+
+### 6.8 卸载与 Proton 前缀回收（v0.1.1）
+
+QAM 已安装列表点「卸载」时：
+
+1. 先调 `preview_tianyi_uninstall` → `preview_uninstall()`：返回安装目录占用、`compatdata/<appid>` 占用（`find_compatdata_dirs()` 跨所有 Steam 库）、解析出的 Steam AppID（`_resolve_record_app_id()`：记录里的 appid，缺失时回查快捷方式）；
+2. UI 显示"安装目录占用 / Proton 前缀另占 X"，三按钮：**取消** / **仅删游戏文件**（默认，`delete_compatdata=false`） / **连 Proton 前缀一起删**（检测到前缀时才出现，`delete_compatdata=true`）；
+3. 卸载顺序：删除安装目录（`_can_remove_install_path` 安全校验）→ 可选删除 Proton 前缀 → 移除已安装记录 → 清理 Steam 快捷方式/映射/封面 → 清会话；
+4. **compatdata 路径安全**：`_can_remove_compatdata_dir()` 只允许 `<library>/steamapps/compatdata/<appid>` 结构且拒绝符号链接；只删 `find_compatdata_dirs()` 返回、且 appid 与记录一致的目录；
+5. 返回 `compatdata: {requested, app_id, paths, removed_paths, freed_bytes}`；未删/失败写入顶部 `warning`；
+6. **默认不删**：避免"只想重装游戏"时把 Proton 前缀里的存档/配置一起删掉。
 
 ---
 
@@ -392,18 +436,18 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 | 环节 | 代码位置 |
 |---|---|
-| 多库 compatdata 定位 | [steam_shortcuts.py:115](../py_modules/steam_shortcuts.py) `find_compat_user_dir()` / [steam_shortcuts.py:80](../py_modules/steam_shortcuts.py) `_steam_library_paths()` |
-| 上传入口 | [tianyi_service.py:2457](../py_modules/tianyi_service.py) `start_cloud_save_upload()` |
-| 上传后台任务 | [tianyi_service.py:4211](../py_modules/tianyi_service.py) `_run_cloud_save_upload_task()` |
-| 候选目录扫描 | [tianyi_service.py:3689](../py_modules/tianyi_service.py) `_collect_cloud_save_candidates()` |
-| 打包 + manifest | [tianyi_service.py:4102](../py_modules/tianyi_service.py) `_archive_single_game_saves()` |
+| 多库 compatdata 定位 | [steam_shortcuts.py:134](../py_modules/steam_shortcuts.py) `find_compat_user_dir()` / [steam_shortcuts.py:80](../py_modules/steam_shortcuts.py) `_steam_library_paths()` |
+| 上传入口 | [tianyi_service.py:2480](../py_modules/tianyi_service.py) `start_cloud_save_upload()` |
+| 上传后台任务 | [tianyi_service.py:4234](../py_modules/tianyi_service.py) `_run_cloud_save_upload_task()` |
+| 候选目录扫描 | [tianyi_service.py:3712](../py_modules/tianyi_service.py) `_collect_cloud_save_candidates()` |
+| 打包 + manifest | [tianyi_service.py:4125](../py_modules/tianyi_service.py) `_archive_single_game_saves()` |
 | 云端上传 / 列版本 / 下载 | [tianyi_client.py:2024](../py_modules/tianyi_client.py) `upload_archive_to_cloud()`、[tianyi_client.py:2061](../py_modules/tianyi_client.py) `list_cloud_archives()`、[tianyi_client.py:2112](../py_modules/tianyi_client.py) `download_cloud_archive()` |
-| 恢复四步 | [tianyi_service.py:2509](../py_modules/tianyi_service.py) `list_cloud_save_restore_options()`、[tianyi_service.py:2623](../py_modules/tianyi_service.py) `list_cloud_save_restore_entries()`、[tianyi_service.py:2710](../py_modules/tianyi_service.py) `plan_cloud_save_restore()`、[tianyi_service.py:2940](../py_modules/tianyi_service.py) `apply_cloud_save_restore()` |
+| 恢复四步 | [tianyi_service.py:2532](../py_modules/tianyi_service.py) `list_cloud_save_restore_options()`、[tianyi_service.py:2646](../py_modules/tianyi_service.py) `list_cloud_save_restore_entries()`、[tianyi_service.py:2733](../py_modules/tianyi_service.py) `plan_cloud_save_restore()`、[tianyi_service.py:2963](../py_modules/tianyi_service.py) `apply_cloud_save_restore()` |
 
 ### 7.3 游玩时长（独立小链路）
 
-- `SteamClient.Apps.RegisterForGameActionStart/End` 全局监听 → `record_tianyi_game_action`（[src/index.tsx:804](../src/index.tsx) `installGlobalGameActionReporter()`）→ `TianyiService.record_game_action()`：重复 start 且间隔超过 5 秒视为上一局结束，单局封顶 12 小时，重启后能恢复会话。
-- 库游戏详情页：用 `routerHook.addPatch("/library/app/:appid")` **patch Steam 库页面的 `renderFunc` 和组件 `type`**，把"我的游玩 / 主线 / 总时长（HowLongToBeat）"插进去（[src/index.tsx:1358](../src/index.tsx) `installLibraryPlaytimePatch()`）。这是全项目最"黑魔法"的一段，依赖 Steam UI 内部结构。
+- `SteamClient.Apps.RegisterForGameActionStart/End` 全局监听 → `record_tianyi_game_action`（[src/index.tsx:832](../src/index.tsx) `installGlobalGameActionReporter()`）→ `TianyiService.record_game_action()`：重复 start 且间隔超过 5 秒视为上一局结束，单局封顶 12 小时，重启后能恢复会话。
+- 库游戏详情页：用 `routerHook.addPatch("/library/app/:appid")` **patch Steam 库页面的 `renderFunc` 和组件 `type`**，把"我的游玩 / 主线 / 总时长（HowLongToBeat）"插进去（[src/index.tsx:1386](../src/index.tsx) `installLibraryPlaytimePatch()`）。这是全项目最"黑魔法"的一段，依赖 Steam UI 内部结构。
 
 ---
 
@@ -416,7 +460,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | **Cookie DB 直读** | 读 `~/.local/share/Steam/config/htmlcache/Cookies` 等 SQLite，过滤 `189.cn` 域 | 旧方案；`v10/v11` 加密的 cookie 直接跳过 |
 | 手动粘贴 cookie | `POST /api/tianyi/login/manual` | 兜底 API 保留 |
 
-代码位置：二维码 [tianyi_service.py:1197](../py_modules/tianyi_service.py) `start_qr_login()` / [tianyi_service.py:1283](../py_modules/tianyi_service.py) `poll_qr_login()`；CDP [tianyi_service.py:6816](../py_modules/tianyi_service.py) `_collect_tianyi_cookie_from_cdp()`；Cookie DB [tianyi_service.py:7015](../py_modules/tianyi_service.py) `_collect_tianyi_cookie_from_cookie_db()`；手动 cookie [tianyi_http.py:151](../py_modules/tianyi_http.py) `handle_login_manual()`。
+代码位置：二维码 [tianyi_service.py:1220](../py_modules/tianyi_service.py) `start_qr_login()` / [tianyi_service.py:1306](../py_modules/tianyi_service.py) `poll_qr_login()`；CDP [tianyi_service.py:7012](../py_modules/tianyi_service.py) `_collect_tianyi_cookie_from_cdp()`；Cookie DB [tianyi_service.py:7211](../py_modules/tianyi_service.py) `_collect_tianyi_cookie_from_cookie_db()`；手动 cookie [tianyi_http.py:151](../py_modules/tianyi_http.py) `handle_login_manual()`。
 
 注意：**cookie 从不经过浏览器回传**，登录桥页面只负责显示二维码和状态，全程由 Python 侧完成。
 
@@ -470,7 +514,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 - 游戏目录每次 `initialize()` 全量读 CSV 进内存（约 2800 条，开销可忽略）。
 - 云存档恢复的覆盖备份是**就地改名**的 `*.freedeckcy-bak-<YYmmdd_HHMMSS>`，不会自动清理，失败后可手工找回。
 - `tasks[]` 用 `group_id` 分组：同一安装计划（分卷/多包）的多个文件共享 `group_id` 与 `group_total`；`file_size` 是清单里的预期字节数，用于下载完整性校验与会话恢复。
-- `install_status` 取值：`pending` / `installing` / `installed` / `failed` / **`bundled`**（多分卷归档的非主卷，由主卷统一解压，安装完成后保持该值）。
+- `install_status` 取值：`pending` / `installing` / `installed` / `failed` / **`waiting`**（`7z t` 校验失败已安排自动重下，或人工重试排队中）/ **`bundled`**（多分卷归档的非主卷，由主卷统一解压，安装完成后保持该值）。
 - 状态文件含登录 Cookie：保存时状态目录 chmod **0700**、`state.json` 及临时文件 chmod **0600**（`_chmod_private()`，失败不阻断）。
 
 ---
@@ -482,13 +526,13 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 3. **两段式安装**：`prepare`（只探测：文件清单、剩余空间、Proton 评级）→ `start`（真正下单）。用户能在确认前看到"要下多大、装完多大、盘够不够"。
 4. **解压到 staging 再合并**：先解到临时目录，再合并进目标目录，并自动去掉压缩包里"套一层同名文件夹"的情况。这是处理第三方打包资源非常实用的技巧。
 5. **云存档带 manifest**：不裸传文件，而是打包 + `manifest.json` 记录源路径、条目、游玩时长。恢复时才能做**路径推断**、**冲突探测**、**时长合并**（取较大值，不降级覆盖）和**覆盖前自动备份**。
-6. **降级链与自愈**：Python 解析失败 → Node 解析；内置运行时优先 → 系统命令兜底；7z 失败 → `shutil.unpack_archive`；缓存刷新失败 → 用旧缓存；aria2 会话丢失 → 按路径认领 / 原直链重新加入，直链过期 → `changeUri` 原地换链；文件大小不符 → 隔离坏文件后自动重下一次。
+6. **降级链与自愈**：Python 解析失败 → Node 解析；内置运行时优先 → 系统命令兜底；7z 失败 → `shutil.unpack_archive`；缓存刷新失败 → 用旧缓存；aria2 会话丢失 → 按路径认领 / 原直链重新加入，直链过期 → `changeUri` 原地换链；文件大小不符或 `7z t` 校验失败 → 隔离坏文件后自动重下一次；仍失败可人工「重试」。
 
 ---
 
 ## 12. 问题清单
 
-> 本清单覆盖 2026-11 三轮工程补全后的状态；标注"（本次补全已修复）"的条目已落地，其余为当前仍存在的**已知问题**。维护建议见 [ROADMAP.md](ROADMAP.md)。
+> 本清单覆盖 2026-11 三轮工程补全 + freedeckCY v0.1.1 四件套后的状态；标注"（已修复）"的条目已落地，其余为当前仍存在的**已知问题**。维护建议见 [ROADMAP.md](ROADMAP.md)。
 
 ### P0：会直接导致"装不上 / 丢数据 / 被利用"
 
@@ -513,18 +557,22 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 16. ~~前后端契约漂移：`/api/tianyi/state` 丢 settings、`panel_state.library_url` 恒为空串~~：**本次补全已修复**。
 17. 分享解析只取第一页 60 条、不递归，超多文件的分享会漏。（已知问题）
 18. 分卷识别只覆盖常见 6 类命名；非标准命名（如自定义 `.001` 前缀/混合分卷）仍可能被当普通文件处理。（已知问题）
+19. ~~安装前没有归档完整性校验，坏包要解压到一半才失败~~：**v0.1.1 已修复**——解压前 `7z t` 校验（best-effort，7z 不可用时跳过），失败隔离并自动重下一次（见 6.6）。
+20. ~~卸载只删游戏目录，Proton 前缀长期占盘~~：**v0.1.1 已修复**——卸载预览显示占用，可选"连 Proton 前缀一起删"（默认不删、路径安全校验，见 6.8）。
 
 ### P2：工程性
 
-19. `tianyi_service.py` 约 7200 行、单类 100+ 方法；`src/index.tsx` 约 100 KB / 2900 行单文件。已补 `tests/`（215 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
-20. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
-21. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
-22. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）
-23. ~~日志无限增长 / `basicConfig(force=True)` 覆盖 Decky 日志配置~~：**本次补全已修复**——改为 `RotatingFileHandler`（5 MB × 3），`propagate=False`。
-24. ~~`state.json` 以默认文件权限落盘（内容含登录 Cookie）~~：**本次补全已修复**——状态目录 0700、文件 0600。
-25. ~~aria2 启动参数偏弱（预分配慢、无超时/重试/日志/证书）~~：**本次补全已修复**——`--file-allocation=none`、connect 10 s / read 60 s、retry-wait 5 / max-tries 10、`--log aria2.log`、自动选 `--ca-certificate`，下载请求带 UA/Referer。
-26. ~~Steam 快捷方式/Proton 写入无法回滚~~：**本次补全已修复**（同第 10 条，写前备份 + 回读；但运行中的 Steam 仍可能覆盖，见第 13 条）。
-27. Proton 用户目录已支持自定义用户名打分兜底，但极端布局（多前缀、非常规用户名）仍可能漏扫。（已知问题）
+21. `tianyi_service.py` 约 7400 行、单类 100+ 方法；`src/index.tsx` 约 100 KB / 3000 行单文件。已补 `tests/`（220 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
+23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
+24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）
+25. ~~日志无限增长 / `basicConfig(force=True)` 覆盖 Decky 日志配置~~：**本次补全已修复**——改为 `RotatingFileHandler`（5 MB × 3），`propagate=False`。
+26. ~~`state.json` 以默认文件权限落盘（内容含登录 Cookie）~~：**本次补全已修复**——状态目录 0700、文件 0600。
+27. ~~aria2 启动参数偏弱（预分配慢、无超时/重试/日志/证书）~~：**本次补全已修复**——`--file-allocation=none`、connect 10 s / read 60 s、retry-wait 5 / max-tries 10、`--log aria2.log`、自动选 `--ca-certificate`，下载请求带 UA/Referer。
+28. ~~Steam 快捷方式/Proton 写入无法回滚~~：**本次补全已修复**（同第 10 条，写前备份 + 回读；但运行中的 Steam 仍可能覆盖，见第 13 条）。
+29. Proton 用户目录已支持自定义用户名打分兜底，但极端布局（多前缀、非常规用户名）仍可能漏扫。（已知问题）
+30. ~~失败任务只能移除后重新下载~~：**v0.1.1 已修复**——任务行「重试」按钮 + `retry_task()`（文件完整时直接重装，见 6.7）。
+31. ~~排障依赖手工拼命令~~：**v0.1.1 已修复**——`make doctor` / `scripts/doctor.sh` 一条命令输出运行时、Steam、state、日志、端口、网络诊断（只读，见 DEVELOPMENT §6.6）。
 
 ---
 
@@ -532,12 +580,14 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 作者 v0.6 发行版（解包于本地 `0.6/freedeck-plugin`，**只读参考、不随本仓库分发**）在下载管线、Steam 写入、模拟器与资源池上比本仓库完整得多。本轮只借鉴与"稳定下载 / 安全写 Steam"直接相关的少数能力；其余能力要么不采纳、要么列入 [ROADMAP.md](ROADMAP.md)。
 
-### 13.1 已采纳（本轮）
+### 13.1 已采纳（三轮 + v0.1.1）
 
 | 能力 | v0.6 出处 | 本仓库实现 |
 |---|---|---|
 | 多分卷归档识别（6 类命名、主卷、缺失分卷） | `archive_detector.py` | `py_modules/archive_bundle.py`；只解主卷、其余 `bundled`（见 6.3） |
-| 解压前收紧 | `archive_validator.py` 预检思路 | `_wait_payload_settled()`（等 `.aria2` 释放、大小稳定两次）+ `_precheck_archive_payload()`（空文件/HTML）；**未照搬 `7z t`**（见 13.4 / ROADMAP §9.4） |
+| 解压前收紧 | `archive_validator.py` 预检思路 | `_wait_payload_settled()`（等 `.aria2` 释放、大小稳定两次）+ `_precheck_archive_payload()`（空文件/HTML）；v0.1.1 起再补 `7z t` best-effort 校验（见 6.6） |
+| `7z t` 解压前校验 + 自动重下（v0.1.1 落地） | `archive_validator.test_archive` 思路 | `seven_zip.test_archive()`（7z 不可执行时跳过）+ `_schedule_archive_repair()`（见 6.6） |
+| compatdata 卸载清理（v0.1.1 落地） | `uninstall_installed_game(delete_compatdata=)` | `preview_uninstall()` + `find_compatdata_dirs()` + `_can_remove_compatdata_dir()`（见 6.8） |
 | aria2 运行时复用（meta + flock） | `aria2_manager.py` 的 `aria2.runtime.json` + flock | `aria2-runtime.json` + `aria2-runtime.lock`，插件重载附着存活实例（见 6.4） |
 | 直链原地换链 | `aria2.changeUri` | `Aria2Manager.replace_uri()`；直链过期保留 gid 与进度 |
 | Steam 写入：DevkitGameID token 去重、unchanged、备份、回读 | `steam_shortcuts.py` | 同策略 + `*.freedeckcy-bak-*` 保留 12 份（见 6.5） |
@@ -557,7 +607,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### 13.4 待做（详见 ROADMAP §9）
 
-`7z t` 全量校验、Range 续传探测、SQLite 任务库、平台目录 + 封面索引、单平台模拟器闭环、资源池只读、百度 OpenAPI、自动重启 Steam、compatdata 卸载清理；CTFile 等其它网盘来源仅作评估（接口/合规先决条件多，未列入当前优先级）。
+`7z t` 校验与 compatdata 卸载清理已在 v0.1.1 落地（见 13.1）。其余待做：Range 续传探测、SQLite 任务库、平台目录 + 封面索引、单平台模拟器闭环、资源池只读、百度 OpenAPI、自动重启 Steam；CTFile 等其它网盘来源仅作评估（接口/合规先决条件多，未列入当前优先级）。
 
 ---
 
@@ -578,5 +628,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | `bundled` | 任务 `install_status` 的一种：该文件属于多分卷归档但非主卷，由主卷统一解压 |
 | DevkitGameID | Steam 快捷方式字段；本项目写入 freedeckCY token，作为比 LaunchOptions 更稳的去重/启动标记 |
 | group_id | 同一安装计划（分卷/多包）共享的分组 ID；整组下载完成后才安装、只注册一次 Steam |
+| `7z t` | 7-Zip 的归档测试子命令；本项目解压前跑它做完整性校验，7z 不可用时 best-effort 跳过 |
+| compatdata 回收 | 卸载时可选删除 `<library>/steamapps/compatdata/<appid>`（默认不删，需在确认框显式选择） |
 | libraryfolders.vdf | Steam 记录多游戏库（SD 卡、第二块盘）的 VDF 配置；本项目据此在所有库中扫描 `compatdata` |
 | 天翼云盘 | 中国电信 189 云盘，`cloud.189.cn`，本项目唯一的资源存储后端 |

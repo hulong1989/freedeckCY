@@ -112,6 +112,25 @@ def _steam_library_paths(steam_root: str) -> List[str]:
     return libraries
 
 
+def find_compatdata_dirs(app_id_unsigned: int) -> List[str]:
+    """在所有 Steam 库里定位该 AppID 的 compatdata 目录（卸载清理用）。"""
+    app_id = int(app_id_unsigned or 0) & 0xFFFFFFFF
+    if app_id <= 0:
+        return []
+    steam_root = _find_steam_root()
+    if not steam_root:
+        return []
+
+    result: List[str] = []
+    for library in _steam_library_paths(steam_root):
+        candidate = os.path.join(library, "steamapps", "compatdata", str(app_id))
+        if os.path.isdir(candidate):
+            resolved = os.path.realpath(candidate)
+            if resolved not in result:
+                result.append(resolved)
+    return result
+
+
 def find_compat_user_dir(app_id_unsigned: int) -> Dict[str, Any]:
     """在所有 Steam 库里定位该 AppID 的 Proton 用户目录（compatdata 可能不在主库）。"""
     app_id = int(app_id_unsigned or 0) & 0xFFFFFFFF

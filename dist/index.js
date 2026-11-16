@@ -105,6 +105,8 @@ const getTianyiLibraryGameTimeStats = callable("get_tianyi_library_game_time_sta
 const pauseTianyiTask = callable("pause_tianyi_task");
 const resumeTianyiTask = callable("resume_tianyi_task");
 const removeTianyiTask = callable("remove_tianyi_task");
+const retryTianyiTask = callable("retry_tianyi_task");
+const previewTianyiUninstall = callable("preview_tianyi_uninstall");
 const uninstallTianyiInstalledGame = callable("uninstall_tianyi_installed_game");
 const PANEL_REQUEST_TIMEOUT_MS = 6000;
 const PANEL_POLL_MODE_ACTIVE = "active";
@@ -206,6 +208,18 @@ function formatSpeed(speed) {
         index += 1;
     }
     return `${value.toFixed(index === 0 ? 0 : 2)} ${units[index]}`;
+}
+function formatBytesText(size) {
+    let value = Number(size || 0);
+    if (!Number.isFinite(value) || value <= 0)
+        return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let index = 0;
+    while (value >= 1024 && index < units.length - 1) {
+        value /= 1024;
+        index += 1;
+    }
+    return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 function formatPlaytimeText(seconds, fallback) {
     const fallbackText = String(fallback || "").trim();
@@ -1880,6 +1894,7 @@ function Content() {
     const [openingLibrary, setOpeningLibrary] = SP_REACT.useState(false);
     const [uninstallingKey, setUninstallingKey] = SP_REACT.useState("");
     const [taskActionKey, setTaskActionKey] = SP_REACT.useState("");
+    const [previewingKey, setPreviewingKey] = SP_REACT.useState("");
     const syncingRef = SP_REACT.useRef(false);
     const latestStateRef = SP_REACT.useRef(EMPTY_STATE);
     const syncState = SP_REACT.useCallback(async (pollMode = PANEL_POLL_MODE_IDLE) => {
@@ -2068,7 +2083,7 @@ function Content() {
         const account = String(state.login.user_account || "").trim() || "未知账号";
         return `已登录：${account}（账号）`;
     }, [state.login.logged_in, state.login.user_account]);
-    const performUninstallInstalledGame = SP_REACT.useCallback(async (item) => {
+    const performUninstallInstalledGame = SP_REACT.useCallback(async (item, deleteCompatdata = false) => {
         const gameId = String(item.game_id || "").trim();
         const installPath = String(item.install_path || "").trim();
         const title = String(item.title || gameId || "该游戏");
@@ -2085,11 +2100,18 @@ function Content() {
                 game_id: gameId,
                 install_path: installPath,
                 delete_files: true,
+                delete_compatdata: Boolean(deleteCompatdata),
             });
             if (result.status !== "success") {
                 throw new Error(result.message || "卸载失败");
             }
-            toaster.toast({ title: "freedeckCY", body: `已卸载：${title}` });
+            const freedBytes = Number(result.data?.compatdata?.freed_bytes || 0);
+            const suffix = deleteCompatdata
+                ? freedBytes > 0
+                    ? `（已回收 Proton 前缀 ${formatBytesText(freedBytes)}）`
+                    : "（含 Proton 前缀）"
+                : "";
+            toaster.toast({ title: "freedeckCY", body: `已卸载：${title}${suffix}` });
             await syncState();
         }
         catch (error) {
@@ -2099,7 +2121,7 @@ function Content() {
             setUninstallingKey("");
         }
     }, [syncState, uninstallingKey]);
-    const onUninstallInstalledGame = SP_REACT.useCallback((item) => {
+    const onUninstallInstalledGame = SP_REACT.useCallback(async (item) => {
         const gameId = String(item.game_id || "").trim();
         const installPath = String(item.install_path || "").trim();
         const title = String(item.title || gameId || "该游戏");
@@ -2107,12 +2129,39 @@ function Content() {
             toaster.toast({ title: "freedeckCY", body: "安装路径为空，无法卸载" });
             return;
         }
-        if (uninstallingKey)
+        if (uninstallingKey || previewingKey)
             return;
-        DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u786E\u8BA4\u5378\u8F7D", strDescription: `确定卸载「${title}」吗？\n\n将删除安装目录：\n${installPath}`, strOKButtonText: "\u786E\u8BA4\u5378\u8F7D", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
-                void performUninstallInstalledGame(item);
+        const key = `${gameId}::${installPath}`;
+        setPreviewingKey(key);
+        let preview = null;
+        try {
+            const result = await previewTianyiUninstall({ game_id: gameId, install_path: installPath });
+            if (result.status === "success")
+                preview = result.data ?? null;
+        }
+        catch {
+            preview = null;
+        }
+        finally {
+            setPreviewingKey("");
+        }
+        const installBytes = Number(preview?.install_size_bytes || 0);
+        const compatBytes = Number(preview?.compatdata_size_bytes || 0);
+        const lines = [`确定卸载「${title}」吗？`, ""];
+        if (installBytes > 0)
+            lines.push(`安装目录占用：${formatBytesText(installBytes)}`);
+        lines.push(installPath);
+        if (compatBytes > 0) {
+            lines.push("", `Proton 前缀（compatdata）另占 ${formatBytesText(compatBytes)}，可选择一并删除。`);
+        }
+        DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u786E\u8BA4\u5378\u8F7D", strDescription: lines.join("\n"), strOKButtonText: compatBytes > 0 ? "仅删游戏文件" : "确认卸载", strMiddleButtonText: compatBytes > 0 ? `连 Proton 前缀一起删（${formatBytesText(compatBytes)}）` : undefined, onMiddleButton: compatBytes > 0
+                ? () => {
+                    void performUninstallInstalledGame(item, true);
+                }
+                : undefined, strCancelButtonText: "\u53D6\u6D88", onOK: () => {
+                void performUninstallInstalledGame(item, false);
             }, onCancel: () => { } }));
-    }, [performUninstallInstalledGame, uninstallingKey]);
+    }, [performUninstallInstalledGame, previewingKey, uninstallingKey]);
     const performTaskAction = SP_REACT.useCallback(async (action, task) => {
         const taskId = String(task.task_id || "").trim();
         if (!taskId)
@@ -2121,12 +2170,24 @@ function Content() {
             return;
         setTaskActionKey(`${action}:${taskId}`);
         try {
-            const runner = action === "pause" ? pauseTianyiTask : action === "resume" ? resumeTianyiTask : removeTianyiTask;
+            const runner = action === "pause"
+                ? pauseTianyiTask
+                : action === "resume"
+                    ? resumeTianyiTask
+                    : action === "retry"
+                        ? retryTianyiTask
+                        : removeTianyiTask;
             const result = await runner({ task_id: taskId });
             if (result.status !== "success") {
                 throw new Error(result.message || "任务操作失败");
             }
-            const label = action === "pause" ? "已暂停" : action === "resume" ? "已继续" : "已移除";
+            const label = action === "pause"
+                ? "已暂停"
+                : action === "resume"
+                    ? "已继续"
+                    : action === "retry"
+                        ? "已重新开始"
+                        : "已移除";
             toaster.toast({
                 title: "freedeckCY",
                 body: `${label}：${task.game_title || task.file_name || taskId}`,
@@ -2162,6 +2223,7 @@ function Content() {
                     const status = String(task.status || "");
                     const canPause = status === "active" || status === "waiting";
                     const canResume = status === "paused";
+                    const canRetry = status === "error" || String(task.install_status || "") === "failed";
                     const busy = Boolean(taskActionKey) && taskActionKey.endsWith(taskId);
                     const buttonStyle = {
                         minWidth: "76px",
@@ -2170,7 +2232,13 @@ function Content() {
                         background: "rgba(255, 255, 255, 0.12)",
                         color: "#f2f2f2",
                     };
-                    return (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [TaskProgressRow(task), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%", marginTop: "4px" }, children: [canPause && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("pause", task), onOKButton: () => void performTaskAction("pause", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "暂停" }) })), canResume && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("resume", task), onOKButton: () => void performTaskAction("resume", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "继续" }) })), SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => onRemoveTask(task), onOKButton: () => onRemoveTask(task), disabled: Boolean(taskActionKey), style: {
+                    return (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [TaskProgressRow(task), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%", marginTop: "4px" }, children: [canPause && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("pause", task), onOKButton: () => void performTaskAction("pause", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "暂停" }) })), canResume && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("resume", task), onOKButton: () => void performTaskAction("resume", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "继续" }) })), canRetry && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("retry", task), onOKButton: () => void performTaskAction("retry", task), disabled: Boolean(taskActionKey), style: {
+                                                minWidth: "76px",
+                                                borderRadius: "10px",
+                                                border: "1px solid rgba(120, 200, 255, 0.45)",
+                                                background: "rgba(120, 200, 255, 0.16)",
+                                                color: "#dff4ff",
+                                            }, children: busy ? "重试中..." : "重试" }) })), SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => onRemoveTask(task), onOKButton: () => onRemoveTask(task), disabled: Boolean(taskActionKey), style: {
                                                 minWidth: "76px",
                                                 borderRadius: "10px",
                                                 border: "1px solid rgba(255, 106, 106, 0.4)",

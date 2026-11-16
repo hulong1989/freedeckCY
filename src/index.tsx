@@ -276,6 +276,17 @@ interface UninstallInstalledPayload {
   game_id: string;
   install_path: string;
   delete_files: boolean;
+  delete_compatdata?: boolean;
+}
+
+interface UninstallPreviewData {
+  game_id: string;
+  title: string;
+  install_path: string;
+  install_size_bytes: number;
+  steam_app_id: number;
+  compatdata_paths: string[];
+  compatdata_size_bytes: number;
 }
 
 interface LibraryGameTimeStatsData {
@@ -332,6 +343,11 @@ const getTianyiLibraryGameTimeStats = callable<
 const pauseTianyiTask = callable<[{ task_id: string }], ApiResponse<Record<string, unknown>>>("pause_tianyi_task");
 const resumeTianyiTask = callable<[{ task_id: string }], ApiResponse<Record<string, unknown>>>("resume_tianyi_task");
 const removeTianyiTask = callable<[{ task_id: string }], ApiResponse<Record<string, unknown>>>("remove_tianyi_task");
+const retryTianyiTask = callable<[{ task_id: string }], ApiResponse<Record<string, unknown>>>("retry_tianyi_task");
+const previewTianyiUninstall = callable<
+  [{ game_id: string; install_path: string }],
+  ApiResponse<UninstallPreviewData>
+>("preview_tianyi_uninstall");
 const uninstallTianyiInstalledGame = callable<[UninstallInstalledPayload], ApiResponse<Record<string, unknown>>>(
   "uninstall_tianyi_installed_game",
 );
@@ -449,6 +465,18 @@ function formatSpeed(speed: number): string {
     index += 1;
   }
   return `${value.toFixed(index === 0 ? 0 : 2)} ${units[index]}`;
+}
+
+function formatBytesText(size: number): string {
+  let value = Number(size || 0);
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
 function formatPlaytimeText(seconds: number, fallback?: string): string {
@@ -2451,6 +2479,7 @@ function Content() {
   const [openingLibrary, setOpeningLibrary] = useState<boolean>(false);
   const [uninstallingKey, setUninstallingKey] = useState<string>("");
   const [taskActionKey, setTaskActionKey] = useState<string>("");
+  const [previewingKey, setPreviewingKey] = useState<string>("");
   const syncingRef = useRef<boolean>(false);
   const latestStateRef = useRef<PanelState>(EMPTY_STATE);
 
@@ -2642,7 +2671,7 @@ function Content() {
   }, [state.login.logged_in, state.login.user_account]);
 
   const performUninstallInstalledGame = useCallback(
-    async (item: InstalledGameItem) => {
+    async (item: InstalledGameItem, deleteCompatdata = false) => {
       const gameId = String(item.game_id || "").trim();
       const installPath = String(item.install_path || "").trim();
       const title = String(item.title || gameId || "该游戏");
@@ -2659,11 +2688,20 @@ function Content() {
           game_id: gameId,
           install_path: installPath,
           delete_files: true,
+          delete_compatdata: Boolean(deleteCompatdata),
         });
         if (result.status !== "success") {
           throw new Error(result.message || "卸载失败");
         }
-        toaster.toast({ title: "freedeckCY", body: `已卸载：${title}` });
+        const freedBytes = Number(
+          (result.data as { compatdata?: { freed_bytes?: number } } | undefined)?.compatdata?.freed_bytes || 0,
+        );
+        const suffix = deleteCompatdata
+          ? freedBytes > 0
+            ? `（已回收 Proton 前缀 ${formatBytesText(freedBytes)}）`
+            : "（含 Proton 前缀）"
+          : "";
+        toaster.toast({ title: "freedeckCY", body: `已卸载：${title}${suffix}` });
         await syncState();
       } catch (error) {
         toaster.toast({ title: "freedeckCY", body: String(error) });
@@ -2675,7 +2713,7 @@ function Content() {
   );
 
   const onUninstallInstalledGame = useCallback(
-    (item: InstalledGameItem) => {
+    async (item: InstalledGameItem) => {
       const gameId = String(item.game_id || "").trim();
       const installPath = String(item.install_path || "").trim();
       const title = String(item.title || gameId || "该游戏");
@@ -2683,37 +2721,83 @@ function Content() {
         toaster.toast({ title: "freedeckCY", body: "安装路径为空，无法卸载" });
         return;
       }
-      if (uninstallingKey) return;
+      if (uninstallingKey || previewingKey) return;
+
+      const key = `${gameId}::${installPath}`;
+      setPreviewingKey(key);
+      let preview: UninstallPreviewData | null = null;
+      try {
+        const result = await previewTianyiUninstall({ game_id: gameId, install_path: installPath });
+        if (result.status === "success") preview = result.data ?? null;
+      } catch {
+        preview = null;
+      } finally {
+        setPreviewingKey("");
+      }
+
+      const installBytes = Number(preview?.install_size_bytes || 0);
+      const compatBytes = Number(preview?.compatdata_size_bytes || 0);
+      const lines: string[] = [`确定卸载「${title}」吗？`, ""];
+      if (installBytes > 0) lines.push(`安装目录占用：${formatBytesText(installBytes)}`);
+      lines.push(installPath);
+      if (compatBytes > 0) {
+        lines.push("", `Proton 前缀（compatdata）另占 ${formatBytesText(compatBytes)}，可选择一并删除。`);
+      }
+
       showModal(
         <ConfirmModal
           strTitle="确认卸载"
-          strDescription={`确定卸载「${title}」吗？\n\n将删除安装目录：\n${installPath}`}
-          strOKButtonText="确认卸载"
+          strDescription={lines.join("\n")}
+          strOKButtonText={compatBytes > 0 ? "仅删游戏文件" : "确认卸载"}
+          strMiddleButtonText={
+            compatBytes > 0 ? `连 Proton 前缀一起删（${formatBytesText(compatBytes)}）` : undefined
+          }
+          onMiddleButton={
+            compatBytes > 0
+              ? () => {
+                  void performUninstallInstalledGame(item, true);
+                }
+              : undefined
+          }
           strCancelButtonText="取消"
           onOK={() => {
-            void performUninstallInstalledGame(item);
+            void performUninstallInstalledGame(item, false);
           }}
           onCancel={() => {}}
         />,
       );
     },
-    [performUninstallInstalledGame, uninstallingKey],
+    [performUninstallInstalledGame, previewingKey, uninstallingKey],
   );
 
   const performTaskAction = useCallback(
-    async (action: "pause" | "resume" | "remove", task: TaskItem) => {
+    async (action: "pause" | "resume" | "remove" | "retry", task: TaskItem) => {
       const taskId = String(task.task_id || "").trim();
       if (!taskId) return;
       if (taskActionKey) return;
 
       setTaskActionKey(`${action}:${taskId}`);
       try {
-        const runner = action === "pause" ? pauseTianyiTask : action === "resume" ? resumeTianyiTask : removeTianyiTask;
+        const runner =
+          action === "pause"
+            ? pauseTianyiTask
+            : action === "resume"
+              ? resumeTianyiTask
+              : action === "retry"
+                ? retryTianyiTask
+                : removeTianyiTask;
         const result = await runner({ task_id: taskId });
         if (result.status !== "success") {
           throw new Error(result.message || "任务操作失败");
         }
-        const label = action === "pause" ? "已暂停" : action === "resume" ? "已继续" : "已移除";
+        const label =
+          action === "pause"
+            ? "已暂停"
+            : action === "resume"
+              ? "已继续"
+              : action === "retry"
+                ? "已重新开始"
+                : "已移除";
         toaster.toast({
           title: "freedeckCY",
           body: `${label}：${task.game_title || task.file_name || taskId}`,
@@ -2793,6 +2877,7 @@ function Content() {
             const status = String(task.status || "");
             const canPause = status === "active" || status === "waiting";
             const canResume = status === "paused";
+            const canRetry = status === "error" || String(task.install_status || "") === "failed";
             const busy = Boolean(taskActionKey) && taskActionKey.endsWith(taskId);
             const buttonStyle = {
               minWidth: "76px",
@@ -2826,6 +2911,24 @@ function Content() {
                         style={buttonStyle}
                       >
                         {busy ? "处理中..." : "继续"}
+                      </DialogButton>
+                    </Focusable>
+                  )}
+                  {canRetry && (
+                    <Focusable style={{ flex: 1 }}>
+                      <DialogButton
+                        onClick={() => void performTaskAction("retry", task)}
+                        onOKButton={() => void performTaskAction("retry", task)}
+                        disabled={Boolean(taskActionKey)}
+                        style={{
+                          minWidth: "76px",
+                          borderRadius: "10px",
+                          border: "1px solid rgba(120, 200, 255, 0.45)",
+                          background: "rgba(120, 200, 255, 0.16)",
+                          color: "#dff4ff",
+                        }}
+                      >
+                        {busy ? "重试中..." : "重试"}
                       </DialogButton>
                     </Focusable>
                   )}

@@ -142,3 +142,22 @@ def test_finds_custom_proton_username(tmp_path, monkeypatch):
 
     result = sc.find_compat_user_dir(APP_ID)
     assert result["compat_user_dir"] == os.path.realpath(custom)
+
+
+def test_find_compatdata_dirs_across_libraries(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+
+    main_root = home / ".steam" / "steam"
+    (main_root / "steamapps").mkdir(parents=True)
+    sd_library = home / "sdcard" / "SteamLibrary"
+    (sd_library / "steamapps").mkdir(parents=True)
+    _write_library_folders(main_root, [main_root, sd_library])
+    sd_compat = sd_library / "steamapps" / "compatdata" / str(APP_ID)
+    sd_compat.mkdir(parents=True)
+
+    dirs = sc.find_compatdata_dirs(APP_ID)
+    assert os.path.realpath(sd_compat) in dirs
+    assert sc.find_compatdata_dirs(0) == []
+    assert sc.find_compatdata_dirs(999999) == []

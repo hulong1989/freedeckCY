@@ -1,7 +1,7 @@
 # freedeckCY
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 重新起步，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.1.1**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 
 Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把"下载 → 解压 → 装进 Steam 库"整条链路做成几个按钮，另带云存档上传/恢复和游玩时长统计。
@@ -15,9 +15,9 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，本仓库版本号 **0.1.0** 重新起步 |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，本仓库版本号 **0.1.1** 重新起步（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| 本次补全 | 三轮：① 运行时依赖获取与打包、P0 缺陷修复、接口加固、文档/测试/CI；② 分卷分组安装、aria2 重启恢复、下载完整性校验、Steam 多库/SD 卡/Flatpak、日志轮转与 state 权限收紧；③ 对照作者 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、坏文件隔离自愈、Steam 写前备份与 `DevkitGameID` 去重 |
+| 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
 
 ## 功能
@@ -30,6 +30,10 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **下载完整性校验**：按资源清单里的文件大小比对落盘结果；不一致先隔离坏文件自愈重下一次，仍失败才标错
 - **解压保护**：等 aria2 释放 `.aria2` 控制文件、大小稳定后才解压；空文件/HTML 错误页会被提前拦截
 - **Steam 配置安全**：shortcuts.vdf / config.vdf 写前留时间戳备份（保留 12 份），无变化不重写
+- **归档校验与自愈**：解压前 `7z t` 测试完整性；失败自动隔离坏包并重下一次，完成后继续安装
+- **卸载回收 Proton 前缀**：可选删除 `compatdata/<appid>`，确认前显示占用，默认只删游戏文件
+- **失败任务重试**：QAM 任务行一键重试（文件完整则直接重装，不完整则重新取直链）
+- **环境诊断**：`make doctor` 一条命令输出运行时/Steam/state/日志/端口/网络（只读）
 - **多库 / SD 卡 / Flatpak**：扫描 `libraryfolders.vdf`，Proton 前缀不只在主库找
 - **云存档**：扫描 Proton 前缀里的存档目录，打包 `7z + manifest.json` 上传到自己的网盘；恢复时做冲突探测，覆盖前就地备份
 - **游玩时长**：监听 Steam 启动/退出事件累计时长，并在游戏库详情页展示（含 HowLongToBeat 的主线/总时长）
@@ -48,7 +52,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
-make package     # 产出 dist-artifacts/freedeckCY-v0.1.0.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.1.1.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -73,7 +77,8 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 215）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 220）
+make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 ```
 
 更多细节（模块职责、调试、故障排查）见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)；
@@ -88,6 +93,7 @@ python3 -m venv .venv
 | `FREEDECKCY_NODE_BIN` | 指定 node 路径 |
 | `FREEDECKCY_STEAM_ROOT` | 覆盖 Steam 根目录（Flatpak/自定义安装时用） |
 | `FREEDECKCY_STATE_FILE` | `clear_freedeckcy_tasks.sh` 使用的 state.json 路径 |
+| `FREEDECKCY_PORT` | `make doctor` 检测本地服务端口（默认 59271） |
 
 ## 工作原理（一屏版）
 
@@ -113,24 +119,25 @@ CSV 资源清单 ──▶ 分享解析（天翼云盘开放接口 + Node 兜底
 ```
 main.py                     Decky 插件入口（RPC 薄转发 + 后台维护循环）
 py_modules/
-  tianyi_service.py         业务内核：下载/安装（分卷/自愈）/云存档/登录/时长
+  tianyi_service.py         业务内核：下载/安装（分卷/自愈/重试）/卸载/云存档/登录/时长
   tianyi_client.py          天翼云盘协议：分享解析、直链、token、上传
   tianyi_http.py            本地 HTTP 路由（34 条）
   tianyi_store.py           state.json 数据模型与读写
   server_manager.py         aiohttp 生命周期、Host/Origin 校验、设置持久化
   aria2_manager.py          aria2 运行时复用（meta+flock）+ JSON-RPC + changeUri
-  seven_zip_manager.py      7zz 解压/压缩
-  steam_shortcuts.py        快捷方式/Proton/封面/写前备份
+  seven_zip_manager.py      7zz 解压/压缩 + `7z t` 校验
+  steam_shortcuts.py        快捷方式/Proton/封面/写前备份/compatdata 定位
   game_catalog.py           CSV 资源目录
   archive_bundle.py         多分卷归档识别（.7z.001 / .part1.rar / .z01+zip ...）
 src/index.tsx               QAM 面板（React，构建产物在 dist/）
 defaults/tianyi_library_ui  本地游戏库页面（Vue 3，免构建）
 defaults/tianyi_catalog     资源清单 CSV
 backend/*.js                Node 辅助脚本（分享解析兜底、云盘上传）
-scripts/                    运行时获取与打包脚本
+scripts/                    运行时获取（fetch_runtime）/ 打包（package）/ 诊断（doctor）
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
-tests/                      pytest 用例（215 个）
-Makefile                    构建入口：runtime / package / test / clean
+tests/                      pytest 用例（220 个）
+CHANGELOG.md                版本变更记录
+Makefile                    构建入口：runtime / package / test / doctor / clean
 ```
 
 ## 安全说明
@@ -153,7 +160,7 @@ Makefile                    构建入口：runtime / package / test / clean
 - `config.vdf` 采用文本改写，运行中的 Steam 可能回写覆盖
 - 全中文硬编码，无 i18n
 - 云存档的上传/恢复仍依赖 `node`（`make runtime` 会准备；未执行则该功能不可用）
-- 下载完整性目前只做「大小 + 文件头」校验，没跑 `7z t`、也没有哈希校验
+- 下载完整性做「大小 + 文件头 + `7z t`」，但没有哈希校验；7z 不可用时自动跳过校验（best-effort）
 - 分卷识别只覆盖常见 6 类命名，冷门命名会被当成普通文件
 - `tianyi_service.py` 仍是单文件巨型类，长期维护成本高
 

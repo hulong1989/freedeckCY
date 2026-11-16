@@ -247,18 +247,22 @@ class Plugin:
         game_id: str = "",
         install_path: str = "",
         delete_files: bool = True,
+        delete_compatdata: bool = False,
     ) -> dict:
-        """卸载已安装游戏并移除记录。"""
+        """卸载已安装游戏并移除记录（可选回收 Proton 前缀）。"""
         try:
             if isinstance(payload, dict):
                 game_id = str(payload.get("game_id", game_id))
                 install_path = str(payload.get("install_path", install_path))
                 if "delete_files" in payload:
                     delete_files = bool(payload.get("delete_files"))
+                if "delete_compatdata" in payload:
+                    delete_compatdata = bool(payload.get("delete_compatdata"))
             data = await self._get_tianyi_service().uninstall_installed_game(
                 game_id=game_id,
                 install_path=install_path,
                 delete_files=delete_files,
+                delete_compatdata=delete_compatdata,
             )
             return {"status": "success", "data": data}
         except Exception as exc:
@@ -280,6 +284,30 @@ class Plugin:
             if isinstance(payload, dict):
                 task_id = str(payload.get("task_id", task_id))
             data = await self._get_tianyi_service().resume_task(task_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def retry_tianyi_task(self, payload=None, task_id: str = "") -> dict:
+        """重试失败/中断的下载任务。"""
+        try:
+            if isinstance(payload, dict):
+                task_id = str(payload.get("task_id", task_id))
+            data = await self._get_tianyi_service().retry_task(task_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def preview_tianyi_uninstall(self, payload=None, game_id: str = "", install_path: str = "") -> dict:
+        """卸载前预览安装目录 / Proton 前缀占用。"""
+        try:
+            if isinstance(payload, dict):
+                game_id = str(payload.get("game_id", game_id))
+                install_path = str(payload.get("install_path", install_path))
+            data = await self._get_tianyi_service().preview_uninstall(
+                game_id=game_id,
+                install_path=install_path,
+            )
             return {"status": "success", "data": data}
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}

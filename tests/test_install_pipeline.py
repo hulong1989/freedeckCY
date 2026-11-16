@@ -17,7 +17,7 @@ import pytest
 import config
 import tianyi_service as svc_module
 from tianyi_service import TianyiService, _is_within_dir
-from tianyi_store import TianyiTaskRecord
+from tianyi_store import TianyiInstalledGame, TianyiTaskRecord
 
 
 class _FakePlugin:
@@ -56,6 +56,12 @@ def service(tmp_path, monkeypatch):
         return True, ""
 
     monkeypatch.setattr(instance, "_wait_payload_settled", _settled)
+
+    # 7z 校验在集成测试里默认视为通过（真实二进制是 Linux 版，macOS 上跑不了）
+    def _verified(archive_path, timeout=900.0):
+        return True, ""
+
+    monkeypatch.setattr(instance.seven_zip, "test_archive", _verified)
     return instance
 
 
@@ -569,3 +575,132 @@ def test_precheck_archive_payload_rejects_html_and_empty(service, tmp_path):
     good.write_bytes(b"7z\xbc\xaf\x27\x1c" + b"0" * 32)
     ok, message = service._precheck_archive_payload(str(good))
     assert ok is True
+
+
+def test_archive_validation_failure_schedules_redownload(service, tmp_path, monkeypatch):
+    """7z t 失败：隔离坏文件 + 自动重新下载，且不把任务标记为已处理。"""
+    task = _add_completed_task(service, tmp_path, task_id="bad-archive", status="waiting")
+    _patch_aria2(service)
+    monkeypatch.setattr(
+        service.seven_zip, "test_archive", lambda *a, **k: (False, "归档校验失败: 数据损坏")
+    )
+
+    async def _fetch_token(cookie):
+        return "token"
+
+    async def _fetch_url(cookie, token, share_id, file_id):
+        return "https://api.cloud.189.cn/fake"
+
+    async def _add_uri(**kwargs):
+        return "gid-repaired"
+
+    monkeypatch.setattr(svc_module, "fetch_access_token", _fetch_token)
+    monkeypatch.setattr(svc_module, "fetch_download_url", _fetch_url)
+    service.aria2.add_uri = _add_uri  # type: ignore[assignment]
+    service.store.login.cookie = "UID=1; TEST=1"
+
+    async def _scenario():
+        await service.maintenance_tick()
+        for _ in range(120):
+            if task.gid == "gid-repaired":
+                return
+            await asyncio.sleep(0.05)
+        raise AssertionError(f"未触发重新下载: status={task.status} msg={task.install_message}")
+
+    asyncio.run(_scenario())
+    assert task.post_processed is False
+    assert "归档" in task.install_message
+    assert "下载" in task.install_message
+
+
+def test_retry_task_reinstalls_complete_file(service, tmp_path):
+    """失败任务重试：文件已完整时直接重新安装。"""
+    task = _add_completed_task(service, tmp_path, task_id="retry-ok", status="error")
+    task.file_size = Path(task.local_path).stat().st_size
+    task.error_reason = "模拟失败"
+
+    async def _scenario():
+        view = await service.retry_task(task.task_id)
+        assert view["status"] == "complete"
+        for _ in range(120):
+            if task.post_processed:
+                return
+            await asyncio.sleep(0.05)
+        raise AssertionError("重试后未被安装")
+
+    asyncio.run(_scenario())
+    assert task.install_status == "installed"
+    assert len(service.store.installed_games) == 1
+
+
+def test_retry_task_readds_when_file_missing(service, tmp_path, monkeypatch):
+    """失败任务重试：文件不完整时重新获取直链加入下载。"""
+    task = _add_completed_task(service, tmp_path, task_id="retry-missing", status="error")
+    Path(task.local_path).unlink()
+
+    async def _fetch_token(cookie):
+        return "token"
+
+    async def _fetch_url(cookie, token, share_id, file_id):
+        return "https://api.cloud.189.cn/fake"
+
+    async def _add_uri(**kwargs):
+        return "gid-retry"
+
+    monkeypatch.setattr(svc_module, "fetch_access_token", _fetch_token)
+    monkeypatch.setattr(svc_module, "fetch_download_url", _fetch_url)
+    service.aria2.add_uri = _add_uri  # type: ignore[assignment]
+    service.store.login.cookie = "UID=1; TEST=1"
+
+    view = asyncio.run(service.retry_task(task.task_id))
+    assert view["status"] == "waiting"
+    assert task.gid == "gid-retry"
+
+
+def test_uninstall_preview_and_compatdata_cleanup(service, tmp_path, monkeypatch):
+    """卸载可选回收 Proton 前缀，并给出预览大小。"""
+    home = tmp_path / "home"
+    main_root = home / ".steam" / "steam"
+    (main_root / "steamapps").mkdir(parents=True)
+    sd_library = home / "sdcard" / "SteamLibrary"
+    compat = sd_library / "steamapps" / "compatdata" / "123456" / "pfx" / "drive_c" / "users" / "steamuser"
+    compat.mkdir(parents=True)
+    (compat / "save.dat").write_bytes(b"x" * 1024)
+    (main_root / "steamapps" / "libraryfolders.vdf").write_text(
+        '"libraryfolders"\n{\n'
+        f'\t"0"\n\t{{\n\t\t"path"\t\t"{main_root}"\n\t}}\n'
+        f'\t"1"\n\t{{\n\t\t"path"\t\t"{sd_library}"\n\t}}\n'
+        "}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(
+        svc_module,
+        "remove_tianyi_shortcut",
+        lambda **kwargs: {"ok": True, "removed": True, "cleanup_ok": True},
+    )
+
+    install_dir = tmp_path / "installed" / "DemoGame"
+    install_dir.mkdir(parents=True)
+    (install_dir / "game.bin").write_bytes(b"y" * 2048)
+    service.store.upsert_installed_game(
+        TianyiInstalledGame(
+            game_id="1001",
+            game_title="DemoGame",
+            install_path=str(install_dir),
+            source_path="",
+            steam_app_id=123456,
+        )
+    )
+
+    preview = asyncio.run(service.preview_uninstall(game_id="1001"))
+    assert preview["install_size_bytes"] == 2048
+    assert preview["compatdata_size_bytes"] == 1024
+    assert preview["steam_app_id"] == 123456
+    assert preview["compatdata_paths"]
+
+    result = asyncio.run(service.uninstall_installed_game(game_id="1001", delete_compatdata=True))
+    assert result["compatdata"]["freed_bytes"] == 1024
+    assert result["compatdata"]["removed_paths"]
+    assert not (sd_library / "steamapps" / "compatdata" / "123456").exists()
+    assert not install_dir.exists()

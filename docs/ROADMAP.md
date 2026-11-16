@@ -1,10 +1,12 @@
 # freedeckCY 后续路线图（ROADMAP）
 
-> 本文件列出本仓库在 **2026-11 三轮工程补全之后**（第三轮参考作者 v0.6 发行版对齐了部分下载/Steam 集成能力）值得继续做、以及明确不建议做的方向。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
+> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套之后**（第三轮参考作者 v0.6 发行版对齐了部分下载/Steam 集成能力；v0.1.1 落地了 compatdata 清理与 `7z t` 校验）值得继续做、以及明确不建议做的方向。当前版本 **v0.1.1**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
 >
 > 背景：上游作者已停止维护，`main` 只是早期版本，Releases 里的百度网盘 / 模拟器 / 资源池代码**不在本仓库**（见 [ARCHITECTURE.md](ARCHITECTURE.md) §2）。
 >
 > ⚠️ 合规提示：本项目分发的资源链接来自互联网，属于盗版资源分发，违反云盘服务条款并涉及版权风险。本路线图只讨论**工程改进**，不建议部署使用，更不建议扩大资源分发能力。
+>
+> **v0.1.1 已落地（本文件不再列为候选）**：卸载可选回收 Proton 前缀（§9.2）、解压前 `7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」按钮（`retry_task`）、`make doctor` 环境诊断。
 
 ---
 
@@ -12,7 +14,7 @@
 
 | # | 事项 | 优先级 | 预估 | 一句话收益 |
 |---|---|---|---|---|
-| 1 | 拆分 `tianyi_service.py` | P0（工程健康） | 大 | 让 7200 行巨型类可维护、可测试 |
+| 1 | 拆分 `tianyi_service.py` | P0（工程健康） | 大 | 让 7400 行巨型类可维护、可测试 |
 | 2 | CI 增加 `ruff` / `mypy` | P0（工程健康） | 中 | 拦住低级错误与类型漂移 |
 | 3 | 云存档 plan/apply 与 HTTP handler 测试 | P1（数据安全） | 中 | 覆盖最容易丢存档的路径 |
 | 4 | 去掉 node 依赖（纯 Python 实现） | P1（可部署性） | 中 | 去掉约 90 MB 的 node 运行时与跨架构问题 |
@@ -26,9 +28,9 @@
 
 ---
 
-## 1. 拆分 `tianyi_service.py`（P0，当前约 7200 行）
+## 1. 拆分 `tianyi_service.py`（P0，当前约 7400 行）
 
-**现状**：`py_modules/tianyi_service.py` 约 7200 行、单个 `TianyiService` 类 100+ 方法，覆盖安装、云存档、登录采集、时长、面板缓存等互相独立的职责；此外 `_post_process_completed_task` / `_collect_cloud_save_candidates` 等长函数仍在膨胀。
+**现状**：`py_modules/tianyi_service.py` 约 7400 行、单个 `TianyiService` 类 100+ 方法，覆盖安装、云存档、登录采集、时长、面板缓存等互相独立的职责；此外 `_post_process_completed_task` / `_collect_cloud_save_candidates` 等长函数仍在膨胀。
 
 **为什么**：巨型类导致改动风险高、review 困难、测试只能整体起实例；第二轮的"分组安装 / 重启恢复"是在这个文件里继续叠加的，再拖延拆分成本只会更高。
 
@@ -38,7 +40,7 @@
 
 - 拆出至少 4 个模块（建议：`install_flow.py`、`cloud_save_flow.py`、`login_flow.py`、`playtime.py`），`TianyiService` 只做编排与状态持有；
 - `main.py` / `tianyi_http.py` 的调用面不变（RPC 与 HTTP 契约不动）；
-- `make test`（当前 215 个用例）保持全绿，新增用例覆盖搬迁后的模块；
+- `make test`（当前 220 个用例）保持全绿，新增用例覆盖搬迁后的模块；
 - 单个 Python 文件 < 1500 行；`docs/ARCHITECTURE.md` 的引用与模块图同步更新。
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_http.py`、`docs/ARCHITECTURE.md`。
@@ -47,7 +49,7 @@
 
 ## 2. CI 增加 `ruff` / `mypy`（P0）
 
-**现状**：CI 只有 pytest + 前端构建；Python 侧无静态检查、无类型检查（`ARCHITECTURE.md` P2-19 已记录）。
+**现状**：CI 只有 pytest + 前端构建；Python 侧无静态检查、无类型检查（`ARCHITECTURE.md` P2-21 已记录）。
 
 **为什么**：代码里大量 `Any` / 动态字典，且 `decky` 是注入模块；引入静态检查能在不改行为的前提下拦住未定义名、拼写错误和类型漂移（例如未定义变量、漏 import、未使用变量这类问题正是 ruff 能直接抓到的）。
 
@@ -161,7 +163,7 @@
 
 ## 8. i18n（P2）
 
-**现状**：界面与错误消息全中文硬编码在 `src/index.tsx`、`defaults/tianyi_library_ui/`、Python 返回值与日志里（`ARCHITECTURE.md` P2-20）。
+**现状**：界面与错误消息全中文硬编码在 `src/index.tsx`、`defaults/tianyi_library_ui/`、Python 返回值与日志里（`ARCHITECTURE.md` P2-22）。
 
 **为什么**：英文用户无法使用；文案集中后也更容易维护与统一术语。
 
@@ -178,16 +180,16 @@
 
 ---
 
-## 9. v0.6 对齐候选（本轮未做）
+## 9. v0.6 对齐候选（9.2 / 9.4 已在 v0.1.1 落地，其余未做）
 
-作者 v0.6 发行版（本地只读参考 `0.6/freedeck-plugin`，不随本仓库分发）在下载管线、模拟器与资源池上完整得多。本轮只采纳了下载/Steam 写入相关的少数能力（见 [ARCHITECTURE.md](ARCHITECTURE.md) §13），以下按 **性价比 + 工作量** 从高到低排列，供后续认领。
+作者 v0.6 发行版（本地只读参考 `0.6/freedeck-plugin`，不随本仓库分发）在下载管线、模拟器与资源池上完整得多。三轮补全只采纳了下载/Steam 写入相关的少数能力（见 [ARCHITECTURE.md](ARCHITECTURE.md) §13）；**v0.1.1 又落地了 9.2（compatdata 清理）与 9.4（`7z t` best-effort 校验）**，其余按 **性价比 + 工作量** 从高到低排列，供后续认领。
 
 | # | 候选 | 优先级 | 工作量 | v0.6 出处 | 一句话收益 |
 |---|---|---|---|---|---|
 | 9.1 | Range 续传探测 | P1 | 小 | `_remote_supports_resume()` | 避免对不支持续传的直链做无效重试 |
-| 9.2 | compatdata 卸载清理 | P1 | 小 | `uninstall_installed_game(delete_compatdata=)` | 卸载后回收 Proton 前缀空间 |
+| 9.2 | ~~compatdata 卸载清理~~ ✅ | ~~P1~~ | ~~小~~ | `uninstall_installed_game(delete_compatdata=)` | **已在 v0.1.1 落地**：卸载可选回收 Proton 前缀 |
 | 9.3 | 自动重启 Steam | P1 | 小 | `main.py::restart_steam` | 写完快捷方式即可生效，不用手动重启 |
-| 9.4 | `7z t` 全量归档校验 | P1 | 中 | `archive_validator.test_archive` | 解压前发现坏包，避免"解到一半失败" |
+| 9.4 | ~~`7z t` 全量归档校验~~ ✅ | ~~P1~~ | ~~中~~ | `archive_validator.test_archive` | **已在 v0.1.1 落地（best-effort）**：解压前发现坏包并自动重下 |
 | 9.5 | SQLite 任务库 | P2 | 大 | `archive_task_db.py` | 任务持久化/查询与崩溃恢复更可靠 |
 | 9.6 | 平台目录 + 封面索引 | P2 | 大 | `gba_catalog.py` 等 + `generate_*_cover_urls.py` | 多平台资源目录与封面本地化 |
 | 9.7 | 资源池只读 | P2 | 中 | 腾讯文档 smartsheet 读取 | 扩充资源，但不引入投稿/点赞 |
@@ -211,22 +213,16 @@
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_client.py`、`tests/`、`docs/DEVELOPMENT.md`。
 
-### 9.2 compatdata 卸载清理（P1，工作量：小）
+### 9.2 ~~compatdata 卸载清理~~（✅ 已在 v0.1.1 落地）
 
-**v0.6 参考**：`uninstall_installed_game(..., delete_compatdata=delete_proton_files)`，返回 `proton_files_deleted`。
+**落地实现（v0.1.1）**：
 
-**为什么**：一个 Proton 前缀动辄几百 MB～数 GB；只删游戏目录会让 `steamapps/compatdata/<appid>` 长期占盘。
+- `steam_shortcuts.find_compatdata_dirs(app_id)` 跨所有 Steam 库定位 `<library>/steamapps/compatdata/<appid>`；
+- `tianyi_service.preview_uninstall()` + `preview_tianyi_uninstall` RPC 返回安装目录与 Proton 前缀占用；QAM 卸载确认框显示两者大小，三按钮：取消 / 仅删游戏文件 / 连 Proton 前缀一起删（默认不删）；
+- `uninstall_installed_game(delete_compatdata=...)` 返回 `compatdata: {requested, app_id, paths, removed_paths, freed_bytes}`；
+- 路径安全：`_can_remove_compatdata_dir()` 只允许标准 `steamapps/compatdata/<appid>` 结构、拒绝符号链接，appid 由 `_resolve_record_app_id()` 从记录或快捷方式解析。
 
-**代价**：误删会丢存档/配置，必须做成显式选项（默认关）、严格校验 appid 与路径归属。
-
-**验收标准**：
-
-- 卸载 RPC/HTTP 增加 `delete_compatdata` 选项（默认 false），UI 二次确认；
-- 只允许删 `steamapps/compatdata/<appid>` 且 appid 来自本插件安装记录 / 快捷方式解析；删除前校验路径在任一 Steam 库内；
-- 返回 `compatdata_deleted` 字段；失败不影响游戏目录卸载；
-- 单测覆盖"正常删除 / 非本插件 appid 拒绝 / 路径越界拒绝"。
-
-**涉及文件**：`py_modules/tianyi_service.py`、`py_modules/steam_shortcuts.py`、`py_modules/tianyi_http.py`、`src/index.tsx`、`tests/`。
+**仍未做**：`shadercache` / `compatdata` 以外的 per-appid 残留不做自动清理；默认不删的语义保持不变。
 
 ### 9.3 自动重启 Steam（P1，工作量：小）
 
@@ -245,22 +241,16 @@
 
 **涉及文件**：`main.py`、`py_modules/tianyi_service.py`、`src/index.tsx`、`tests/`。
 
-### 9.4 `7z t` 全量归档校验（P1，工作量：中）
+### 9.4 ~~`7z t` 全量归档校验~~（✅ 已在 v0.1.1 落地，best-effort）
 
-**v0.6 参考**：`archive_validator.test_archive()` 在解压前执行 `7zz t <entry>`，配合签名/HTML 预检与超时。
+**落地实现（v0.1.1）**：
 
-**为什么**：当前只做"文件大小 + 头部预检"；坏包（截断、串包、加密）仍可能解到一半失败，浪费已下载流量与解压时间。
+- `SevenZipManager.test_archive()` 在解压前对主卷执行 `7z t`（默认超时 900 s）；**7z 缺失或无法执行时返回"跳过校验"，不阻断安装**（后续解压仍需要可用 7z）；
+- 校验失败 → `_schedule_archive_repair()`：隔离坏包（`*.freedeckcy-archive-invalid-*`）+ 原直链自动重下一次（每任务一次，`post_processed` 不置真）；重下完成后自动重新安装；
+- 第二次仍失败 → 任务 `failed`，用任务行「重试」按钮人工重试；
+- 单测覆盖：校验成功 / 失败 / 7z 不可执行跳过 / 自动重下与二次失败路径。
 
-**代价**：大包 `7z t` 要额外读一遍（分钟级），需要超时与"跳过校验"开关；解压链路要多一次子进程调用与错误码映射。
-
-**验收标准**：
-
-- 解压前对主卷执行 `7zz t`（带超时、可配置跳过；>N GB 时提示耗时）；
-- 校验失败映射为可读原因（签名错误/截断/密码/工具缺失），不再进入解压；
-- 单测用假 7z 脚本覆盖成功/失败/超时；DEVELOPMENT 故障排查补"归档校验失败"处置；
-- 多分卷场景只测主卷（与 7z 行为一致）。
-
-**涉及文件**：`py_modules/tianyi_service.py`、`py_modules/seven_zip_manager.py`、`tests/`、`docs/DEVELOPMENT.md`。
+**仍未做**：没有 hash/签名校验；超时与"按体积跳过校验"暂未做成可配置项（当前固定 900 s 超时、始终尝试）；`7z t` 会多读一遍大包，属已知开销。
 
 ### 9.5 SQLite 任务库（P2，工作量：大）
 
@@ -391,4 +381,4 @@
 - 架构与问题清单：[ARCHITECTURE.md](ARCHITECTURE.md)
 - 与作者 v0.6 的能力对照：[ARCHITECTURE.md](ARCHITECTURE.md) §13
 - 本地开发、调试、故障排查：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 当前测试基线：`make test` → 215 passed（2026-11 第三轮补全后）
+- 当前测试基线：`make test` → 220 passed（2026-11 v0.1.1）

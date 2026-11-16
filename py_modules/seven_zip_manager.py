@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence, Tuple
 
 
 class SevenZipError(RuntimeError):
@@ -62,6 +62,45 @@ class SevenZipManager:
             "解压组件不可用：未找到内置 7zz 或系统 7z 命令。"
             "请先执行 `make runtime`，或用 FREEDECKCY_7Z_BIN 指定路径"
         )
+
+    def test_archive(self, archive_path: str, timeout: float = 900.0) -> Tuple[bool, str]:
+        """用 `7z t` 做解压前完整性校验。
+
+        多分卷只需校验主卷（7z 会在同目录自动找到其余分卷）。
+        返回 (True, "") 或 (False, 可读原因)。
+        """
+        archive = os.path.realpath(os.path.expanduser(str(archive_path or "").strip()))
+        if not archive or not os.path.isfile(archive):
+            return False, f"待校验文件不存在: {archive_path}"
+        try:
+            binary = self._resolve_binary_path()
+        except SevenZipError as exc:
+            # 校验是 best-effort：缺 7z 时不应阻断安装（解压阶段会给出真实报错）。
+            return True, f"跳过校验: {exc}"
+
+        try:
+            completed = subprocess.run(
+                [binary, "t", archive],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=max(30.0, float(timeout or 900.0)),
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return False, "归档校验超时（文件过大或磁盘读取异常）"
+        except OSError as exc:
+            # 例如在 macOS 上拿到的是 Linux 版 7zz（Exec format error），跳过即可。
+            return True, f"跳过校验（7z 无法执行）: {exc}"
+        except Exception as exc:
+            return False, f"归档校验执行失败: {exc}"
+
+        if int(completed.returncode or 0) == 0:
+            return True, ""
+
+        output = bytes(completed.stdout or b"").decode("utf-8", errors="ignore").strip()
+        tail = [line.strip() for line in output.splitlines() if line.strip()][-3:]
+        detail = " | ".join(tail) if tail else f"exit={completed.returncode}"
+        return False, f"归档校验失败: {detail}"
 
     def extract_archive(
         self,
