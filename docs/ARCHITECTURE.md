@@ -584,7 +584,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **错误诊断（v0.18.0 起，v0.19.1 增强 TLS/urllib 回退）**：
 
-- `request_qr()` 直接请求 `getqrcode`；v0.19.1 起 aiohttp 依次尝试系统证书、跳过证书校验，仍失败回退 urllib（兼容部分 Decky/SteamOS 环境），错误消息带具体异常/HTTP 状态/响应片段；
+- `request_qr()` 直接请求 `getqrcode`；v0.19.1/v0.19.2 起二维码、图片、轮询、换 Cookie 均依次尝试系统证书、跳过证书校验/urllib 回退（兼容 SteamOS 证书链问题），错误消息带具体异常/HTTP 状态/响应片段；
 - HTTP 非 200 会抛带状态码/响应片段的 `BaiduQrError`（如 `获取百度二维码 HTTP 403: ...`）；轮询时 HTTP ≥400 或连接重置/DNS/SSL 等非超时错误返回 `{"status":"error"}`，服务层转 `stage=failed` 并把真实异常写进 QAM 消息，不再一直显示 waiting；超时仍视为 waiting；
 - `start_baidu_qr_login()` 会对任何取码异常记日志并返回"获取百度二维码失败：<原因>"；`poll_baidu_qr_login()` 的 `stage` 为 waiting/scanned/success/expired/failed，`failed` 带具体原因；`complete_login()` 非 200/无 BDUSS 时抛 `BaiduQrError`。
 

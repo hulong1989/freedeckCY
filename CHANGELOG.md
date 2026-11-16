@@ -2,6 +2,22 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.19.2
+
+### 修复
+
+- **Deck 上百度扫码 TLS 证书失败**：诊断包确认 `SSLCertVerificationError: unable to get local issuer certificate`
+  （SteamOS/Python 证书链问题）。v0.19.1 只给 `getqrcode` 加了 TLS/urllib 回退，本版补齐：
+  - `fetch_qr_image()`：aiohttp 失败后用未校验 SSL 的 urllib 重试；
+  - `poll_qr()`：先系统证书，失败后 `ssl=False` 重试；
+  - `complete_login()`：同样两层 TLS 回退；
+  - 全部失败时返回具体异常/HTTP 状态。
+- 诊断包中版本仍为 0.18.0；更新到 0.19.2 后重新扫码即可。
+
+### 变更
+
+- 版本 0.19.1 → 0.19.2；测试仍 351。
+
 ## v0.19.1
 
 ### 修复

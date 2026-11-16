@@ -134,7 +134,7 @@ async def fetch_qr_image(imgurl: str) -> bytes:
     except Exception:
         try:
             request = urllib.request.Request(url, headers=HEADERS)
-            with urllib.request.urlopen(request, timeout=15, context=_ssl_context()) as response:
+            with urllib.request.urlopen(request, timeout=15, context=ssl._create_unverified_context()) as response:
                 return response.read()
         except Exception:
             return b""
@@ -149,22 +149,33 @@ async def poll_qr(
     """单次轮询；百度是长轮询，超时视为仍在等待。"""
     params = {"channel_id": str(sign or "").strip(), "tpl": "pp", "tt": str(int(time.time() * 1000))}
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
-    try:
-        jar = aiohttp.CookieJar(unsafe=True)
-        if cookies:
-            jar.update_cookies(cookies)
-        async with aiohttp.ClientSession(timeout=_timeout(timeout), cookie_jar=jar) as session:
-            async with session.get(UNICAST_URL, params=params, headers=headers) as response:
-                text = await response.text()
-                if response.status >= 400:
-                    return {"status": "error", "error": f"HTTP {response.status}"}
-    except asyncio.TimeoutError:
-        return {"status": "waiting"}
-    except Exception as exc:
-        # 连接被重置/DNS/SSL 等：返回错误让前端显示，而不是一直 waiting。
-        if "timeout" in str(exc).lower():
+    text = ""
+    last_error = ""
+    for verify in (True, False):
+        try:
+            jar = aiohttp.CookieJar(unsafe=True)
+            if cookies:
+                jar.update_cookies(cookies)
+            connector = aiohttp.TCPConnector(ssl=_ssl_context() if verify else False)
+            async with aiohttp.ClientSession(
+                timeout=_timeout(timeout), cookie_jar=jar, connector=connector
+            ) as session:
+                async with session.get(UNICAST_URL, params=params, headers=headers) as response:
+                    text = await response.text()
+                    if response.status >= 400:
+                        last_error = f"HTTP {response.status}"
+                        text = ""
+                        continue
+                    if text.strip():
+                        break
+        except asyncio.TimeoutError:
             return {"status": "waiting"}
-        return {"status": "error", "error": str(exc)[:200]}
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            if "timeout" in str(exc).lower():
+                return {"status": "waiting"}
+    if not text.strip():
+        return {"status": "error", "error": (last_error or "empty response")[:300]}
     if not text.strip():
         return {"status": "waiting"}
     try:
@@ -226,19 +237,28 @@ async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) ->
         "elapsed": "1",
     }
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
-    try:
-        jar = aiohttp.CookieJar(unsafe=True)
-        if cookies:
-            jar.update_cookies(cookies)
-        async with aiohttp.ClientSession(timeout=_timeout(20), cookie_jar=jar) as session:
-            async with session.get(QR_LOGIN_URL, params=params, headers=headers) as response:
-                text = await response.text()
-                if response.status != 200:
-                    raise BaiduQrError(f"百度登录 HTTP {response.status}: {text[:200]}")
-    except BaiduQrError:
-        raise
-    except Exception as exc:
-        raise BaiduQrError(f"百度登录网络错误: {exc}") from exc
+    text = ""
+    last_error = ""
+    for verify in (True, False):
+        try:
+            jar = aiohttp.CookieJar(unsafe=True)
+            if cookies:
+                jar.update_cookies(cookies)
+            connector = aiohttp.TCPConnector(ssl=_ssl_context() if verify else False)
+            async with aiohttp.ClientSession(
+                timeout=_timeout(20), cookie_jar=jar, connector=connector
+            ) as session:
+                async with session.get(QR_LOGIN_URL, params=params, headers=headers) as response:
+                    text = await response.text()
+                    if response.status != 200:
+                        last_error = f"HTTP {response.status}: {text[:200]}"
+                        text = ""
+                        continue
+                    break
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+    if not text.strip():
+        raise BaiduQrError(f"百度登录网络错误: {last_error or 'empty response'}")
     data = _parse_login_payload(text)
     session_data = data.get("data", {}).get("session") if isinstance(data.get("data"), dict) else {}
     if not isinstance(session_data, dict):
