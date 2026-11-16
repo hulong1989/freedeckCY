@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import config
 from emulator_manager import installed_command, get_spec
+from param_sfo import find_param_sfo, read_param_sfo
 
 # 标准数据目录（Linux）
 STANDARD_SAVE_DIRS: Dict[str, Tuple[str, ...]] = {
@@ -87,6 +88,8 @@ PORTABLE_SUBDIRS: Dict[str, Tuple[str, ...]] = {
 
 # 按单游戏文件名过滤的平台（避免共享目录把其它游戏一起打包）
 PER_GAME_PLATFORMS = {"gba", "fc", "md", "nds"}
+PARAM_SFO_PLATFORMS = {"psp", "ps3"}
+TITLE_ID_PLATFORMS = {"3ds"}
 SAVE_SUFFIXES = (".sav", ".srm", ".dsv", ".mcd", ".ps2", ".bin", ".state", ".st")
 
 _MAX_PATHS = 12
@@ -189,6 +192,85 @@ def _per_game_entries(root: str, stem: str) -> List[str]:
     return matches
 
 
+def _norm_title(value: str) -> str:
+    raw = str(value or "").strip().lower()
+    return "".join(char for char in raw if char.isalnum() or "\u4e00" <= char <= "\u9fff")
+
+
+def _iter_savedata_dirs(platform: str, root: str):
+    """遍历 PSP SAVEDATA/PSP 或 PS3 dev_hdd0/home 下的存档目录。"""
+    base = os.path.realpath(root)
+    if platform == "psp":
+        try:
+            for entry in os.scandir(base):
+                if entry.is_dir():
+                    yield entry.path
+        except Exception:
+            return
+        return
+    # PS3: dev_hdd0/home/<user>/savedata/<TITLEID>
+    for dirpath, _dirnames, _filenames in os.walk(base):
+        parts = os.path.relpath(dirpath, base).split(os.sep)
+        if len(parts) >= 3 and parts[1] == "savedata":
+            yield dirpath
+
+
+def _read_3ds_title_id(rom_path: str) -> str:
+    """从 NCSD（.3ds/.cci）头 0x108 读 8 字节 Program ID。"""
+    path = str(rom_path or "").strip()
+    if not path or not os.path.isfile(path):
+        return ""
+    if os.path.splitext(path)[1].lower() not in {".3ds", ".cci", ".cxi"}:
+        return ""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0x100)
+            header = fh.read(0x10)
+    except Exception:
+        return ""
+    if len(header) < 0x10 or header[:4] != b"NCSD":
+        return ""
+    try:
+        return f"{int.from_bytes(header[8:16], 'little'):016x}"
+    except Exception:
+        return ""
+
+
+def _split_3ds(roots: Sequence[str], rom_path: str) -> List[str]:
+    title_id = _read_3ds_title_id(rom_path)
+    if not title_id:
+        return []
+    low = title_id[-8:]
+    matches: List[str] = []
+    for root in roots:
+        for dirpath, dirnames, _filenames in os.walk(root):
+            if "title" in dirnames:
+                title_dir = os.path.join(dirpath, "title")
+                for high in os.listdir(title_dir) if os.path.isdir(title_dir) else []:
+                    candidate = os.path.join(title_dir, high, low)
+                    if os.path.isdir(candidate) and candidate not in matches:
+                        matches.append(candidate)
+    return matches
+
+
+def _split_param_sfo(platform: str, roots: Sequence[str], title: str) -> List[str]:
+    wanted = _norm_title(title)
+    if not wanted:
+        return []
+    matches: List[str] = []
+    for root in roots:
+        for directory in _iter_savedata_dirs(platform, root):
+            param = find_param_sfo(directory)
+            if not param:
+                continue
+            meta = read_param_sfo(param)
+            current = _norm_title(str(meta.get("TITLE", "") or ""))
+            if current and (current == wanted or wanted in current or current in wanted):
+                if directory not in matches:
+                    matches.append(directory)
+    return matches
+
+
 def collect_emulator_save_paths(record: Any) -> EmulatorSaveResult:
     """返回已安装模拟器游戏的存档路径。"""
     platform = str(getattr(record, "platform", "") or "pc").strip().lower()
@@ -215,6 +297,16 @@ def collect_emulator_save_paths(record: Any) -> EmulatorSaveResult:
     if not candidates:
         return EmulatorSaveResult([], platform, emulator, False, searched, "save_dir_missing")
 
+    if platform in TITLE_ID_PLATFORMS:
+        matched = _split_3ds(candidates, str(getattr(record, "rom_path", "") or ""))
+        if matched:
+            return EmulatorSaveResult(matched, platform, emulator, True, candidates, "")
+
+    if platform in PARAM_SFO_PLATFORMS:
+        matched = _split_param_sfo(platform, candidates, str(getattr(record, "game_title", "") or ""))
+        if matched:
+            return EmulatorSaveResult(matched, platform, emulator, True, candidates, "")
+
     if platform in PER_GAME_PLATFORMS:
         rom_path = str(getattr(record, "rom_path", "") or "").strip()
         stem = Path(rom_path).stem if rom_path else ""
@@ -229,3 +321,57 @@ def collect_emulator_save_paths(record: Any) -> EmulatorSaveResult:
 
     # 共享记忆卡/标题目录：返回整个目录，调用方按路径签名去重。
     return EmulatorSaveResult(candidates, platform, emulator, False, candidates, "")
+
+
+def restore_roots(record: Any) -> List[str]:
+    """恢复时可写入的模拟器存档根目录（存在优先，返回绝对路径）。"""
+    platform = str(getattr(record, "platform", "") or "pc").strip().lower()
+    roots: List[str] = []
+    for raw in STANDARD_SAVE_DIRS.get(platform, ()):
+        path = os.path.realpath(os.path.expanduser(raw))
+        if path and path not in roots:
+            roots.append(path)
+    for root in _portable_roots(record):
+        for sub in PORTABLE_SUBDIRS.get(platform, ()):
+            path = os.path.realpath(os.path.join(root, sub))
+            if path and path not in roots:
+                roots.append(path)
+    # 存在的目录优先，方便 UI 默认选择。
+    roots.sort(key=lambda path: (0 if os.path.isdir(path) else 1, len(path)))
+    return roots
+
+
+def build_restore_targets(
+    record: Any,
+    entries: Sequence[Dict[str, Any]],
+) -> Tuple[List[str], Dict[str, str]]:
+    """把云端 manifest 条目映射到本机目标父目录。
+
+    - 如果 source_path 仍在本机 HOME 下（同机恢复），优先恢复到原位置；
+    - 跨设备/路径不存在时，落到该平台第一个可写根目录。
+    """
+    roots = restore_roots(record)
+    home = os.path.realpath(os.path.expanduser("~"))
+    entry_targets: Dict[str, str] = {}
+    for entry in entries:
+        entry_id = str(entry.get("entry_id", "") or "").strip()
+        if not entry_id:
+            continue
+        source = str(entry.get("source_path", "") or "").strip()
+        target_parent = ""
+        if source:
+            try:
+                resolved = os.path.realpath(os.path.expanduser(source))
+                parent = os.path.dirname(resolved)
+                # 只允许恢复到已知模拟器存档根目录内，避免被恶意 manifest 写到 HOME 任意位置。
+                for root in roots:
+                    if parent == root or parent.startswith(root.rstrip(os.sep) + os.sep):
+                        target_parent = parent
+                        break
+            except Exception:
+                target_parent = ""
+        if not target_parent:
+            target_parent = roots[0] if roots else ""
+        if target_parent:
+            entry_targets[entry_id] = target_parent
+    return roots, entry_targets

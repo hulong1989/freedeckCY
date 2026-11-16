@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.15.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.16.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -22,7 +22,8 @@
 | `py_modules/save_manifest.py` | **Ludusavi 存档清单（v0.8.0）**：加载本地 JSON、标题/SteamID 匹配、`<base>/<winAppData>/...` 占位符解析到 Proton 前缀、glob 展开（最多 200 路径）；运行时不联网 |
 | `py_modules/gamewatch.py` | **游戏进程检测（v0.8.0）**：后台每 8 s 扫 `/proc/*/cmdline`（无 `/proc` 回退 `pgrep -f`），状态切换产出 start/end 事件（自动云存档只在 end 触发） |
 | `py_modules/emulator_manager.py` | **通用模拟器注册表（v0.14.1，10 平台全部在线下载）**：`EmulatorSpec`/`EMULATORS` 描述 GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch（3DS 带 `flatpak_id=org.azahar_emu.Azahar`）；`available_platforms(arch)` 做架构白名单；官方资产解析、首次安装按需下载、AppImage/zip 解包、SteamOS 上 3DS 优先 Flatpak（`_is_steamos`/`flatpak_installed`/`_ensure_flatpak`）、`find_rom_file()`、3DS wrapper 强制 XWayland、`emulator_status()`；旧 `prepare_bios()` 保留兼容 |
-| `py_modules/emulator_saves.py` | **模拟器存档发现（v0.15.0）**：`STANDARD_SAVE_DIRS`/`PORTABLE_SUBDIRS` 覆盖 10 平台（含 Flatpak 数据目录）；GBA/FC/MD/NDS 按 ROM 文件名单游戏匹配，PSP/PS1/PS2/3DS/PS3/Switch 返回共享记忆卡/标题目录（按路径签名去重）；只上传、不恢复 |
+| `py_modules/emulator_saves.py` | **模拟器存档发现/恢复（v0.15.0；v0.16.0 恢复/拆分）**：`STANDARD_SAVE_DIRS`/`PORTABLE_SUBDIRS` 覆盖 10 平台；GBA/FC/MD/NDS 按 ROM 名称单游戏匹配，PSP/PS3 用 PARAM.SFO、3DS 用 NCSD title id 拆分，PS1/PS2/Switch 仍共享；`restore_roots`/`build_restore_targets` 提供恢复白名单 |
+| `py_modules/param_sfo.py` | 最小 `PARAM.SFO` 解析（v0.16.0）：`read_param_sfo()` 读 key/value、`find_param_sfo()` 在存档目录递归查找，用于 PSP/PS3 按 TITLE 拆分存档 |
 | `py_modules/emulator_setup.py` | **安装后 BIOS/固件部署（v0.12.0；v0.14.1 3DS 加 Flatpak 路径）**：`setup_emulator(platform, command, seven_zip)` 把 `bios/<platform>/` 下文件/压缩包部署到模拟器目录并写 portable 配置；3DS sysdata 同时部署到 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`；只补缺失/只改单个键，不下载 |
 | `py_modules/submission.py` | **仓库游戏提交（v0.13.0）**：`normalize_platform()` 平台别名、`validate_submission()`/`validate_submission_files()` 校验、`build_catalog_row()` 生成目录行、`merge_submissions()` 合并（dry-run/`--apply`）；纯标准库，可被 CLI 直接 import |
 | `py_modules/baidu_client.py` | **百度公开分享 URL 解析（v0.14.0）**：`resolve_baidu_share(share_url, "")` 取分享页元数据（share_id/uk/sekey/files），**只传空 cookie，不读 BDUSS/Cookie**；给 OpenAPI 链路提供公开分享上下文 |
@@ -44,7 +45,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（337 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度 OpenAPI（来源识别/token 刷新/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（345 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度 OpenAPI（来源识别/token 刷新/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -212,7 +213,7 @@ defaults/runtime/node/<arch>/bin/node
 | gba | mGBA 0.10.5 | `mGBA-0.10.5-appimage-{x64,arm64}.appimage` | AppImage，**首次安装按需下载**（x64 约 25MB / arm64 约 24.6MB） | `.gba` | `FREEDECKCY_MGBA_BIN` |
 | psp | PPSSPP 1.20.4 | `PPSSPP-v1.20.4-anylinux-{x86_64,aarch64}.AppImage` | AppImage，按需下载 | `.iso/.cso/.pbp/.elf` | `FREEDECKCY_PPSSPP_BIN` |
 | nds | melonDS 1.1 | `melonDS-1.1-appimage-{x86_64,aarch64}.zip` | zip 内 AppImage，按需下载 | `.nds/.dsi/.srl` | `FREEDECKCY_MELONDS_BIN` |
-| ps1 | DuckStation `latest` | `DuckStation-{x64,arm64}.AppImage` | AppImage，按需下载；**需要自备 BIOS** | `.cue/.m3u/.chd/.iso/.pbp/.bin` | `FREEDECKCY_DUCKSTATION_BIN` |
+| ps1 | DuckStation `latest` | `DuckStation-{x64,arm64}.AppImage` | AppImage，按需下载；**需要自备 BIOS** | `.m3u/.cue/.chd/.iso/.pbp/.bin` | `FREEDECKCY_DUCKSTATION_BIN` |
 | fc | Mesen2 2.1.1 | `Mesen_2.1.1_Linux_{x64,ARM64}.zip` | zip 内单文件 `Mesen`，按需下载 | `.nes/.fds/.unf/.unif` | `FREEDECKCY_MESEN_BIN` |
 | md | Mesen2 2.1.1 | 同上（**与 FC 共享缓存** `emulators/mesen/<arch>/`） | zip 内单文件 `Mesen`，按需下载 | `.md/.gen/.smd/.bin/.32x` | `FREEDECKCY_MESEN_BIN` |
 | 3ds | Azahar 2126.2 | **SteamOS 优先 Flathub `org.azahar_emu.Azahar`**；否则 `azahar.AppImage`（**仅 x86_64**） | 3DS system files（setup）；Flatpak 自动安装或 AppImage 回退 | `.3ds/.cia/.cci/.cxi/.app` | `FREEDECKCY_AZAHAR_BIN`（最高优先） |
@@ -333,7 +334,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **337 个用例**（`make test` 实测 `337 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **345 个用例**（`make test` 实测 `345 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -491,7 +492,7 @@ curl -s http://127.0.0.1:59271/api/tianyi/update-check | python3 -m json.tool
 | gba | mGBA 0.10.5 | `mGBA-0.10.5-appimage-x64.appimage` / `-arm64` | x64 / arm64 | AppImage（按需下载，x64 约 25MB / arm64 约 24.6MB） | `-f <rom>` | `.gba` |
 | psp | PPSSPP 1.20.4 | `PPSSPP-v1.20.4-anylinux-x86_64.AppImage` / `-aarch64` | x64 / arm64 | AppImage | `--fullscreen <rom>` | `.iso/.cso/.pbp/.elf` |
 | nds | melonDS 1.1 | `melonDS-1.1-appimage-x86_64.zip` / `-aarch64` | x64 / arm64 | zip 内 AppImage | `<rom>` | `.nds/.dsi/.srl` |
-| ps1 | DuckStation `latest` | `DuckStation-x64.AppImage` / `DuckStation-arm64.AppImage` | x64 / arm64 | AppImage | `-batch -fullscreen <rom>` | `.cue/.m3u/.chd/.iso/.pbp/.bin` |
+| ps1 | DuckStation `latest` | `DuckStation-x64.AppImage` / `DuckStation-arm64.AppImage` | x64 / arm64 | AppImage | `-batch -fullscreen <rom>` | `.m3u/.cue/.chd/.iso/.pbp/.bin` |
 | fc | Mesen2 2.1.1 | `Mesen_2.1.1_Linux_x64.zip` / `_ARM64.zip` | x64 / arm64 | zip 内单文件 `Mesen` | `/fullscreen <rom>` | `.nes/.fds/.unf/.unif` |
 | md | Mesen2 2.1.1 | 同 FC（共享 `emulators/mesen/<arch>/`） | x64 / arm64 | zip 内单文件 `Mesen` | `/fullscreen <rom>` | `.md/.gen/.smd/.bin/.32x` |
 | 3ds | Azahar 2126.2 | `azahar.AppImage` | **仅 x64** | AppImage（需 system files setup） | `<rom>` | `.3ds/.cia/.cci/.cxi/.app` |
@@ -662,7 +663,40 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 ```
 
 - **隐私/大小**：3DS（`sdmc`/`nand`）与 Switch（`nand/user/save`）目录可能很大，会受指纹 5000 文件与上传体积限制；共享记忆卡会包含同卡其它游戏，上传前确认目录内容；
-- **恢复边界**：当前只上传，恢复仍只支持 PC/Proton（模拟器共享记忆卡恢复/冲突映射未做）。
+- **恢复**：v0.16.0 起支持（见下节）；PS1/PS2 单片记忆卡、Switch 目录不能按游戏拆，覆盖前有备份、冲突需确认。
+
+**模拟器存档恢复（v0.16.0）**：
+
+- 恢复计划：`plan_cloud_save_restore` 遇到 manifest `source_strategy="emulator_saves"` → `_plan_emulator_save_restore()`；按已安装记录的平台根生成 `copy_pairs`/`plan_items`，目标冲突会带 `conflict_count`/`conflict_samples` 与 `requires_confirmation`；
+- **目标白名单**：`restore_roots(record)` 返回平台标准/portable 根；`build_restore_targets(record, entries)` 只允许写入这些根——同机 `source_path` 父目录在根内则恢复到原父目录，跨机落到第一个根；拒绝 manifest 任意 HOME 路径；
+- **备份**：apply 沿用现有恢复流程，覆盖前生成 `*.freedeckcy-bak-<YYYYmmdd_HHMMSS>`；
+- 状态/诊断字段：`stage=ready`、`requires_confirmation`、`conflict_count`、`conflict_samples`、`target_candidates`、`entry_target_dirs`；
+- 边界：PS1/PS2 单片记忆卡、Switch 目录不能按游戏拆；3DS 跨设备可能退化到根目录；共享卡覆盖需要确认。
+
+**按游戏拆分调试（v0.16.0）**：
+
+```bash
+# PSP/PS3：存档目录里应有 PARAM.SFO；TITLE 与游戏标题做归一化匹配
+find ~/.local/share/ppsspp ~/.config/rpcs3 -name PARAM.SFO 2>/dev/null
+python3 - <<'PY'
+import sys; sys.path.insert(0, "py_modules")
+from param_sfo import read_param_sfo
+print(read_param_sfo("<PARAM.SFO 路径>").get("TITLE"))
+PY
+
+# 3DS：NCSD 头 0x100 起 16 字节，Program ID 在 0x108（小端 8 字节）
+xxd -s 0x100 -l 16 "<game>.3ds"
+# 目录：.../title/00040000/<low8>/
+```
+
+上传候选里 `emulator_saves.per_game=True` 表示拆分成功；`False` 表示回退共享目录。拆分失败原因看 `searched`/`reason`（无 PARAM.SFO/TITLE 不匹配/NCSD 读不到都会回退，不是错误）。
+
+**PS1 多碟 m3u（v0.16.0）**：`find_rom_file()` 对 PS1 先找 `.m3u`（已有直接用）；没有且多于一张 `.cue/.chd` 时按自然排序生成 `<共同父目录>/freedeckcy-multidisc.m3u`（相对路径、`#EXTM3U`），单碟仍返回 `.cue`；可手工检查/重排：
+
+```bash
+cat "<install_dir>/<游戏>/freedeckcy-multidisc.m3u"
+# 顺序不对可直接编辑，或删掉让插件按自然排序重新生成；已存在的 m3u 不会被覆盖
+```
 
 ### 6.10 游戏提交校验与合并（v0.13.0）
 
@@ -769,6 +803,10 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 | **已安装页签点卡片启动失败** | ① 看 flash 提示：`该游戏缺少 Steam AppID` 说明记录里没有 appid，去 Steam 库手动启动；② `当前环境没有 xdg-open/gio` 说明后端无法拉起外部程序（DroidDeck 桌面需有 xdg-open）；③ 用 `curl /api/tianyi/installed` 确认 `steam_appid` 与 `exists` |
 | **自动云存档没触发** | ① 确认设置 `cloud_save_auto_upload` 为 true（QAM 开关/设置接口）；② 需要已登录天翼账号且当前无进行中的上传任务；③ gamewatch 需要进程命令行包含 install_path（自定义 wrapper 可能不满足；容器无 `/proc` 时回退 `pgrep -f`，需系统有 pgrep）；④ 自动上传有 30 s 防抖，连续退出多个游戏只有第一个会立即上传；⑤ 看日志 `auto cloud save upload after exit` / `gamewatch poll failed` |
 | **模拟器存档没上传 / 找不到** | 看上传状态 `diagnostics.collect[*].diagnostics.emulator_saves.reason`：`save_dir_missing`（没装到标准目录/portable 目录）、`game_save_not_found`（GBA/FC/MD/NDS 必须与 ROM 同名；改名/自定义存档名会匹配不到）、`emulator_saves_shared`（共享记忆卡已被前一个游戏上传）、`emulator_saves_disabled`（开关关闭）；确认 QAM「包含模拟器存档」开启 |
+| **模拟器存档恢复目标不在白名单** | 只能恢复到平台标准/portable 根（`restore_roots`）；跨设备 3DS 可能退化到根目录；不要手工把 manifest 的 `source_path` 指到 HOME 其它位置，插件会拒绝/改落到第一个根 |
+| **共享记忆卡恢复覆盖了别的游戏** | PS1/PS2 单片记忆卡、Switch 目录不能按游戏拆；恢复是整卡/整目录覆盖，覆盖前会生成 `*.freedeckcy-bak-<时间戳>`，冲突会要求确认；恢复前建议先备份/确认 |
+| **PS1 m3u 顺序不对 / 没生成** | 已有 `.m3u` 优先且不会被覆盖；没有时多张 `.cue/.chd` 才生成 `freedeckcy-multidisc.m3u`（按文件名自然排序）；单碟不生成。顺序不对可手工编辑，或删掉让插件重生成 |
+| **3DS title id 读不到 / 没拆分** | 只支持 `.3ds/.cci/.cxi` 且 NCSD 头在 `0x100`；读不到会回退共享 `title` 目录（不是错误）。检查 `xxd -s 0x100 -l 16` 与 `.../title/00040000/<low8>/` 是否存在 |
 | **3DS/Switch 上传很大 / 太慢** | 这两个平台是共享标题目录（`sdmc`/`nand/user/save`），目录可能很大；关闭「包含模拟器存档」或手动清理目录后再试；指纹最多 5000 文件 |
 | **上传被跳过（reason=unchanged）** | 存档指纹和上次上传相同（相对路径+大小+mtime 未变）。确属未变化是预期；想强制上传：退出插件后删除 `state.json` 里对应游戏的 `cloud_save_fingerprints` 条目，或删除整个字段后重载插件 |
 | **Ludusavi 清单未命中（退回 proton_prefix/install_fallback）** | ① 确认 `defaults/ludusavi/manifest.json.gz` 存在（`make ludusavi-manifest`，发布包自带）；② 上传状态 `diagnostics.collect` 里看 `ludusavi.matched/path_count` 与 `source_strategy`；③ 标题差异大时只能靠 Steam AppID 匹配（先看快捷方式是否解析出 appid）；④ 封面/标题含特殊字符时 `normalize_title()` 会去掉非字母数字/CJK 字符 |
@@ -819,7 +857,8 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 - **仅早期版本**：`package.json` 版本 0.8.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
 - **DroidDeck 适配未真机验证**：ARM64 运行环境、FEX/ARM Proton、Android 存储映射都可能有差异；实测失败时优先参考 [DROIDDECK.md](DROIDDECK.md) 的排障与日志收集。
 - **目录数据需保持干净**：新增/合并目录后必须跑 `make normalize-catalog` 与 `make validate-catalog`（CI 对内置目录执行 `--strict`）；「模拟器」是清洗后的兜底分类，不是真实游戏分类。
-- **模拟器存档上传（v0.15.0）**：只上传、不恢复（恢复仍只支持 PC/Proton）；PSP/PS1/PS2/3DS/PS3/Switch 共享记忆卡整目录上传、不按游戏拆分（同卡其它游戏也会包含）；GBA/FC/MD/NDS 按 ROM 文件名匹配，改名会 `game_save_not_found`；3DS/Switch 目录可能很大；`cloud_save_include_emulators` 默认开，可关。
+- **模拟器存档恢复/拆分（v0.16.0）**：PSP/PS3 用 PARAM.SFO、3DS 用 NCSD title id 拆分，PS1/PS2/Switch 仍整卡/整目录；恢复目标受 `restore_roots` 白名单限制，跨设备 3DS 可能退化到根目录；覆盖前有 `*.freedeckcy-bak-<时间戳>` 备份，共享卡冲突需确认；PS1 多碟自动 m3u 需要多张 `.cue/.chd`，已有 m3u 优先。
+- **模拟器存档上传（v0.15.0）**：PSP/PS1/PS2/3DS/PS3/Switch 共享记忆卡整目录上传、不按游戏拆分（同卡其它游戏也会包含）；GBA/FC/MD/NDS 按 ROM 文件名匹配，改名会 `game_save_not_found`；3DS/Switch 目录可能很大；`cloud_save_include_emulators` 默认开，可关。
 - **3DS（Azahar）SteamOS 兼容**（v0.14.1）：SteamOS 3.9.5 优先 Flathub Flatpak（AppImage 有上游 #127/#953 问题），需要系统有 flatpak 且能访问 Flathub；Flatpak 安装失败会回退 AppImage（可能仍打不开）；3DS 仅 x86_64（aarch64 目录隐藏）；system files 需用户自备并部署到 `~/.var/app/org.azahar_emu.Azahar/data/...`；已有快捷方式会自动重写，但真机验证仍待补。
 - **百度网盘只走官方 OpenAPI**（v0.14.0）：必须自建应用 + OAuth 授权（无公共应用）；分享文件需转存 `/FreedeckTmp` 才能取 dlink，会占用户网盘（安装后清理，失败则保留）；`errno=-6`/dlink 403 等官方错误进安装消息；**不接 BDUSS/Cookie/CDP**；公开分享元数据解析仍依赖分享页结构（空 cookie），页面改版可能影响解析。
 - **10 平台可安装，按架构裁剪，BIOS/固件自动部署**（v0.12.0）：x86_64 上 10 个平台（含 3DS/PS2/PS3/Switch）都可安装/启动；aarch64 上 3DS/PS2/PS3 无官方 arm64 包，目录按 `available_platforms()` 白名单隐藏（条目与筛选条都不出现），Switch 有 arm64 包可用。**插件包不集成任何模拟器，首次安装都需要联网下载**（包体积约 45MB）；PS1/PS2 需要 BIOS、3DS/PS3/Switch 需要 system files/固件/keys（v0.12.0 安装后自动从 `bios/<platform>/` 部署到模拟器目录并写 portable 配置，含压缩包；缺失不阻断安装但装完不能直接玩）；模拟器只识别注册表内扩展名，不含存档管理；下载/解包会额外占一份空间；ARM64/DroidDeck 上这些平台尚未真机验证。
@@ -862,6 +901,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 | 改 Proton 工具解析 / 设置 | `py_modules/steam_shortcuts.py` 的 `detect_proton_tool` / `add_or_update_tianyi_shortcut(proton_tool=)`；设置项 `proton_tool` 贯穿 `tianyi_store` / `tianyi_service.update_settings` / `main.set_tianyi_settings` / `tianyi_http.handle_settings_*` |
 | 改打包架构 / ARM64 产物 | `scripts/package.sh` 的 `PACKAGE_ARCH`；`Makefile` 的 `package-droiddeck` / `runtime ARCH=`（模拟器不在包内，与打包无关） |
 | 改模拟器支持 / 新增平台 | `py_modules/emulator_manager.py` 的 `EmulatorSpec` / `EMULATORS`（官方资产、launch_args、rom_extensions、env_var、state_key、executables、bios_required、setup_required/setup_hint）；`available_platforms(arch)` 决定架构白名单；`tianyi_service.list_catalog` 传 `allowed_platforms`；`_build_install_plan`/`_auto_register_emulator_to_steam` 的模拟器字段；BIOS 见 `bios_dir`/`bios_present`/`prepare_bios` |
+| 改模拟器存档恢复/拆分 | `emulator_saves.py`（`restore_roots`/`build_restore_targets`/`_split_param_sfo`/`_split_3ds`/`_read_3ds_title_id`）、`param_sfo.py`、`tianyi_service._plan_emulator_save_restore`；PS1 多碟见 `emulator_manager.find_rom_file` |
 | 改模拟器存档发现 | `py_modules/emulator_saves.py`（`STANDARD_SAVE_DIRS`/`PORTABLE_SUBDIRS`/`PER_GAME_PLATFORMS`/`collect_emulator_save_paths`）；`tianyi_service._collect_cloud_save_candidates` 的 `emulator_saves` 分支与去重；设置 `cloud_save_include_emulators` |
 | 改 3DS Flatpak/修复 | `emulator_manager.py` 的 `_is_steamos`/`flatpak_installed`/`_ensure_flatpak`/`ensure_emulator`/`create_launch_wrapper`；`emulator_setup._deploy_3ds`；`tianyi_service._maybe_schedule_launcher_repair`/`_repair_emulator_launchers` |
 | 改百度 OpenAPI | `py_modules/baidu_openapi_client.py`（OAuth/refresh/转存/dlink/清理）、`py_modules/baidu_client.py`（公开分享元数据）、`tianyi_service` 的 `_share_provider`/`_build_install_plan`/`_fetch_baidu_direct_url`/`_cleanup_baidu_transfer_files`、QAM 百度区；不引入 BDUSS/Cookie |
@@ -880,13 +920,13 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 337 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 345 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
 - [ ] 改动打包/运行时时验证两种架构：`make package`（x86_64）与 `make package-droiddeck`（aarch64），确认产物后缀与包内 `defaults/runtime/<arch>/` 只有 aria2c/7zz/node（**不含任何模拟器**）；模拟器首次安装联网下载，PS1/PS2 BIOS、3DS/PS3/Switch 系统文件由用户自备；
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
-- [ ] 改模拟器存档发现后跑 `pytest tests/test_emulator_saves.py -q`，确认单游戏不会退化成整目录、共享目录去重、开关关闭时 `emulator_saves_disabled`；
+- [ ] 改模拟器存档发现/恢复后跑 `pytest tests/test_emulator_saves.py -q`：单游戏不退化成整目录、共享目录去重、PARAM.SFO/3DS 拆分、恢复目标白名单、开关关闭；PS1 多碟跑 `tests/test_emulator.py` 的 m3u 用例；
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
 - [ ] 改百度相关代码后跑 `python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`（mock HTTP，不联网）；确认未引入 Cookie/BDUSS 路径；
 - [ ] 改提交校验/合并后跑 `make validate-submissions`、`python scripts/merge_submissions.py --dry-run`，确认无 JSON 时 CI 也通过；`make validate-catalog` 确认合并后的 CSV 合法；

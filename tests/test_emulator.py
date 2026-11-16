@@ -630,3 +630,24 @@ def test_3ds_wrapper_sets_xwayland_env(tmp_path):
     text = wrapper.read_text(encoding="utf-8")
     assert "QT_QPA_PLATFORM=xcb" in text
     assert "game.3ds" in text
+
+
+def test_ps1_multidisc_generates_m3u(tmp_path):
+    (tmp_path / "Disc 1.cue").write_text('FILE "Disc 1.bin" BINARY\n', encoding="utf-8")
+    (tmp_path / "Disc 2.cue").write_text('FILE "Disc 2.bin" BINARY\n', encoding="utf-8")
+    found = emu.find_rom_file(str(tmp_path), "Disc 1.cue", "ps1")
+    assert found.endswith("freedeckcy-multidisc.m3u")
+    content = Path(found).read_text(encoding="utf-8")
+    assert "Disc 1.cue" in content and "Disc 2.cue" in content
+    assert content.index("Disc 1.cue") < content.index("Disc 2.cue")
+
+
+def test_ps1_prefers_existing_m3u(tmp_path):
+    (tmp_path / "game.cue").write_text("x", encoding="utf-8")
+    (tmp_path / "custom.m3u").write_text("game.cue\n", encoding="utf-8")
+    assert emu.find_rom_file(str(tmp_path), "game.cue", "ps1").endswith("custom.m3u")
+
+
+def test_ps1_single_cue_returns_cue(tmp_path):
+    (tmp_path / "game.cue").write_text("x", encoding="utf-8")
+    assert emu.find_rom_file(str(tmp_path), "game.cue", "ps1").endswith("game.cue")

@@ -116,7 +116,7 @@ EMULATORS: Dict[str, EmulatorSpec] = {
         },
         archive="appimage",
         launch_args=("-batch", "-fullscreen", "{rom}"),
-        rom_extensions=(".cue", ".m3u", ".chd", ".iso", ".pbp", ".bin"),
+        rom_extensions=(".m3u", ".cue", ".chd", ".iso", ".pbp", ".bin"),
         env_var="FREEDECKCY_DUCKSTATION_BIN",
         notes="DuckStation 官方 AppImage；需要自备 PS1 BIOS（scph*.bin）",
         min_bytes=40 * 1024 * 1024,
@@ -731,6 +731,22 @@ async def ensure_mgba(plugin_dir: str = "", *, allow_download: bool = True) -> L
     return await ensure_emulator("gba", plugin_dir, allow_download=allow_download)
 
 
+def _common_parent(paths: Sequence[Path]) -> Path:
+    try:
+        common = os.path.commonpath([str(path.parent) for path in paths])
+    except Exception:
+        common = str(paths[0].parent)
+    return Path(common)
+
+
+def _natural_disc_key(name: str):
+    """Disc 1/2/10、CD1/CD2 自然排序。"""
+    import re
+
+    parts = re.split(r"(\d+)", str(name or "").lower())
+    return [int(part) if part.isdigit() else part for part in parts]
+
+
 def find_rom_file(target_dir: str, open_path: str = "", platform_name: str = "gba") -> str:
     spec = get_spec(platform_name)
     if spec is None:
@@ -751,10 +767,33 @@ def find_rom_file(target_dir: str, open_path: str = "", platform_name: str = "gb
     def sort_key(path: Path):
         return (preference.get(path.suffix.lower(), 99), len(str(path)), str(path))
 
-    if wanted_stem:
+    if wanted_stem and str(platform_name or "").lower() != "ps1":
         exact = [path for path in roms if path.stem.lower() == wanted_stem]
         if exact:
-            return str(sorted(exact, key=sort_key)[0])
+            roms = exact
+
+    if str(platform_name or "").lower() == "ps1":
+        playlists = [path for path in roms if path.suffix.lower() == ".m3u"]
+        if playlists:
+            return str(sorted(playlists, key=sort_key)[0])
+        discs = [
+            path
+            for path in roms
+            if path.suffix.lower() in {".cue", ".chd"}
+        ]
+        if len(discs) > 1:
+            parent = _common_parent(discs)
+            playlist = parent / "freedeckcy-multidisc.m3u"
+            try:
+                lines = ["#EXTM3U"]
+                for disc in sorted(discs, key=lambda path: _natural_disc_key(path.name)):
+                    lines.append(os.path.relpath(disc, parent).replace(os.sep, "/"))
+                playlist.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                config.logger.info("PS1 multi-disc playlist generated: %s (%d discs)", playlist, len(discs))
+                return str(playlist)
+            except Exception as exc:
+                config.logger.warning("PS1 m3u 生成失败，回退单碟: %s", exc)
+
     return str(sorted(roms, key=sort_key)[0])
 
 

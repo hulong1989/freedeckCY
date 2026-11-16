@@ -54,7 +54,7 @@ from emulator_manager import (
     get_spec,
     supported_platforms,
 )
-from emulator_saves import collect_emulator_save_paths
+from emulator_saves import build_restore_targets, collect_emulator_save_paths
 from gamewatch import GameWatcher
 from save_manifest import load_manifest, match_manifest, resolve_manifest_paths
 from game_catalog import (
@@ -3136,6 +3136,112 @@ class TianyiService:
         finally:
             self._cleanup_cloud_save_temp_paths([str(bundle.get("temp_dir", "") or "")])
 
+    async def _plan_emulator_save_restore(
+        self,
+        *,
+        bundle: Dict[str, Any],
+        manifest: Dict[str, Any],
+        entries: List[Dict[str, Any]],
+        selected_ids: Sequence[str],
+        game_id: str,
+        game_key: str,
+        game_title: str,
+        version_name: str,
+        manifest_playtime: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """模拟器存档恢复计划：同机恢复到原路径，跨机落到平台默认根目录。"""
+        temp_dir = str(bundle.get("temp_dir", "") or "")
+        extract_dir = str(bundle.get("extract_dir", "") or "")
+        record = next(
+            (
+                item
+                for item in list(self.store.installed_games or [])
+                if str(item.game_id or "") == game_id
+            ),
+            None,
+        )
+        if record is None:
+            self._cleanup_cloud_save_temp_paths([temp_dir])
+            raise TianyiApiError("未找到该模拟器游戏的安装记录，无法恢复存档")
+
+        roots, entry_targets = build_restore_targets(record, entries)
+        if not roots:
+            self._cleanup_cloud_save_temp_paths([temp_dir])
+            raise TianyiApiError("未找到该平台的模拟器存档目录")
+        target_dir = roots[0]
+        try:
+            copy_plan = self._build_restore_copy_plan(
+                extract_dir=extract_dir,
+                entries=entries,
+                selected_entry_ids=selected_ids,
+                target_dir=target_dir,
+                entry_target_dirs=entry_targets,
+            )
+        except Exception as exc:
+            self._cleanup_cloud_save_temp_paths([temp_dir])
+            raise TianyiApiError(f"模拟器存档恢复计划生成失败：{exc}") from exc
+
+        copy_pairs = list(copy_plan.get("copy_pairs") or [])
+        plan_items = [dict(item) for item in list(copy_plan.get("plan_items") or []) if isinstance(item, dict)]
+        conflict_count = max(0, _safe_int(copy_plan.get("conflict_count"), 0))
+        conflict_samples = [str(item or "") for item in list(copy_plan.get("conflict_samples") or []) if str(item or "").strip()]
+        requires_confirmation = conflict_count > 0
+        plan_id = uuid.uuid4().hex
+        async with self._cloud_save_restore_lock:
+            self._cloud_save_restore_plan = {
+                "plan_id": plan_id,
+                "temp_paths": [temp_dir],
+                "copy_pairs": copy_pairs,
+                "plan_items": plan_items,
+                "requires_confirmation": requires_confirmation,
+                "conflict_count": conflict_count,
+                "conflict_samples": conflict_samples,
+                "target_dir": target_dir,
+                "entry_target_dirs": dict(entry_targets),
+                "game_id": game_id,
+                "game_key": game_key,
+                "game_title": game_title,
+                "version_name": version_name,
+                "selected_entry_ids": list(selected_ids),
+                "manifest_playtime": dict(manifest_playtime or {}),
+            }
+
+        await self._set_cloud_save_restore_state(
+            stage="ready",
+            running=False,
+            progress=100.0,
+            message="模拟器存档恢复计划已生成",
+            reason="",
+            selected_entry_ids=list(selected_ids),
+            selected_target_dir=target_dir,
+            requires_confirmation=requires_confirmation,
+            conflict_count=conflict_count,
+            conflict_samples=conflict_samples,
+            restored_files=0,
+            restored_entries=0,
+            diagnostics={
+                "source_strategy": "emulator_saves",
+                "target_candidates": roots,
+                "plan_items": plan_items,
+                "manifest_playtime": dict(manifest_playtime or {}),
+            },
+        )
+        return {
+            "accepted": True,
+            "plan_id": plan_id,
+            "message": "模拟器存档恢复计划已生成",
+            "reason": "",
+            "requires_confirmation": requires_confirmation,
+            "conflict_count": conflict_count,
+            "conflict_samples": conflict_samples,
+            "target_candidates": roots,
+            "selected_target_dir": target_dir,
+            "selected_entry_ids": list(selected_ids),
+            "available_entries": entries,
+            "restorable_files": len(copy_pairs),
+            "restorable_entries": len(plan_items),
+        }
+
     async def plan_cloud_save_restore(
         self,
         *,
@@ -3195,15 +3301,25 @@ class TianyiService:
         temp_dir = str(bundle.get("temp_dir", "") or "")
         extract_dir = str(bundle.get("extract_dir", "") or "")
         manifest = dict(bundle.get("manifest") or {})
-        if str(manifest.get("source_strategy", "") or "").strip() == "emulator_saves":
-            self._cleanup_cloud_save_temp_paths([temp_dir, extract_dir])
-            raise TianyiApiError("模拟器存档目前只支持上传，暂不支持恢复（共享记忆卡可能覆盖其它游戏）")
         manifest_playtime = self._extract_manifest_playtime_payload(manifest)
         entries = [dict(item) for item in list(bundle.get("entries") or []) if isinstance(item, dict)]
         available_entry_ids = [str(item.get("entry_id", "") or "").strip() for item in entries if str(item.get("entry_id", "") or "").strip()]
         selected_ids = [str(item or "").strip() for item in list(selected_entry_ids or []) if str(item or "").strip()]
         if not selected_ids:
             selected_ids = list(available_entry_ids)
+
+        if str(manifest.get("source_strategy", "") or "").strip() == "emulator_saves":
+            return await self._plan_emulator_save_restore(
+                bundle=bundle,
+                manifest=manifest,
+                entries=entries,
+                selected_ids=selected_ids,
+                game_id=normalized_game_id,
+                game_key=normalized_game_key,
+                game_title=normalized_game_title,
+                version_name=normalized_version,
+                manifest_playtime=manifest_playtime,
+            )
 
         entry_target_dirs: Dict[str, str] = {}
         compat_user_dir = self._resolve_current_compat_user_dir(normalized_game_id)

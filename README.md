@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.15.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.16.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,7 +21,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.15.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.16.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -44,7 +44,8 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **浏览 / 分页 / 排序**：打开库页即浏览全部资源，按平台/分类筛选，支持排序与 L1/R1 翻页
 - **已安装管理**：已安装页签可启动游戏、打开目录、卸载（`steam://rungameid`）
 - **模拟器闭环（10 平台）**：GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC/MD（Mesen2）/ 3DS（Azahar）/ PS2（PCSX2）/ PS3（RPCS3）/ Switch（Eden）；全部首次安装在线下载官方包（不集成进插件包），启动脚本走原生 Linux、不写 Proton
-- **自动云存档**：Ludusavi 清单（53k+ 游戏）+ gamewatch 进程检测；游戏退出后只上传该游戏，存档未变化自动跳过；PC + **10 个模拟器平台**的存档都能纳入；QAM 可关闭/关闭模拟器部分
+- **自动云存档**：Ludusavi 清单（53k+ 游戏）+ gamewatch 进程检测；游戏退出后只上传该游戏，存档未变化自动跳过；PC + **10 个模拟器平台**的存档都能纳入；支持模拟器存档恢复（自动备份、同机原路径优先）；PSP/PS3/3DS 共享存档会按游戏拆分；QAM 可关闭/关闭模拟器部分
+- **PS1 多碟**：安装目录多张 `.cue`/`.chd` 时自动生成 `freedeckcy-multidisc.m3u`，DuckStation 直接启动
 - **百度网盘（官方 OpenAPI）**：QAM 配置 App Key/Secret、授权码登录；百度分享链接可解析、转存、下载并安装（安装后清理转存文件）
 - **游戏提交**：网页库「提交游戏」打开 GitHub Issue 表单；也支持 `submissions/*.json` PR，CI 校验后一键合并进目录
 - **诊断与更新**：一键导出脱敏诊断 zip；检查 GitHub 最新 Release
@@ -72,7 +73,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
-make package     # 产出 dist-artifacts/freedeckCY-v0.15.0.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.16.0.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -94,8 +95,8 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.15.0.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.15.0-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.16.0.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.16.0-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
@@ -115,7 +116,7 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 337）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 345）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
@@ -199,7 +200,7 @@ backend/*.js                Node 辅助脚本（分享解析兜底、云盘上�
 scripts/                    运行时获取（aria2/7zz/node）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗 / 远程目录 / 清单转换
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
 catalog-json/               NewFreedeck 兼容目录 JSON + schema（可直接读/自托管）
-tests/                      pytest 用例（337 个）
+tests/                      pytest 用例（345 个）
 CHANGELOG.md                版本变更记录
 Makefile                    构建入口：runtime / catalog-json / ludusavi-manifest / package / package-droiddeck / test / doctor / validate-catalog / validate-submissions / normalize-catalog / clean
 ```
@@ -238,8 +239,8 @@ Makefile                    构建入口：runtime / catalog-json / ludusavi-man
 - **3DS / SteamOS**：SteamOS 上 3DS 优先走官方 Flatpak（首次安装自动装，约数百 MB 运行时），避免官方 AppImage 在 Steam Deck 上的兼容问题；无 Flatpak 环境回退 AppImage
 - **模拟器边界**：所有平台首次安装都需联网下载官方包（约 15–99MB）；PS1/PS2 BIOS、PS3 固件、3DS system files、Switch keys/固件都要自备，放到 `~/.local/share/freedeckCY/bios/<platform>/`（支持 zip/7z 压缩包，安装时自动解压部署）；3DS/PS2/PS3 仅 x86_64；解包目录会多占空间；ARM64 未真机验证
 - **百度网盘边界**：只接官方 OpenAPI，需要自行在百度网盘开放平台创建应用并授权；不支持 BDUSS/Cookie 网页抓取；转存受百度账号空间/接口配额限制；未授权时安装会提示
-- **模拟器云存档边界**：只做上传，尚未做云端存档到模拟器目录的恢复/冲突映射；PS1/PS2 等共享记忆卡按平台去重，恢复时不能只挑某一个游戏；3DS/Switch 的整目录可能较大，可在 QAM 关闭「包含模拟器存档」
-- **自动云存档边界**：PC 存档覆盖 Ludusavi 清单/Proton 前缀；模拟器存档自 v0.15.0 起支持上传（见上一条），但暂不支持恢复；首次自动上传依赖清单匹配/登录态
+- **模拟器云存档边界**：PS1/PS2 单片记忆卡、Switch 存档目录仍无法按游戏拆分，恢复会整卡覆盖（需确认）；3DS/Switch 整目录可能较大，可在 QAM 关闭「包含模拟器存档」
+- **自动云存档边界**：PC 存档覆盖 Ludusavi 清单/Proton 前缀；模拟器存档 v0.15.0 起支持上传、v0.16.0 起支持恢复（见上一条）；首次自动上传依赖清单匹配/登录态
 - **DroidDeck 适配未真机验证**：FEX / ARM Proton / Android 存储映射可能有差异，排障见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
 - **更新检查依赖 GitHub API**：未认证限流 60 次/小时/IP，失败只提示、不缓存失败结果；成功结果缓存 1 小时
 - 分卷识别只覆盖常见 6 类命名，冷门命名会被当成普通文件

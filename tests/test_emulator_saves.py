@@ -138,3 +138,137 @@ def test_cloud_candidates_respect_emulator_toggle(tmp_path, monkeypatch):
     candidates, diagnostics = asyncio.run(service._collect_cloud_save_candidates())
     assert candidates == []
     assert diagnostics["ignored"][0]["reason"] == "emulator_saves_disabled"
+
+
+def _sfo(title: str) -> bytes:
+    import struct
+
+    key = b"TITLE\x00"
+    value = title.encode("utf-8") + b"\x00"
+    key_start = 36
+    data_start = key_start + len(key)
+    header = b"\x00PSF" + struct.pack("<IIII", 0x101, key_start, data_start, 1)
+    index = struct.pack("<HHIII", 0, 0x0204, len(value), len(value), 0)
+    return header + index + key + value
+
+
+def test_psp_save_split_by_param_sfo(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    savedata = tmp_path / ".local" / "share" / "ppsspp" / "PSP" / "SAVEDATA"
+    target = savedata / "ULUS10001"
+    other = savedata / "ULUS10002"
+    target.mkdir(parents=True)
+    other.mkdir(parents=True)
+    (target / "PARAM.SFO").write_bytes(_sfo("Game One"))
+    (other / "PARAM.SFO").write_bytes(_sfo("Other Game"))
+
+    result = emulator_saves.collect_emulator_save_paths(
+        SimpleNamespace(platform="psp", game_title="Game One", rom_path="/roms/game.iso", install_path="", launcher_path="")
+    )
+    assert result.per_game is True
+    assert result.paths == [str(target)]
+
+
+def test_ps3_save_split_by_param_sfo(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    savedata = tmp_path / ".config" / "rpcs3" / "dev_hdd0" / "home" / "00000001" / "savedata"
+    target = savedata / "NPWR10001"
+    other = savedata / "NPWR10002"
+    target.mkdir(parents=True)
+    other.mkdir(parents=True)
+    (target / "PARAM.SFO").write_bytes(_sfo("Game One"))
+    (other / "PARAM.SFO").write_bytes(_sfo("Other Game"))
+
+    result = emulator_saves.collect_emulator_save_paths(
+        SimpleNamespace(platform="ps3", game_title="Game One", rom_path="/roms/game.iso", install_path="", launcher_path="")
+    )
+    assert result.per_game is True
+    assert result.paths == [str(target)]
+
+
+def test_restore_targets_use_original_home_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    source = tmp_path / ".local" / "share" / "mgba" / "saves" / "game.sav"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"x")
+    roots, targets = emulator_saves.build_restore_targets(
+        SimpleNamespace(platform="gba", rom_path="/roms/game.gba", install_path="", launcher_path=""),
+        [{"entry_id": "e1", "source_path": str(source), "archive_rel_path": "game.sav"}],
+    )
+    assert roots
+    assert targets["e1"] == str(source.parent)
+
+
+def test_plan_emulator_save_restore(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    home_save = tmp_path / ".local" / "share" / "mgba" / "saves"
+    home_save.mkdir(parents=True)
+    source = home_save / "game.sav"
+
+    service = TianyiService.__new__(TianyiService)
+    service.store = TianyiStateStore(str(tmp_path / "state.json"))
+    service.store.installed_games = [
+        SimpleNamespace(
+            game_id="g1",
+            game_title="GBA Game",
+            platform="gba",
+            rom_path=str(tmp_path / "game.gba"),
+            install_path=str(tmp_path),
+            launcher_path="",
+        )
+    ]
+    service._cloud_save_restore_lock = asyncio.Lock()
+    service._cloud_save_restore_plan = None
+    service._cloud_save_restore_state = {}
+
+    extract = tmp_path / "extract"
+    extract.mkdir()
+    (extract / "game.sav").write_bytes(b"save")
+    bundle = {"temp_dir": str(tmp_path / "tmp"), "extract_dir": str(extract)}
+    manifest = {"source_strategy": "emulator_saves"}
+    entries = [
+        {
+            "entry_id": "e1",
+            "entry_name": "game.sav",
+            "source_path": str(source),
+            "archive_rel_path": "game.sav",
+            "file_count": 1,
+        }
+    ]
+    result = asyncio.run(
+        service._plan_emulator_save_restore(
+            bundle=bundle,
+            manifest=manifest,
+            entries=entries,
+            selected_ids=["e1"],
+            game_id="g1",
+            game_key="gba-g1",
+            game_title="GBA Game",
+            version_name="2026.7z",
+            manifest_playtime={},
+        )
+    )
+    assert result["accepted"] is True
+    assert result["restorable_files"] == 1
+    plan = service._cloud_save_restore_plan
+    assert plan["copy_pairs"][0][1] == str(source)
+
+
+def test_3ds_save_split_by_title_id(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    rom = tmp_path / "game.3ds"
+    header = bytearray(0x120)
+    header[0x100:0x104] = b"NCSD"
+    header[0x108:0x110] = (0x0004000000033600).to_bytes(8, "little")
+    rom.write_bytes(bytes(header))
+
+    sdmc = tmp_path / ".local" / "share" / "azahar" / "sdmc"
+    title = sdmc / "Nintendo 3DS" / "id0" / "id1" / "title" / "00040000" / "00033600"
+    (title / "data").mkdir(parents=True)
+    (title / "data" / "00000001.sav").write_bytes(b"save")
+
+    result = emulator_saves.collect_emulator_save_paths(
+        SimpleNamespace(platform="3ds", game_title="Game", rom_path=str(rom), install_path="", launcher_path="")
+    )
+    assert result.per_game is True
+    assert result.paths == [str(title)]
