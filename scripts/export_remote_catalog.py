@@ -181,7 +181,7 @@ def main() -> int:
         default="defaults/tianyi_catalog/freedeckcy_catalog.csv",
         help="本地目录 CSV",
     )
-    parser.add_argument("--out", default="dist-artifacts/catalog-server", help="输出目录")
+    parser.add_argument("--out", default="catalog-json", help="输出目录（默认仓库内 catalog-json/）")
     parser.add_argument("--curated-limit", type=int, default=CURATED_LIMIT, help="每个平台精选数量")
     args = parser.parse_args()
 

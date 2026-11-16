@@ -1,0 +1,116 @@
+{
+  "curated_limit": 60,
+  "files": {
+    "all.json": {
+      "count": 7084,
+      "sha256": "5b9148f457199c5bab8e566f1cd59bd03ad029d1257d3d621881992c645dd6af"
+    },
+    "curated/3ds.json": {
+      "count": 60,
+      "sha256": "ff9dc860e111f9d0366838add16ec7c69fb2220981e59365555c04cee4878cfd"
+    },
+    "curated/fc.json": {
+      "count": 60,
+      "sha256": "aef8d12b0e080d2610a4d0e35fddf3ce3761f1cc0f4fcd0db917dc368e65ac25"
+    },
+    "curated/gba.json": {
+      "count": 60,
+      "sha256": "40b306f34ed868b910d4f7591b2f916b3d8cafe201e9c943e9bfccdcd9894d7f"
+    },
+    "curated/md.json": {
+      "count": 60,
+      "sha256": "0fd6faa4928b0fab4640a80bf3199e044de41ef08e699ebf9954526b1bdb022e"
+    },
+    "curated/nds.json": {
+      "count": 60,
+      "sha256": "dc19625d781d7c08c63e389b4e0cff4252641bb865b37c22f0c8569cb0feaf69"
+    },
+    "curated/pc.json": {
+      "count": 60,
+      "sha256": "21a63b6bba932b63863cee7d43f9a66e542351225e2a56ecd68909ba7ea12dc8"
+    },
+    "curated/ps1.json": {
+      "count": 60,
+      "sha256": "8fb1b383316e5fa8540edae22ac79f03c664bce36c6562dc2fd0918928510bcc"
+    },
+    "curated/ps2.json": {
+      "count": 60,
+      "sha256": "3234b247c58ffe7b370a1a9dafc3c267072d64c25199e3fe29c457a9d3a3c590"
+    },
+    "curated/ps3.json": {
+      "count": 60,
+      "sha256": "9db63b8b0444195a5d11fb3c50d2336bbd055fcaaf4f1bb189c893356ad6ad87"
+    },
+    "curated/psp.json": {
+      "count": 60,
+      "sha256": "0214101b80607213701a8ea43deb627d10ae6184565af2773e9707c169902948"
+    },
+    "curated/switch.json": {
+      "count": 60,
+      "sha256": "8460eea6a443063027c0ef10036563f386c5bc6dd01e3205ab2e7bf62accefb4"
+    },
+    "platform/3ds.json": {
+      "count": 305,
+      "sha256": "eacc0c464be6e45e69817262a8ea96cb18df8fda18964aacd309223854321ff2"
+    },
+    "platform/fc.json": {
+      "count": 1475,
+      "sha256": "a61979fa3c5ed82159678486bab57cd6f6d8c86f4929ba60022db4ed4e43948b"
+    },
+    "platform/gba.json": {
+      "count": 553,
+      "sha256": "ff0fee77600295fb1caf3e524df440bb54a9c8ff977b53d0a39594ad48880e22"
+    },
+    "platform/md.json": {
+      "count": 191,
+      "sha256": "9324884d426308fadd6901721ec346e56a3c4bb7ca25b9117bac150a4c95f196"
+    },
+    "platform/nds.json": {
+      "count": 722,
+      "sha256": "3a17d84b6e248fde882ddb27cb32236b73da5da01f3b2904f049cff2d0837fb6"
+    },
+    "platform/pc.json": {
+      "count": 2540,
+      "sha256": "84576489e913bc97abc2d2877ff061cda7b90f909a8a626d002b1e803cdaa585"
+    },
+    "platform/ps1.json": {
+      "count": 194,
+      "sha256": "9e370ceb0aa264bf9de0f41b1197d4dee5ea19e4dfa799a497a340bebc7dc1af"
+    },
+    "platform/ps2.json": {
+      "count": 250,
+      "sha256": "63cd1970a411f1bcefaea692a493f27b1f35c2b609719e6d41282c69065504b3"
+    },
+    "platform/ps3.json": {
+      "count": 194,
+      "sha256": "323b678b154c003ab9f533c36354d3ad2659741d471fa677c096f2ff7b98bc18"
+    },
+    "platform/psp.json": {
+      "count": 575,
+      "sha256": "4c306f2d9fa0458be9f6ca0be619d22af4ed5c2ace7e8aa740774ecc98dee247"
+    },
+    "platform/switch.json": {
+      "count": 85,
+      "sha256": "6aa679fa775cf4cadfea789da75926fee988e9b160c87e47c4037fcd354003dc"
+    }
+  },
+  "generated_at": 1794821852,
+  "generated_at_text": "2026-11-16 17:37:32",
+  "platforms": {
+    "3ds": 305,
+    "fc": 1475,
+    "gba": 553,
+    "md": 191,
+    "nds": 722,
+    "pc": 2540,
+    "ps1": 194,
+    "ps2": 250,
+    "ps3": 194,
+    "psp": 575,
+    "switch": 85
+  },
+  "schema_version": 1,
+  "source": "freedeckcy_catalog.csv",
+  "source_sha256": "733569be5f6b8f5e41d4961e975b1d44843ce8a97d151ded5212b66ea95a036b",
+  "total": 7084
+}

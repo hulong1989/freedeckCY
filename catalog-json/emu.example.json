@@ -1,0 +1,13 @@
+{
+  "_comment": "NewFreedeck emu.json 模板：share_url/pwd/file_name 留空，请填自己的合法来源；不要提交真实分享链接。",
+  "gba": { "share_url": "", "pwd": "", "file_name": "" },
+  "ps1": { "share_url": "", "pwd": "", "file_name": "" },
+  "ps2": { "share_url": "", "pwd": "", "file_name": "" },
+  "ps3": { "share_url": "", "pwd": "", "file_name": "" },
+  "psp": { "share_url": "", "pwd": "", "file_name": "" },
+  "3ds": { "share_url": "", "pwd": "", "file_name": "" },
+  "nds": { "share_url": "", "pwd": "", "file_name": "" },
+  "fc": { "share_url": "", "pwd": "", "file_name": "" },
+  "md": { "share_url": "", "pwd": "", "file_name": "" },
+  "switch": { "share_url": "", "pwd": "", "file_name": "" }
+}

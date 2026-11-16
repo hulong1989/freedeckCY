@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NewFreedeck catalog item",
+  "type": "object",
+  "required": ["game_id", "title", "platform", "down_url"],
+  "properties": {
+    "game_id": { "type": "string" },
+    "title": { "type": "string" },
+    "title_zh": { "type": "string" },
+    "title_en": { "type": "string" },
+    "platform": { "type": "string" },
+    "cover_url": { "type": "string" },
+    "size_text": { "type": "string" },
+    "genre": { "type": "string" },
+    "down_url": { "type": "string", "pattern": "^https?://cloud\\.189\\.cn/" },
+    "file_name": { "type": "string" },
+    "size_bytes": { "type": "integer", "minimum": 0 },
+    "pwd": { "type": "string" },
+    "server": { "type": "string" },
+    "version": { "type": "string" },
+    "validity": { "type": "string" },
+    "install_size_text": { "type": "string" },
+    "install_size_bytes": { "type": "integer", "minimum": 0 },
+    "grouped": { "type": "boolean" },
+    "variant_count": { "type": "integer", "minimum": 0 },
+    "multi_disc": { "type": "boolean" },
+    "disc_count": { "type": "integer", "minimum": 1 },
+    "variants": {
+      "type": "array",
+      "items": { "$ref": "#" }
+    }
+  }
+}

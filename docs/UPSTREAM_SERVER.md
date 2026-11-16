@@ -106,13 +106,13 @@ make catalog-json
 # 等价于：
 python3 scripts/export_remote_catalog.py \
   --catalog defaults/tianyi_catalog/freedeckcy_catalog.csv \
-  --out dist-artifacts/catalog-server
+  --out catalog-json
 ```
 
-输出：
+输出（仓库内已提交一份快照，可直接读取）：
 
 ```
-catalog-server/
+catalog-json/
   all.json                 # 7084 条，NewFreedeck 兼容
   platform/<platform>.json # 按平台拆分
   curated/<platform>.json  # 每平台精选（封面优先/体积降序，默认 60）
@@ -124,7 +124,7 @@ catalog-server/
 自托管（任意静态服务器 / GitHub Pages / Release 资产）：
 
 ```bash
-cd dist-artifacts/catalog-server
+cd catalog-json
 python3 -m http.server 8000
 # all:     http://127.0.0.1:8000/all.json
 # platform:http://127.0.0.1:8000/platform/gba.json

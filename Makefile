@@ -34,7 +34,7 @@ help:
 	@echo "目标:"
 	@echo "  runtime    下载 aria2c / 7zz / node 到 defaults/runtime/（幂等，可重复执行）"
 	@echo "  emulator-runtime  下载 mGBA AppImage（x86_64/aarch64）到 defaults/runtime/mgba/"
-	@echo "  catalog-json  导出 NewFreedeck 兼容目录 JSON 到 dist-artifacts/catalog-server/"
+	@echo "  catalog-json  导出 NewFreedeck 兼容目录 JSON 到 catalog-json/（仓库内，可直接读）"
 	@echo "  package    组装 Decky 插件 zip 到 dist-artifacts/freedeckCY-v<version>.zip"
 	@echo "  package-droiddeck  组装 aarch64 包（DroidDeck/ARM 设备）到 ...-arm64.zip"
 	@echo "  test       使用 .venv/bin/pytest 运行测试（未安装则提示安装 dev 依赖）"
@@ -65,7 +65,7 @@ emulator-runtime:
 	@cd "$(ROOT)" && bash scripts/fetch_emulator.sh $(RUNTIME_ARGS)
 
 catalog-json:
-	@cd "$(ROOT)" && python3 scripts/export_remote_catalog.py --out dist-artifacts/catalog-server
+	@cd "$(ROOT)" && python3 scripts/export_remote_catalog.py
 
 package:
 	@cd "$(ROOT)" && bash scripts/package.sh

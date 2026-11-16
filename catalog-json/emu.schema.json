@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NewFreedeck emu.json",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "properties": {
+      "share_url": { "type": "string" },
+      "pwd": { "type": "string" },
+      "file_name": { "type": "string" }
+    },
+    "additionalProperties": true
+  }
+}
