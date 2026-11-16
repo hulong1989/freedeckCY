@@ -728,7 +728,7 @@ def test_non_pc_platform_install_is_rejected(service, tmp_path, monkeypatch):
     try:
         asyncio.run(service._build_install_plan(game_id="9001"))
     except ValueError as exc:
-        assert "模拟器" in str(exc)
+        assert "暂未接入模拟器" in str(exc)
     else:
         raise AssertionError("非 PC 资源不应生成安装计划")
 

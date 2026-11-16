@@ -30,6 +30,13 @@ from yarl import URL
 import config
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
+from emulator_manager import (
+    create_launch_wrapper,
+    emulator_name_for_platform,
+    emulator_status,
+    ensure_mgba,
+    find_rom_file,
+)
 from game_catalog import (
     GameCatalog,
     resolve_default_catalog_path,
@@ -305,6 +312,7 @@ def _task_to_view(task: TianyiTaskRecord) -> Dict[str, Any]:
         "install_status": task.install_status,
         "install_message": task.install_message,
         "installed_path": task.installed_path,
+        "platform": str(getattr(task, "platform", "pc") or "pc"),
         "updated_at": task.updated_at,
     }
 
@@ -390,6 +398,7 @@ class TianyiService:
     def __init__(self, plugin: Any):
         self.plugin = plugin
         plugin_dir = str(getattr(decky, "DECKY_PLUGIN_DIR", Path.cwd()))
+        self.plugin_dir = plugin_dir
         state_root = config.DECKY_SEND_DIR
         try:
             os.makedirs(state_root, exist_ok=True)
@@ -5014,11 +5023,17 @@ class TianyiService:
                 game_title = game_id or "自定义分享"
                 game_id = game_id or normalized_share_url
 
-        if str(platform or "pc").strip().lower() != "pc":
+        platform = str(platform or "pc").strip().lower() or "pc"
+        emulator = emulator_name_for_platform(platform)
+        if platform != "pc" and not emulator:
             raise ValueError(
-                f"当前版本未集成模拟器，暂不支持安装 {str(platform).upper()} 资源；"
-                "可在库页按平台浏览，模拟器支持见 ROADMAP"
+                f"当前只支持 PC 与 GBA（mGBA）资源，{platform.upper()} 暂未接入模拟器"
             )
+        emulator_info: Dict[str, Any] = {}
+        if emulator:
+            emulator_info = emulator_status(self.plugin_dir)
+            if not emulator_info.get("available"):
+                raise ValueError(str(emulator_info.get("message") or "mGBA 不可用"))
 
         settings = self.store.settings
         target_download = (download_dir or settings.download_dir or self.plugin.downloads_dir).strip()
@@ -5033,18 +5048,47 @@ class TianyiService:
         target_install = os.path.realpath(os.path.expanduser(target_install))
         os.makedirs(target_install, exist_ok=True)
 
+        rom_target = ""
+        if emulator:
+            rom_target = os.path.basename(str(open_path or "").replace("\\", "/")).strip()
+            if not rom_target:
+                raise ValueError("资源缺少 ROM 文件名（openpath），无法从分享中定位文件")
         try:
-            resolved = await resolve_share(share_url, self.store.login.cookie)
+            resolved = await resolve_share(
+                share_url,
+                self.store.login.cookie,
+                target_name=rom_target,
+            )
         except TianyiApiError as exc:
             diagnostics = dict(getattr(exc, "diagnostics", {}) or {})
             diagnostics.setdefault("stage", "resolve_share")
             raise TianyiApiError(str(exc), diagnostics=diagnostics) from exc
-        selected = {str(v).strip() for v in (file_ids or []) if str(v).strip()}
-        files = [
-            file_item
-            for file_item in resolved.files
-            if not file_item.is_folder and (not selected or file_item.file_id in selected)
-        ]
+        if emulator:
+            target_key = os.path.basename(rom_target).lower()
+            matched = [
+                file_item
+                for file_item in resolved.files
+                if not file_item.is_folder
+                and os.path.basename(str(file_item.name or "")).lower() == target_key
+            ]
+            if not matched:
+                sample = "、".join(
+                    str(file_item.name or "")
+                    for file_item in resolved.files
+                    if not file_item.is_folder
+                )[:300]
+                raise TianyiApiError(
+                    f"分享中没有找到 ROM「{rom_target}」，可能资源包已更新。"
+                    + (f" 已扫描示例：{sample}" if sample else "")
+                )
+            files = matched[:1]
+        else:
+            selected = {str(v).strip() for v in (file_ids or []) if str(v).strip()}
+            files = [
+                file_item
+                for file_item in resolved.files
+                if not file_item.is_folder and (not selected or file_item.file_id in selected)
+            ]
         if not files:
             raise TianyiApiError("未找到可下载文件，可能所选条目是目录")
 
@@ -5079,6 +5123,9 @@ class TianyiService:
             "game_id": game_id,
             "game_title": game_title,
             "platform": platform,
+            "emulator": emulator,
+            "emulator_info": emulator_info,
+            "rom_target": rom_target,
             "openpath": open_path,
             "share_url": share_url,
             "share_code": resolved.share_code,
@@ -5167,6 +5214,7 @@ class TianyiService:
                     file_size=file_size,
                     group_id=group_id,
                     group_total=group_total,
+                    platform=str(plan.get("platform", "pc") or "pc"),
                     created_at=now,
                     updated_at=now,
                 )
@@ -5772,6 +5820,10 @@ class TianyiService:
             "playtime_sessions": max(0, _safe_int(playtime.get("sessions"), 0)),
             "playtime_last_played_at": max(0, _safe_int(playtime.get("last_played_at"), 0)),
             "playtime_active": bool(playtime.get("active")),
+            "platform": str(record.platform or "pc"),
+            "emulator": str(record.emulator or ""),
+            "rom_path": str(record.rom_path or ""),
+            "launcher_path": str(record.launcher_path or ""),
             "updated_at": int(record.updated_at or 0),
         }
 
@@ -5926,6 +5978,7 @@ class TianyiService:
                 "missing_paths": installed_missing,
             },
             "settings": settings,
+            "emulators": {"mgba": emulator_status(root)},
             "recent_errors": recent_errors,
             "log_tail": log_tail,
         }
@@ -6345,6 +6398,8 @@ class TianyiService:
                 playtime_last_played_at=existing_playtime_last_played_at,
                 playtime_active_started_at=existing_playtime_active_started_at,
                 playtime_active_app_id=existing_playtime_active_app_id,
+                platform=str(lead.platform or "pc"),
+                emulator=emulator_name_for_platform(str(lead.platform or "")),
             )
         )
         self._invalidate_panel_cache(tasks=True, installed=True)
@@ -6358,11 +6413,20 @@ class TianyiService:
             app_id = _safe_int(steam_result.get("appid_unsigned"), 0)
             if app_id > 0:
                 installed_record = self._find_installed_record(game_id=game_id, install_path=target_dir)
-                if installed_record is not None and max(0, _safe_int(installed_record.steam_app_id, 0)) != app_id:
-                    installed_record.steam_app_id = app_id
-                    installed_record.updated_at = _now_wall_ts()
-                    await asyncio.to_thread(self.store.save)
-                    self._invalidate_panel_cache(installed=True)
+                if installed_record is not None:
+                    changed = False
+                    if max(0, _safe_int(installed_record.steam_app_id, 0)) != app_id:
+                        installed_record.steam_app_id = app_id
+                        changed = True
+                    for attr in ("rom_path", "launcher_path", "emulator"):
+                        value = str(steam_result.get(attr, "") or "")
+                        if value and getattr(installed_record, attr, "") != value:
+                            setattr(installed_record, attr, value)
+                            changed = True
+                    if changed:
+                        installed_record.updated_at = _now_wall_ts()
+                        await asyncio.to_thread(self.store.save)
+                        self._invalidate_panel_cache(installed=True)
                 message_parts.append(f"已加入 Steam（AppID {app_id}）")
             else:
                 message_parts.append("已加入 Steam")
@@ -6429,6 +6493,14 @@ class TianyiService:
 
     async def _auto_register_task_to_steam(self, *, task: TianyiTaskRecord, target_dir: str) -> Dict[str, Any]:
         """安装完成后自动写入 Steam 快捷方式、Proton 和封面。"""
+        platform = str(getattr(task, "platform", "pc") or "pc").strip().lower()
+        if emulator_name_for_platform(platform):
+            return await self._auto_register_emulator_to_steam(
+                task=task,
+                target_dir=target_dir,
+                platform=platform,
+            )
+
         exe_path = self._resolve_installed_executable_path(task=task, target_dir=target_dir)
         if not exe_path:
             return {"ok": False, "message": "安装目录未找到可执行文件"}
@@ -6485,6 +6557,81 @@ class TianyiService:
             return result
         except Exception as exc:
             config.logger.exception("Auto add to Steam exception game=%s exe=%s", game_id or display_name, exe_path)
+            return {"ok": False, "message": str(exc)}
+
+    async def _auto_register_emulator_to_steam(
+        self,
+        *,
+        task: TianyiTaskRecord,
+        target_dir: str,
+        platform: str,
+    ) -> Dict[str, Any]:
+        """模拟器资源：生成启动脚本并注册原生 Linux 快捷方式（不写 Proton 映射）。"""
+        rom_path = find_rom_file(target_dir, open_path=str(task.openpath or ""))
+        if not rom_path:
+            return {"ok": False, "message": "安装目录未找到 ROM 文件（.gba）"}
+        try:
+            command = await ensure_mgba(self.plugin_dir)
+        except Exception as exc:
+            return {"ok": False, "message": f"mGBA 不可用: {exc}"}
+
+        wrapper_path = os.path.join(target_dir, "launch-freedeckcy.sh")
+        try:
+            create_launch_wrapper(command=command, rom_path=rom_path, wrapper_path=wrapper_path)
+        except Exception as exc:
+            return {"ok": False, "message": f"生成启动脚本失败: {exc}"}
+
+        game_id = str(task.game_id or "").strip()
+        launch_token = re.sub(r"[^a-zA-Z0-9._-]+", "_", game_id or task.task_id or "game").strip("_")
+        if not launch_token:
+            launch_token = "game"
+        # 启动脚本会忽略 Steam 传入的参数；token 仅用于卸载时定位快捷方式。
+        launch_options = f"freedeckcy:tianyi:{launch_token}"
+        display_name = self._derive_display_title_for_steam(
+            str(task.game_title or task.file_name or "freedeckCY GBA")
+        )
+        categories = ""
+        try:
+            entry = self.catalog.get_by_game_id(game_id)
+            if entry is not None:
+                categories = str(entry.categories or "")
+        except Exception:
+            categories = ""
+
+        cover_info: Dict[str, Any] = {}
+        try:
+            cover_info = await self.resolve_catalog_cover(
+                game_id=game_id,
+                title=str(task.game_title or display_name),
+                categories=categories,
+            )
+        except Exception as exc:
+            config.logger.warning("Resolve GBA cover failed for %s: %s", game_id or display_name, exc)
+
+        try:
+            result = await add_or_update_tianyi_shortcut(
+                game_id=game_id or task.task_id,
+                display_name=display_name,
+                exe_path=wrapper_path,
+                launch_options=launch_options,
+                proton_tool="none",
+                cover_landscape_url=str(cover_info.get("cover_url", "") or ""),
+                cover_portrait_url=str(cover_info.get("square_cover_url", "") or ""),
+                steam_app_id=_safe_int(cover_info.get("app_id"), 0),
+            )
+            if not result.get("ok"):
+                config.logger.warning(
+                    "Auto add GBA to Steam failed game=%s exe=%s reason=%s",
+                    game_id or display_name,
+                    wrapper_path,
+                    result.get("message", ""),
+                )
+            result["rom_path"] = rom_path
+            result["launcher_path"] = wrapper_path
+            result["emulator"] = "mgba"
+            return result
+        except Exception as exc:
+            config.logger.exception("Auto add GBA to Steam exception game=%s", game_id or display_name)
             return {"ok": False, "message": str(exc)}
 
     def _derive_display_title_for_steam(self, title: str) -> str:

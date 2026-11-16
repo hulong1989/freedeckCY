@@ -137,6 +137,7 @@
           <div class="card-info">
             <h3 class="card-title">{{ item.title }}</h3>
             <div class="card-meta">
+              <span v-if="item.platform && item.platform !== 'pc'" class="platform-tag">{{ item.platform.toUpperCase() }}</span>
               <span>{{ item.size_text || "-" }}</span>
               <span v-if="item.playtime_text && item.playtime_text !== '0 分钟'">{{ item.playtime_text }}</span>
             </div>
@@ -203,7 +204,7 @@
               </div>
             </div>
             <div class="modal-side">
-              <p class="modal-sub">确认后自动下载并解压安装</p>
+              <p class="modal-sub">{{ installDialog.plan.emulator ? "模拟器：mGBA · " : "" }}确认后自动下载并解压安装</p>
 
               <div class="space-block">
                 <div class="space-row">

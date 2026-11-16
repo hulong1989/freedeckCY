@@ -1115,8 +1115,8 @@ createApp({
     async openInstallConfirm(item) {
       if (!item || !item.game_id) return;
       const platform = String(item.platform || "pc").toLowerCase();
-      if (platform !== "pc") {
-        this.flash(`当前版本未集成模拟器，暂不支持安装 ${platform.toUpperCase()} 资源`);
+      if (platform !== "pc" && platform !== "gba") {
+        this.flash(`当前只支持 PC 与 GBA（mGBA）资源，${platform.toUpperCase()} 暂未接入模拟器`);
         return;
       }
       void this.fetchCoverForItem(item, { force: true });

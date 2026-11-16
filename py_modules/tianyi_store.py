@@ -98,6 +98,8 @@ class TianyiTaskRecord:
     # 同一安装计划的多个文件共用 group_id：必须全部下载完成后才一起安装
     group_id: str = ""
     group_total: int = 0
+    # 目录平台（PC / gba / ...），安装完成后据此选择模拟器注册方式
+    platform: str = "pc"
     created_at: int = field(default_factory=_now_ts)
     updated_at: int = field(default_factory=_now_ts)
 
@@ -148,6 +150,11 @@ class TianyiInstalledGame:
     playtime_last_played_at: int = 0
     playtime_active_started_at: int = 0
     playtime_active_app_id: int = 0
+    # 平台与模拟器信息（PC 为空/默认）
+    platform: str = "pc"
+    emulator: str = ""
+    rom_path: str = ""
+    launcher_path: str = ""
     created_at: int = field(default_factory=_now_ts)
     updated_at: int = field(default_factory=_now_ts)
 

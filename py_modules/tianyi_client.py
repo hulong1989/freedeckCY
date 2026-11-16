@@ -1075,8 +1075,18 @@ async def get_user_account(cookie: str) -> Optional[str]:
     return account or None
 
 
-async def resolve_share(share_url: str, cookie: str) -> ResolvedShare:
-    """解析分享链接，返回分享文件清单。"""
+async def resolve_share(
+    share_url: str,
+    cookie: str,
+    *,
+    target_name: str = "",
+    max_pages: int = 40,
+) -> ResolvedShare:
+    """解析分享链接，返回分享文件清单。
+
+    target_name 非空时会逐页向后查找该文件（模拟器资源一个分享可能含上千个 ROM），
+    找到即停止；找不到则返回已扫描的文件，由调用方给出明确错误。
+    """
     share_code, pwd = parse_share_url(share_url)
     timeout = aiohttp.ClientTimeout(total=20)
     no_cache = str(_now_ms())
@@ -1560,22 +1570,26 @@ async def resolve_share(share_url: str, cookie: str) -> ResolvedShare:
                     diagnostics={"share_code": share_code, "share_url": share_url, "attempts": attempts},
                 ) from first_error
 
-        file_list_ao = _find_nested_value(list_payload, "fileListAO")
-        rows: object = file_list_ao.get("fileList") if isinstance(file_list_ao, dict) else None
-        if not isinstance(rows, list):
-            rows = _find_nested_value(list_payload, "fileList", "files", "rows", "list")
-        files: List[ResolvedFile] = []
-        if isinstance(rows, list):
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                file_id = _get_json_value(row, "id", "fileId")
-                if not file_id:
-                    continue
-                name = _get_json_value(row, "name", "fileName") or f"file-{file_id}"
-                size = _parse_int(row.get("size", row.get("fileSize", 0)), 0)
-                folder = str(row.get("isFolder", "")).lower() in {"1", "true"}
-                files.append(ResolvedFile(file_id=file_id, name=name, size=size, is_folder=folder))
+        def _parse_files(payload: Dict[str, object]) -> List[ResolvedFile]:
+            file_list_ao = _find_nested_value(payload, "fileListAO")
+            rows: object = file_list_ao.get("fileList") if isinstance(file_list_ao, dict) else None
+            if not isinstance(rows, list):
+                rows = _find_nested_value(payload, "fileList", "files", "rows", "list")
+            parsed: List[ResolvedFile] = []
+            if isinstance(rows, list):
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    file_id = _get_json_value(row, "id", "fileId")
+                    if not file_id:
+                        continue
+                    name = _get_json_value(row, "name", "fileName") or f"file-{file_id}"
+                    size = _parse_int(row.get("size", row.get("fileSize", 0)), 0)
+                    folder = str(row.get("isFolder", "")).lower() in {"1", "true"}
+                    parsed.append(ResolvedFile(file_id=file_id, name=name, size=size, is_folder=folder))
+            return parsed
+
+        files = _parse_files(list_payload)
 
         if not files and root_file_id:
             files.append(
@@ -1586,6 +1600,36 @@ async def resolve_share(share_url: str, cookie: str) -> ResolvedShare:
                     is_folder=False,
                 )
             )
+
+        wanted = os.path.basename(str(target_name or "").replace("\\", "/")).strip().lower()
+        if wanted:
+            seen_ids = {file_item.file_id for file_item in files}
+            page_num = 2
+            while page_num <= max(1, int(max_pages)):
+                if any(
+                    not file_item.is_folder
+                    and os.path.basename(str(file_item.name or "")).lower() == wanted
+                    for file_item in files
+                ):
+                    break
+                page_params = dict(params)
+                page_params["pageNum"] = str(page_num)
+                try:
+                    page_payload = await _request_list_payload(
+                        page_params,
+                        step_name=f"list_share_dir_page_{page_num}",
+                    )
+                except TianyiApiError:
+                    break
+                page_files = _parse_files(page_payload)
+                if not page_files:
+                    break
+                fresh = [file_item for file_item in page_files if file_item.file_id not in seen_ids]
+                if not fresh:
+                    break
+                files.extend(fresh)
+                seen_ids.update(file_item.file_id for file_item in fresh)
+                page_num += 1
 
     return ResolvedShare(share_code=share_code, share_id=share_id, pwd=pwd, files=files)
 

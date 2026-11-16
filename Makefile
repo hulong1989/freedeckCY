@@ -24,7 +24,7 @@ PYTEST := $(ROOT)/.venv/bin/pytest
 REQUIREMENTS_DEV := requirements-dev.txt
 
 .DEFAULT_GOAL := help
-.PHONY: runtime package package-droiddeck test doctor validate-catalog normalize-catalog clean help
+.PHONY: runtime emulator-runtime package package-droiddeck test doctor validate-catalog normalize-catalog clean help
 
 help:
 	@echo "freedeckCY 构建入口"
@@ -33,6 +33,7 @@ help:
 	@echo ""
 	@echo "目标:"
 	@echo "  runtime    下载 aria2c / 7zz / node 到 defaults/runtime/（幂等，可重复执行）"
+	@echo "  emulator-runtime  下载 mGBA AppImage（x86_64/aarch64）到 defaults/runtime/mgba/"
 	@echo "  package    组装 Decky 插件 zip 到 dist-artifacts/freedeckCY-v<version>.zip"
 	@echo "  package-droiddeck  组装 aarch64 包（DroidDeck/ARM 设备）到 ...-arm64.zip"
 	@echo "  test       使用 .venv/bin/pytest 运行测试（未安装则提示安装 dev 依赖）"
@@ -58,6 +59,9 @@ help:
 
 runtime:
 	@cd "$(ROOT)" && bash scripts/fetch_runtime.sh $(RUNTIME_ARGS)
+
+emulator-runtime:
+	@cd "$(ROOT)" && bash scripts/fetch_emulator.sh $(RUNTIME_ARGS)
 
 package:
 	@cd "$(ROOT)" && bash scripts/package.sh

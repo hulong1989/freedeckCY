@@ -2,6 +2,25 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.6.0
+
+### 新增
+
+- **GBA 模拟器闭环（x86_64 + ARM64）**：GBA 资源从“只可浏览”变为可安装、可启动。
+  - 内置 mGBA 0.10.5 官方 AppImage（x64 / arm64，各约 24MB）；首次使用 `--appimage-extract` 解包到用户目录，不依赖 FUSE（DroidDeck/proot 可用）。
+  - 天翼分享分页查找目标 ROM（一个分享含数百个 ROM），按目录 `openpath` 精确选择文件。
+  - 安装完成自动生成 `<install_dir>/launch-freedeckcy.sh`，写入 Steam 快捷方式；**不写 Proton 映射**（原生 Linux）。
+  - 已安装记录新增 `platform` / `emulator` / `rom_path` / `launcher_path`，列表与诊断可见。
+- `make emulator-runtime`（`scripts/fetch_emulator.sh`）：按架构下载 mGBA AppImage，打包时自动带上对应架构。
+- 库页允许 GBA 安装，弹窗显示“模拟器：mGBA”。
+
+### 变更
+
+- 非 PC 平台：GBA 放行，其余平台仍拒绝并提示“暂未接入模拟器”。
+- `resolve_share()` 新增 `target_name` / `max_pages` 参数，支持分页定位文件。
+- 打包按架构裁剪 `defaults/runtime/mgba/`，并检查 `mGBA.AppImage` 是否存在。
+- 测试 251 → 260。
+
 ## v0.5.0
 
 ### 新增

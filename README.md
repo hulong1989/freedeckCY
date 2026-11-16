@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.5.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.6.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 
 Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把"下载 → 解压 → 装进 Steam 库"整条链路做成几个按钮，另带云存档上传/恢复和游玩时长统计。
@@ -19,7 +19,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.5.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.6.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -41,6 +41,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **平台与分类筛选**：库页可切换平台（PC / FC / NDS / PSP / GBA / 3DS / PS2 / PS1 / PS3 / MD / Switch）与分类，支持手柄导航
 - **浏览 / 分页 / 排序**：打开库页即浏览全部资源，按平台/分类筛选，支持排序与 L1/R1 翻页
 - **已安装管理**：已安装页签可启动游戏、打开目录、卸载（`steam://rungameid`）
+- **GBA 模拟器闭环**：内置 mGBA（x64/arm64 AppImage），GBA 资源可安装/启动；不写 Proton 映射
 - **诊断与更新**：一键导出脱敏诊断 zip；检查 GitHub 最新 Release
 - **全量资源目录**：内置 7084 条资源（来自 v0.6），合并封面索引后 6823 条有封面（96.3%；原始自带 3473 条，索引命中 3311）；分类已清洗（不含平台名），可用 `scripts/merge_v06_catalog.py` 复现/更新
 - **数据体检**：`make validate-catalog` 检查重复 ID / 非法链接 / 空标题 / 分类混平台名，并统计封面覆盖率、平台分布与资源总大小（约 39 TB）；CI 每次都会跑
@@ -64,7 +65,8 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
-make package     # 产出 dist-artifacts/freedeckCY-v0.5.0.zip
+make emulator-runtime   # 下载 mGBA AppImage（GBA 安装后启动用）
+make package     # 产出 dist-artifacts/freedeckCY-v0.6.0.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -75,6 +77,7 @@ DroidDeck 支持导入 Decky 插件，但手机是 ARM64，需要 arm64 包：
 
 ```bash
 make runtime ARCH=aarch64
+make emulator-runtime ARCH=aarch64
 make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zip
 ```
 
@@ -86,8 +89,8 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.5.0.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.5.0-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.6.0.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.6.0-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
@@ -107,7 +110,7 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 251）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 260）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
@@ -123,6 +126,7 @@ make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 | `FREEDECKCY_7Z_BIN` | 指定 7zz 路径 |
 | `FREEDECKCY_NODE_BIN` | 指定 node 路径 |
 | `FREEDECKCY_PROTON_TOOL` | 覆盖 Proton 兼容工具名；`none` 表示不写映射（DroidDeck 默认 `droiddeck-proton-arm64`） |
+| `FREEDECKCY_MGBA_BIN` | 覆盖 mGBA 可执行文件/AppImage 路径（默认用内置 AppImage） |
 | `FREEDECKCY_STEAM_ROOT` | 覆盖 Steam 根目录（Flatpak/自定义安装时用） |
 | `FREEDECKCY_STATE_FILE` | `clear_freedeckcy_tasks.sh` 使用的 state.json 路径 |
 | `FREEDECKCY_GAME_CATALOG_CSV` | 覆盖资源清单 CSV 路径 |
@@ -160,6 +164,7 @@ py_modules/
   server_manager.py         aiohttp 生命周期、Host/Origin 校验、设置持久化
   aria2_manager.py          aria2 运行时复用（meta+flock）+ JSON-RPC + changeUri
   seven_zip_manager.py      7zz 解压/压缩 + `7z t` 校验
+  emulator_manager.py       mGBA 运行时管理（AppImage 解包/ROM 查找/启动脚本）
   steam_shortcuts.py        快捷方式/Proton/封面/写前备份/compatdata 定位
   game_catalog.py           CSV 资源目录/平台字段/分类清洗/封面索引
   archive_bundle.py         多分卷归档识别（.7z.001 / .part1.rar / .z01+zip ...）
@@ -167,11 +172,11 @@ src/index.tsx               QAM 面板（React，构建产物在 dist/）
 defaults/tianyi_library_ui  本地游戏库页面（Vue 3，免构建：浏览/分页/排序/已安装/诊断）
 defaults/tianyi_catalog     资源清单（freedeckcy_catalog.csv 7084 条 + 旧目录回退）与封面索引
 backend/*.js                Node 辅助脚本（分享解析兜底、云盘上传）
-scripts/                    运行时获取 / 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗
+scripts/                    运行时获取（含 mGBA）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
-tests/                      pytest 用例（251 个）
+tests/                      pytest 用例（260 个）
 CHANGELOG.md                版本变更记录
-Makefile                    构建入口：runtime / package / package-droiddeck / test / doctor / validate-catalog / normalize-catalog / clean
+Makefile                    构建入口：runtime / emulator-runtime / package / package-droiddeck / test / doctor / validate-catalog / normalize-catalog / clean
 ```
 
 ## 安全说明
@@ -195,7 +200,8 @@ Makefile                    构建入口：runtime / package / package-droiddeck
 - 全中文硬编码，无 i18n
 - 云存档的上传/恢复仍依赖 `node`（`make runtime` 会准备；未执行则该功能不可用）
 - 下载完整性做「大小 + 文件头 + `7z t`」，但没有哈希校验；7z 不可用时自动跳过校验（best-effort）
-- 模拟器平台（FC/NDS/PSP/GBA/3DS/PS2/PS1/PS3/MD/Switch）当前**只可浏览、不可安装**：点击会提示未集成模拟器，后端也会拒绝生成安装计划
+- **GBA 已可安装/启动**（mGBA）；其余模拟器平台（FC/NDS/PSP/3DS/PS2/PS1/PS3/MD/Switch）仍只可浏览、不可安装
+- **GBA 闭环的边界**：只识别 `.gba`（不含 BIOS/存档管理）；首次使用内置 AppImage 会解包到 `~/.local/share/freedeckCY/emulators/`，多占一份空间；ARM64 未真机验证
 - **DroidDeck 适配未真机验证**：FEX / ARM Proton / Android 存储映射可能有差异，排障见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
 - **更新检查依赖 GitHub API**：未认证限流 60 次/小时/IP，失败只提示、不缓存失败结果；成功结果缓存 1 小时
 - 分卷识别只覆盖常见 6 类命名，冷门命名会被当成普通文件
