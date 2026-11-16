@@ -244,11 +244,11 @@ def test_baidu_qr_login_flow(tmp_path, monkeypatch):
     async def _fake_image(url):
         return b"png"
 
-    async def _fake_poll(sign, timeout=8.0):
+    async def _fake_poll(sign, timeout=8.0, **kwargs):
         assert sign == "sign1"
         return {"status": "confirmed", "v": "v-token"}
 
-    async def _fake_complete(v):
+    async def _fake_complete(v, **kwargs):
         assert v == "v-token"
         return {"cookie": "BDUSS=demo; STOKEN=s", "user_account": "tester"}
 

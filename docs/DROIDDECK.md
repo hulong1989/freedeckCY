@@ -1,6 +1,6 @@
 # 在 DroidDeck 上使用 freedeckCY
 
-[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）、v0.15.0 起模拟器存档纳入云存档上传、v0.16.0 起模拟器存档恢复 + PSP/PS3/3DS 按游戏拆分 + PS1 多碟 m3u、v0.17.0 起百度网盘扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退）也可在 DroidDeck 上使用；本文是安装与排障说明。
+[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）、v0.15.0 起模拟器存档纳入云存档上传、v0.16.0 起模拟器存档恢复 + PSP/PS3/3DS 按游戏拆分 + PS1 多碟 m3u、v0.17.0 起百度网盘扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退）、v0.18.0 起扫描已安装游戏 + 百度扫码错误诊断也可在 DroidDeck 上使用；本文是安装与排障说明。
 
 > 适配基于 DroidDeck 的源码与 ARM64 运行时结构，**尚未在真机上完整验证**。遇到问题请按文末“排障”收集日志。
 
@@ -23,6 +23,7 @@ freedeckCY 的处理方式：
 - 模拟器存档恢复（v0.16.0）：云存档恢复不再只支持 PC——模拟器存档按 `restore_roots` 白名单恢复（同机优先原父目录、跨设备落到平台第一个根），覆盖前自动生成 `*.freedeckcy-bak-<时间戳>` 备份；冲突需要确认。**aarch64 上可用 GBA/PSP/NDS/PS1/FC/MD 的恢复/拆分（3DS/PS2/PS3 平台本身隐藏）**；PSP（PARAM.SFO）、3DS（NCSD title id）拆分在 ARM 上同样适用（3DS 平台不可见）；PS1 多碟在 aarch64 上也会生成/优先 `.m3u`。
 - 模拟器存档上传（v0.15.0）：QAM「云存档上传 → 包含模拟器存档」（`cloud_save_include_emulators`，默认开）控制是否上传模拟器存档；发现路径基于 **proot 内 HOME**（`~/.local/share/...`、`~/.config/...`，如 `~/.local/share/ppsspp/PSP/SAVEDATA`、`~/.local/share/azahar/sdmc`、`~/.local/share/eden/nand/user/save`）。**Flatpak 的 `~/.var/app/...` 路径在 Android/proot 下不适用**（DroidDeck 没有 SteamOS Flatpak 环境），不会被误用；GBA/FC/MD/NDS 按 ROM 同名找单游戏存档，PSP/PS1/PS2/3DS/PS3/Switch 上传共享记忆卡/标题目录；**v0.16.0 起支持恢复**（见上一条，白名单目标 + 备份 + 冲突确认）。
 - 3DS（Azahar，v0.14.1）：SteamOS 3.9.5 上优先官方 Flathub Flatpak `org.azahar_emu.Azahar`（AppImage 有上游 #127/#953 兼容问题）；**DroidDeck/aarch64 没有 3DS 官方 arm64 包，目录里仍不显示 3DS**（架构白名单，见 §9.8）。如果设备能跑 x86_64 且装有 flatpak，则自动用 Flatpak、失败回退 AppImage；3DS 启动脚本会强制 XWayland（`QT_QPA_PLATFORM=xcb`/`SDL_VIDEODRIVER=x11`）；system files 放 `~/.local/share/freedeckCY/bios/3ds/sysdata/`，会部署到 azahar/citra 与 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`。已有 3DS 快捷方式由后台自动重写，无需重装。
+- 扫描已安装（v0.18.0）：网页库「已安装」工具栏「扫描已安装」（`POST /api/tianyi/installed/scan`）可把安装目录里已有的游戏补回列表。DroidDeck 上安装目录通常是 proot 内路径（如 `/root/Games`），插件只扫 `settings.install_dir` **一层子目录**；目录名需与目录标题匹配，扫描只补记录/回填 appid/模拟器找 ROM，**不会创建 Steam 快捷方式**。
 - 百度网盘（v0.17.0，扫码/Cookie 主链路）：aarch64 与 x86_64 行为一致（纯 HTTPS API，无本地二进制）。QAM「百度网盘（扫码登录）」→「扫码登录百度网盘」→ 用手机百度 App/百度网盘 App 扫码确认；Cookie 写入 proot 内 `~/.local/share/freedeckCY/tianyi/state.json` 的 `baidu_login`，之后百度分享可直接安装，不需要开放平台 App Key。Cookie 会过期/被风控，失效后重新扫码；扫码 session 仅内存 180s。**OpenAPI（v0.14.0）保留为可选回退**（自建应用 + OAuth，无 Cookie 时才用）。**不接 CDP/网页逆向**。详见 [ARCHITECTURE.md](ARCHITECTURE.md) §5.13 / [DEVELOPMENT.md](DEVELOPMENT.md) §6.11。
 - 仓库游戏提交（v0.13.0）：网页库工具栏有「提交游戏」按钮，点击后用系统浏览器/Steam 内置浏览器打开 GitHub Issue 表单（`https://github.com/hulong1989/freedeckCY/issues/new?template=submit-game.yml`）；也可以直接提 PR 改 `submissions/*.json`。字段与原版资源池投稿一致（名称/英文名/平台/分享链接/提取码/版本/可执行文件名 + `openpath`），**只提交分享链接，不上传游戏文件**；这条链路与设备无关，DroidDeck 上不需要任何额外配置。详见 [submissions/README.md](../submissions/README.md)。
 - 自动云存档（v0.8.0）：内置 Ludusavi 清单（53,549 游戏）按标题/SteamID 匹配，并把 Windows 存档路径解析到 **ARM Proton 前缀**（`compatdata/.../pfx` 内布局与 x86_64 一致）；`gamewatch` 每 8 秒扫 `/proc/*/cmdline`（proot 下通常可用；没有 `/proc` 时回退 `pgrep -f`，需要系统有 pgrep），检测到游戏退出后只上传该游戏。自动上传**默认开启**，可在 QAM「云存档上传」里关闭。
@@ -91,6 +92,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | 模拟器 BIOS/固件部署（v0.12.0） | ✅ 安装后自动部署 `bios/<platform>/`（支持压缩包，7zz 解压缓存）；aarch64 可用 PS1/NDS/Switch 的部署与 GBA/PSP 全屏配置；PS2/PS3/3DS 仅 x86_64 |
 | 仓库游戏提交（v0.13.0） | ✅ 网页库「提交游戏」按钮打开 GitHub Issue 表单；或直接 PR `submissions/*.json`。无设备特定逻辑，DroidDeck 与 Steam Deck 行为一致 |
 | 模拟器存档上传/恢复（v0.15.0 / v0.16.0） | ✅ aarch64 可用：按 proot 内 HOME 发现/恢复 GBA/PSP/NDS/PS1/FC/MD/Switch 存档；恢复走白名单目标 + `*.freedeckcy-bak-*` 备份，冲突需确认；PSP 按 PARAM.SFO 拆分；PS1 多碟 m3u 可用；3DS 拆分随平台隐藏（仅 x86_64） |
+| 扫描已安装（v0.18.0） | ✅ aarch64 可用：扫描 proot 内安装目录一层，按目录名匹配目录条目，回填 appid/模拟器 ROM；不创建 Steam 快捷方式 |
 | 百度网盘（扫码/Cookie，v0.17.0） | ✅ aarch64 可用：QAM 显示二维码，手机扫码后 Cookie 存 state（0600）；安装优先 Cookie，任务带百度 Cookie/Referer/UA；Cookie 过期需重扫；OpenAPI 为可选回退（自建应用/授权）；不接 CDP/网页逆向 |
 | `make doctor` | ⚠️ 需要 DroidDeck 桌面终端；Android 上 `lsof` 可能不存在 |
 
@@ -227,7 +229,10 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 共享记忆卡/标题目录可能很大（3DS/Switch），受指纹 5000 文件与上传体积限制；必要时关闭开关或手动清理。
 - 恢复支持模拟器存档（v0.16.0，白名单目标 + 备份 + 冲突确认）；PS1/PS2 单片记忆卡、Switch 目录仍整卡覆盖。
 
-**百度网盘扫码登录失败 / 安装提示未登录**
+**百度网盘扫码登录失败 / 安装提示未登录**（v0.18.0 起错误会带具体原因）：
+
+- 二维码/轮询会用同一组 Cookie（先访问 passport 首页拿 BAIDUID）；HTTP 非 200 会显示状态码与响应片段，轮询网络错误会显示 `stage=failed`（不再一直 waiting）。
+- 检查 DroidDeck 内网络能否访问 `passport.baidu.com`；二维码 180s 过期需重新获取；扫码后需在手机上确认。
 
 - QAM「百度网盘（扫码登录）」点「扫码登录百度网盘」；二维码不显示时看返回的 `qrcode_url`，或检查 DroidDeck 内网络能否访问 `passport.baidu.com`。
 - 一直 waiting：手机未扫码/未确认；二维码 180s 过期，重新获取即可。scanned 表示已扫码待手机确认。
@@ -253,4 +258,6 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 百度网盘（v0.17.0）主链路是扫码登录（BDUSS/Cookie）：需要手机百度 App 扫码，Cookie 会过期/被风控、失效需重扫；扫码 session 仅内存 180s；OpenAPI 是可选回退（自建应用/授权，转存 `/FreedeckTmp` 占网盘空间）；不接 CDP/网页逆向；扫码确认/换 Cookie 尚未真机验证；aarch64 与 x86_64 行为一致。
 - 仓库游戏提交（v0.13.0）只依赖网页/GitHub，无设备特定逻辑；DroidDeck 上没有额外限制（除了需要能打开 GitHub 的浏览器）。
 - DroidDeck 升级/重装 Decky 可能清空插件，需重新导入 zip。
+- 扫描已安装依赖 proot 内 `settings.install_dir` 可见、目录名与目录标题匹配；只扫一层、不创建 Steam 快捷方式；百度扫码要求手机 App 与网络可达 `passport.baidu.com`。
+- 本版测试基线：`make test` → 349 passed（2026-11 v0.18.0）。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。

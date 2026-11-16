@@ -19,7 +19,9 @@ import pytest
 import config
 import tianyi_service as svc_module
 from tianyi_service import TianyiService, _is_within_dir
-from tianyi_store import TianyiInstalledGame, TianyiTaskRecord
+from tianyi_store import TianyiInstalledGame, TianyiSettings, TianyiStateStore, TianyiTaskRecord
+from game_catalog import GameCatalogEntry
+from types import SimpleNamespace
 
 
 class _FakePlugin:
@@ -835,3 +837,38 @@ def test_export_diagnostics_zip(service):
         assert {"diagnostics.json", "log-tail.txt", "README.txt"} <= names
         content = archive.read("diagnostics.json").decode("utf-8")
         assert "version" in content
+
+
+def test_scan_installed_games_backfills_catalog_match(tmp_path, monkeypatch):
+    install_root = tmp_path / "installed"
+    game_dir = install_root / "My Game"
+    game_dir.mkdir(parents=True)
+    (game_dir / "game.bin").write_bytes(b"x")
+
+    service = TianyiService.__new__(TianyiService)
+    service.store = TianyiStateStore(str(tmp_path / "state.json"))
+    service.store.settings = TianyiSettings(install_dir=str(install_root))
+    service.plugin = SimpleNamespace(downloads_dir=str(tmp_path), server_running=False, server_port=0)
+    service.catalog = SimpleNamespace(
+        entries=[
+            GameCatalogEntry(
+                game_id="9001",
+                title="My Game",
+                category_parent="5",
+                categories="动作",
+                down_url="https://cloud.189.cn/t/abc",
+                pwd="x",
+                openpath="My Game/game.bin",
+                size_bytes=1,
+                size_text="1 B",
+                platform="pc",
+            )
+        ]
+    )
+    service._invalidate_panel_cache = lambda **kwargs: None
+    monkeypatch.setattr("tianyi_service.list_tianyi_shortcuts_sync", lambda: {"rows": []})
+
+    result = asyncio.run(service.scan_installed_games())
+    assert result["added_count"] == 1
+    assert service.store.installed_games[0].game_id == "9001"
+    assert service.store.installed_games[0].install_path == str(game_dir)

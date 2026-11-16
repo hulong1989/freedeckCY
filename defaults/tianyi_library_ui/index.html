@@ -41,6 +41,14 @@
           title="手柄 Y 键也可切换"
           @click="cycleSort"
         >排序：{{ sortLabel }}</button>
+        <button
+          v-if="mode === 'installed'"
+          class="toolbar-btn"
+          tabindex="-1"
+          :disabled="scanBusy"
+          title="扫描安装目录，把旧版本/手动安装的游戏补回列表"
+          @click="scanInstalled"
+        >{{ scanBusy ? "扫描中..." : "扫描已安装" }}</button>
         <button class="toolbar-btn" tabindex="-1" :disabled="diagnosticsBusy" @click="openDiagnostics">
           {{ diagnosticsBusy ? "打包中..." : "导出诊断" }}
         </button>

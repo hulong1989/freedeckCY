@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.17.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.18.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -46,7 +46,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（348 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（349 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -335,7 +335,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **348 个用例**（`make test` 实测 `348 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **349 个用例**（`make test` 实测 `349 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -740,6 +740,13 @@ make validate-catalog                      # 合并后再跑目录体检
 2. 用百度 App/百度网盘 App 扫码，QAM 会从 waiting→scanned（已扫码待确认）→success；
 3. 成功后 Cookie 写入 `state.json` 的 `baidu_login`（`BDUSS=...; STOKEN=...; PTOKEN=...`），可安装百度分享；「退出百度网盘」清空。
 
+**扫码错误诊断（v0.18.0）**：
+
+- `request_qr()` 先访问 `https://passport.baidu.com/` 拿 **BAIDUID**，再请求 `getqrcode`，二维码/轮询/`qrbdusslogin` 共用同一组 Cookie（`CookieJar`）；QAM 服务层把 Cookie 存进内存 session；
+- HTTP 非 200 时错误消息带状态码/响应片段（如 `获取百度二维码 HTTP 403: ...`）；轮询遇到 HTTP ≥400 或连接重置/DNS/SSL 等**非超时**错误返回 `status=error`，服务层转 `stage=failed` 并在 QAM 显示具体原因，不再一直 waiting；超时仍视为 waiting；
+- `start_baidu_qr_login` 的异常会写日志 `Baidu QR request failed: ...` 并返回"获取百度二维码失败：<原因>"；`poll_baidu_qr_login` 的 `stage` 可能是 waiting/scanned/success/expired/failed；
+- 调试：看 QAM 二维码区/提示、`/tmp/freedeckcy.log` 里的 `Baidu QR` 关键字、以及 `/api/tianyi/baidu/qr/poll` 返回的 `stage/message`。
+
 HTTP/手动调试（不依赖 QAM）：
 
 ```bash
@@ -788,6 +795,32 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 | 想用 OpenAPI 而不是扫码 | QAM 清空百度登录（或不要扫码），配置 OpenAPI 应用并授权；安装计划会在无 Cookie 时回退 OpenAPI |
 | 为什么不做 CDP | 不逆向网页接口；Cookie 只通过百度 Passport 官方扫码（`getqrcode/unicast/qrbdusslogin`）获取 |
 
+### 6.12 扫描已安装游戏（v0.18.0）
+
+**用途**：插件重装/state 丢失/游戏是旧版本或手动安装时，把 `settings.install_dir` 里已有的游戏补回「已安装」列表。
+
+**命令/API**：
+
+```bash
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/installed/scan | python3 -m json.tool
+# 返回：scanned / added_count / added_games / skipped_count / unresolved_count / unresolved_dirs / installed_total / message
+```
+
+网页库「已安装」工具栏点「扫描已安装」（`app.js` 的 `scanInstalled()`），完成后刷新列表并 flash「已补回 N 个」；无匹配时提示"目录名需与目录标题匹配"。
+
+**匹配规则**：
+
+- 只扫 `settings.install_dir` **一层子目录**（最多 500 项），跳过隐藏目录和 `compatdata/steamapps/downloads/lost+found/.freedeckcy/.cache`；
+- 目录名经 `_normalize_scan_title()`（小写、去分隔符）与目录条目标题（`[/|｜]` 拆段）做等值/前缀匹配，取最长；已记录 path → `already_recorded`，已记录 game_id → `game_id_recorded`；
+- 匹配到 Steam 快捷方式（app_name 归一化）回填 `steam_app_id`；模拟器平台用 `find_rom_file()` 找 ROM（找不到也建记录，`rom_path` 空）；
+- 未匹配进 `unresolved_dirs`，原因 `catalog_no_match`/`catalog_missing_game_id`。
+
+**排障/日志**：
+
+- 扫描后没新增：确认安装目录设置正确、游戏目录名与目录标题能对上（改名/英文名差异会 no_match）、不是嵌套目录、不是 0 字节目录；
+- 想确认运行细节：看 `/tmp/freedeckcy.log` 的 `scan`/`已安装` 关键字与接口返回的 counts；
+- 扫描**只补记录**，不会创建 Steam 快捷方式；快捷方式缺失需重新安装/重新注册。
+
 ---
 
 ## 7. 常见故障排查---
@@ -818,6 +851,8 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 | 多分卷游戏 **识别不出分卷** | 仅支持常见 6 类命名；非标准命名会被当普通文件。可手工把分卷改名成标准形式，或提 issue（见 ROADMAP "7z t 校验/归档识别增强"） |
 | **分卷/多包只下了一部分就报错** | 组内某包 `error` 时整组不会安装，已完成的分卷提示"同一安装计划中有分卷下载失败，移除失败任务后可继续安装"。移除失败的那条任务后，剩余分卷会自动继续安装；若是解压阶段失败，已解压文件会保留，移除任务后重新发起 |
 | 库页 **看不到平台筛选条** | 平台条只在 `platforms` 数量 > 1 时显示；确认加载的是 `freedeckcy_catalog.csv`（7084 条 / 11 平台）而不是回退的旧目录（全 PC）。可在日志看"已加载游戏目录 total=… platforms=…"或用 `curl '127.0.0.1:59271/api/tianyi/catalog?q=&page=1'` 看 `platforms` 字段 |
+| **扫描已安装没有补回游戏** | 只扫 `settings.install_dir` 一层；目录名要能与目录标题归一化匹配（改名/英文名可能 `catalog_no_match`）；嵌套目录/0 字节目录跳过；扫描只补记录、不建 Steam 快捷方式；看接口返回 `unresolved_dirs` |
+| **百度扫码报错/一直 waiting** | v0.18.0 起错误会带 HTTP 状态/原因（`stage=failed`），看 QAM 提示与 `/tmp/freedeckcy.log` 的 `Baidu QR`；网络需能访问 `passport.baidu.com`；二维码 180s 过期；可重试或改用 OpenAPI 回退 |
 | **点了非 PC 卡片只弹提示、装不了** | 当前架构有官方包的平台（x86_64：10 个；aarch64：GBA/PSP/NDS/PS1/FC/MD/Switch）应可正常安装（见 §6.8）；其它情况是预期：3DS/PS2/PS3 在 aarch64 上无官方包会被目录白名单隐藏/后端拒绝。报错多为模拟器缺失、ROM 名不匹配或 BIOS/setup 文件未配 |
 | 目录里 **`/web/share?code=` 链接没被加载** | v0.3.0 起 `_is_valid_tianyi_url()` 与 `tianyi_client.parse_share_url()` 都支持该形式；检查链接是否带 `code=`、域名是否 `cloud.189.cn`。旧版本目录需重载插件生效 |
 | **已安装页签点卡片启动失败** | ① 看 flash 提示：`该游戏缺少 Steam AppID` 说明记录里没有 appid，去 Steam 库手动启动；② `当前环境没有 xdg-open/gio` 说明后端无法拉起外部程序（DroidDeck 桌面需有 xdg-open）；③ 用 `curl /api/tianyi/installed` 确认 `steam_appid` 与 `exists` |
@@ -942,7 +977,7 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 348 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 349 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
@@ -950,6 +985,7 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
 - [ ] 改模拟器存档发现/恢复后跑 `pytest tests/test_emulator_saves.py -q`：单游戏不退化成整目录、共享目录去重、PARAM.SFO/3DS 拆分、恢复目标白名单、开关关闭；PS1 多碟跑 `tests/test_emulator.py` 的 m3u 用例；
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
+- [ ] 改扫描已安装后跑 `pytest tests/test_install_pipeline.py -q`（扫描回填用例），确认只扫一层、path/game_id 去重、模拟器 ROM 查找；
 - [ ] 改百度相关代码后跑 `python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`（mock HTTP/扫码，不联网）；确认扫码 Cookie 只存 state、不写日志/诊断；
 - [ ] 改提交校验/合并后跑 `make validate-submissions`、`python scripts/merge_submissions.py --dry-run`，确认无 JSON 时 CI 也通过；`make validate-catalog` 确认合并后的 CSV 合法；
 - [ ] 改动模拟器注册表后验证 `available_platforms()`：x86_64 应有 10 个平台、aarch64 只有 7 个（3DS/PS2/PS3 无包），并确认 `/api/tianyi/catalog` 的 `platforms` 计数同步裁剪；

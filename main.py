@@ -322,6 +322,14 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def scan_tianyi_installed_games(self) -> dict:
+        """扫描安装目录，补回已安装游戏。"""
+        try:
+            data = await self._get_tianyi_service().scan_installed_games()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def uninstall_tianyi_installed_game(
         self,
         payload=None,

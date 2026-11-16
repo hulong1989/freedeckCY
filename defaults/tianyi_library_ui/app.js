@@ -42,6 +42,7 @@ createApp({
       activePlatform: "",
       mode: "catalog",
       installed: { total: 0, items: [] },
+      scanBusy: false,
       sort: "",
       sortOptions: ["", "title", "size_desc", "size_asc"],
       sortLabels: { "": "默认", title: "名称", size_desc: "大小↓", size_asc: "大小↑" },
@@ -743,6 +744,20 @@ createApp({
       } else {
         this.setFocusIndex(this.cardStartIndex(), { scroll: true });
         void this.prefetchCovers(this.list.items);
+      }
+    },
+    async scanInstalled() {
+      if (this.scanBusy) return;
+      this.scanBusy = true;
+      try {
+        const result = await apiPost("/api/tianyi/installed/scan", {});
+        const data = result && result.data ? result.data : {};
+        await this.reloadInstalled();
+        this.flash(data.message || `已扫描：新增 ${data.added_count || 0} 个`);
+      } catch (error) {
+        this.flash(`扫描失败：${String(error)}`);
+      } finally {
+        this.scanBusy = false;
       }
     },
     async reloadInstalled() {

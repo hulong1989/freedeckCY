@@ -330,6 +330,15 @@ async def handle_installed_open_folder(request: web.Request, plugin: Any) -> web
         return _json_error_from_exception(exc)
 
 
+async def handle_installed_scan(request: web.Request, plugin: Any) -> web.Response:
+    """扫描安装目录，补回已安装游戏。"""
+    try:
+        data = await _service(plugin).scan_installed_games()
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
 async def handle_installed_uninstall(request: web.Request, plugin: Any) -> web.Response:
     """卸载已安装游戏（可选回收 Proton 前缀）。"""
     try:
@@ -713,6 +722,7 @@ def setup_routes(app: web.Application, plugin: Any) -> None:
     app.router.add_post("/api/tianyi/installed/launch", lambda request: handle_installed_launch(request, plugin))
     app.router.add_post("/api/tianyi/installed/open-folder", lambda request: handle_installed_open_folder(request, plugin))
     app.router.add_post("/api/tianyi/installed/uninstall", lambda request: handle_installed_uninstall(request, plugin))
+    app.router.add_post("/api/tianyi/installed/scan", lambda request: handle_installed_scan(request, plugin))
     app.router.add_get("/api/tianyi/diagnostics", lambda request: handle_diagnostics(request, plugin))
     app.router.add_get("/api/tianyi/diagnostics/export", lambda request: handle_diagnostics_export(request, plugin))
     app.router.add_get("/api/tianyi/update-check", lambda request: handle_update_check(request, plugin))

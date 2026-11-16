@@ -912,7 +912,8 @@ class TianyiService:
         async with self._baidu_qr_lock:
             try:
                 qr = await request_qr()
-            except BaiduQrError as exc:
+            except Exception as exc:
+                config.logger.warning("Baidu QR request failed: %s", exc)
                 raise TianyiApiError(f"获取百度二维码失败：{exc}") from exc
             raw = b""
             try:
@@ -925,6 +926,7 @@ class TianyiService:
             self._baidu_qr_session = {
                 "sign": qr["sign"],
                 "imgurl": qr.get("imgurl", ""),
+                "cookies": qr.get("cookies") or {},
                 "expires_at": _now_wall_ts() + 180,
             }
             return {
@@ -944,14 +946,23 @@ class TianyiService:
             if int(session.get("expires_at", 0) or 0) <= _now_wall_ts():
                 self._baidu_qr_session = {}
                 return {"stage": "expired", "message": "二维码已过期，请重新获取", **self._baidu_web_login_payload()}
-            result = await poll_qr(str(session.get("sign", "") or ""), timeout=8.0)
+            result = await poll_qr(
+                str(session.get("sign", "") or ""),
+                timeout=8.0,
+                cookies=session.get("cookies") if isinstance(session.get("cookies"), dict) else None,
+            )
             stage = str(result.get("status", "") or "")
             if stage == "scanned":
                 return {"stage": "scanned", "message": "已扫码，请在手机上确认登录", **self._baidu_web_login_payload()}
+            if stage == "error":
+                return {"stage": "failed", "message": f"扫码轮询失败：{result.get('error', '')}", **self._baidu_web_login_payload()}
             if stage != "confirmed":
                 return {"stage": "waiting", "message": "等待手机扫码…", **self._baidu_web_login_payload()}
             try:
-                login = await complete_login(str(result.get("v", "") or ""))
+                login = await complete_login(
+                    str(result.get("v", "") or ""),
+                    cookies=session.get("cookies") if isinstance(session.get("cookies"), dict) else None,
+                )
             except BaiduQrError as exc:
                 self._baidu_qr_session = {}
                 return {"stage": "failed", "message": str(exc), **self._baidu_web_login_payload()}
@@ -6768,6 +6779,140 @@ class TianyiService:
             "title": str(record.game_title or ""),
             "steam_app_id": app_id,
             "launched": True,
+        }
+
+    @staticmethod
+    def _normalize_scan_title(value: str) -> str:
+        return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", str(value or "").lower())
+
+    async def scan_installed_games(self) -> Dict[str, Any]:
+        """扫描安装目录，把旧版本/手动安装的游戏补回已安装列表。"""
+        install_root = self._normalize_existing_dir(str(self.store.settings.install_dir or "").strip())
+        if not install_root:
+            raise ValueError("当前未设置有效的安装目录")
+        records = list(self.store.installed_games or [])
+        existing_paths = {
+            self._normalize_dir_path(str(record.install_path or "").strip())
+            for record in records
+            if str(record.install_path or "").strip()
+        }
+        existing_ids = {str(record.game_id or "").strip() for record in records}
+
+        title_index: Dict[str, Any] = {}
+        for entry in list(self.catalog.entries or []):
+            for part in re.split(r"[/|｜]", str(entry.title or "")):
+                key = self._normalize_scan_title(part)
+                if len(key) >= 4 and key not in title_index:
+                    title_index[key] = entry
+
+        shortcut_by_name: Dict[str, int] = {}
+        try:
+            shortcut_result = await asyncio.to_thread(list_tianyi_shortcuts_sync)
+            for row in list(shortcut_result.get("rows") or []):
+                if not isinstance(row, dict):
+                    continue
+                name_key = self._normalize_scan_title(str(row.get("app_name", "") or ""))
+                appid = _safe_int(row.get("appid_unsigned"), 0)
+                if name_key and appid > 0:
+                    shortcut_by_name.setdefault(name_key, appid)
+        except Exception as exc:
+            config.logger.warning("扫描 Steam 快捷方式失败: %s", exc)
+
+        skip_names = {"compatdata", "steamapps", "downloads", "lost+found", ".freedeckcy", ".cache"}
+        added: List[Dict[str, Any]] = []
+        unresolved: List[Dict[str, Any]] = []
+        skipped: List[Dict[str, Any]] = []
+        try:
+            children = sorted(os.listdir(install_root))
+        except Exception as exc:
+            raise ValueError(f"读取安装目录失败：{exc}") from exc
+
+        for name in children[:500]:
+            normalized_name = str(name or "").strip()
+            if not normalized_name or normalized_name.startswith("."):
+                continue
+            if normalized_name.lower() in skip_names:
+                continue
+            install_path = self._normalize_existing_dir(os.path.join(install_root, normalized_name))
+            if not install_path:
+                continue
+            if install_path in existing_paths:
+                skipped.append({"install_path": install_path, "reason": "already_recorded"})
+                continue
+            try:
+                size_bytes = _dir_size_bytes(install_path)
+            except Exception:
+                size_bytes = 0
+            if size_bytes <= 0:
+                continue
+
+            directory_key = self._normalize_scan_title(normalized_name)
+            match = None
+            best_len = 0
+            for key, entry in title_index.items():
+                if directory_key == key or (len(directory_key) >= len(key) and directory_key.startswith(key)):
+                    if len(key) > best_len:
+                        match = entry
+                        best_len = len(key)
+            if match is None:
+                unresolved.append({"install_path": install_path, "name": normalized_name, "reason": "catalog_no_match"})
+                continue
+            game_id = str(match.game_id or "").strip()
+            if not game_id:
+                unresolved.append({"install_path": install_path, "name": normalized_name, "reason": "catalog_missing_game_id"})
+                continue
+            if game_id in existing_ids:
+                skipped.append({"install_path": install_path, "game_id": game_id, "reason": "game_id_recorded"})
+                continue
+
+            platform = str(match.platform or "pc").strip().lower() or "pc"
+            rom_path = ""
+            if platform != "pc":
+                try:
+                    rom_path = find_rom_file(install_path, str(match.openpath or ""), platform)
+                except Exception:
+                    rom_path = ""
+            appid = shortcut_by_name.get(self._normalize_scan_title(str(match.title or "")), 0)
+            record = TianyiInstalledGame(
+                game_id=game_id,
+                game_title=str(match.title or normalized_name),
+                install_path=install_path,
+                source_path=install_path,
+                size_bytes=size_bytes,
+                steam_app_id=appid,
+                platform=platform,
+                rom_path=rom_path,
+            )
+            self.store.upsert_installed_game(record)
+            existing_paths.add(install_path)
+            existing_ids.add(game_id)
+            added.append(
+                {
+                    "game_id": game_id,
+                    "title": record.game_title,
+                    "platform": platform,
+                    "install_path": install_path,
+                    "steam_app_id": appid,
+                }
+            )
+
+        if added:
+            await asyncio.to_thread(self.store.save)
+            self._invalidate_panel_cache(all_data=True)
+        return {
+            "install_root": install_root,
+            "scanned": len(children),
+            "added_count": len(added),
+            "added_games": added[:24],
+            "skipped_count": len(skipped),
+            "unresolved_count": len(unresolved),
+            "unresolved_dirs": unresolved[:24],
+            "installed_total": len(self.store.installed_games or []),
+            "message": (
+                f"已补回 {len(added)} 个已安装游戏"
+                if added
+                else "没有发现可补回的已安装游戏（目录名需与目录标题匹配）"
+            ),
         }
 
     async def open_installed_folder(self, game_id: str) -> Dict[str, Any]:

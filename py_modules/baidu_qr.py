@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
@@ -26,9 +27,23 @@ def _timeout(total: float = 12.0) -> aiohttp.ClientTimeout:
 async def request_qr() -> Dict[str, Any]:
     params = {"lp": "pc", "qrloginfrom": "pc"}
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
-    async with aiohttp.ClientSession(timeout=_timeout(15)) as session:
-        async with session.get(QRCODE_URL, params=params, headers=headers) as response:
-            text = await response.text()
+    jar = aiohttp.CookieJar(unsafe=True)
+    try:
+        async with aiohttp.ClientSession(timeout=_timeout(15), cookie_jar=jar) as session:
+            # 先访问 passport 首页拿 BAIDUID，部分风控环境下的二维码接口需要它。
+            try:
+                async with session.get("https://passport.baidu.com/", headers=headers):
+                    pass
+            except Exception:
+                pass
+            async with session.get(QRCODE_URL, params=params, headers=headers) as response:
+                text = await response.text()
+                if response.status != 200:
+                    raise BaiduQrError(f"获取百度二维码 HTTP {response.status}: {text[:200]}")
+    except BaiduQrError:
+        raise
+    except Exception as exc:
+        raise BaiduQrError(f"获取百度二维码网络错误: {exc}") from exc
     try:
         data = json.loads(text)
     except Exception as exc:
@@ -41,7 +56,12 @@ async def request_qr() -> Dict[str, Any]:
         raise BaiduQrError("百度二维码缺少 sign")
     if imgurl and not imgurl.startswith(("http://", "https://")):
         imgurl = "https://" + imgurl.lstrip("/")
-    return {"sign": sign, "imgurl": imgurl, "prompt": str(data.get("prompt", "") or "")}
+    return {
+        "sign": sign,
+        "imgurl": imgurl,
+        "prompt": str(data.get("prompt", "") or ""),
+        "cookies": {cookie.key: cookie.value for cookie in jar},
+    }
 
 
 async def fetch_qr_image(imgurl: str) -> bytes:
@@ -56,16 +76,31 @@ async def fetch_qr_image(imgurl: str) -> bytes:
             return await response.read()
 
 
-async def poll_qr(sign: str, *, timeout: float = 8.0) -> Dict[str, Any]:
+async def poll_qr(
+    sign: str,
+    *,
+    timeout: float = 8.0,
+    cookies: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
     """单次轮询；百度是长轮询，超时视为仍在等待。"""
     params = {"channel_id": str(sign or "").strip(), "tpl": "pp", "tt": str(int(time.time() * 1000))}
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
     try:
-        async with aiohttp.ClientSession(timeout=_timeout(timeout)) as session:
+        jar = aiohttp.CookieJar(unsafe=True)
+        if cookies:
+            jar.update_cookies(cookies)
+        async with aiohttp.ClientSession(timeout=_timeout(timeout), cookie_jar=jar) as session:
             async with session.get(UNICAST_URL, params=params, headers=headers) as response:
                 text = await response.text()
-    except Exception:
+                if response.status >= 400:
+                    return {"status": "error", "error": f"HTTP {response.status}"}
+    except asyncio.TimeoutError:
         return {"status": "waiting"}
+    except Exception as exc:
+        # 连接被重置/DNS/SSL 等：返回错误让前端显示，而不是一直 waiting。
+        if "timeout" in str(exc).lower():
+            return {"status": "waiting"}
+        return {"status": "error", "error": str(exc)[:200]}
     if not text.strip():
         return {"status": "waiting"}
     try:
@@ -109,7 +144,7 @@ def _parse_login_payload(text: str) -> Dict[str, Any]:
             return {}
 
 
-async def complete_login(v: str) -> Dict[str, Any]:
+async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """用 unicast 返回的 v 换取 BDUSS/STOKEN/PTOKEN。"""
     value = str(v or "").strip()
     if not value:
@@ -127,9 +162,19 @@ async def complete_login(v: str) -> Dict[str, Any]:
         "elapsed": "1",
     }
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
-    async with aiohttp.ClientSession(timeout=_timeout(20)) as session:
-        async with session.get(QR_LOGIN_URL, params=params, headers=headers) as response:
-            text = await response.text()
+    try:
+        jar = aiohttp.CookieJar(unsafe=True)
+        if cookies:
+            jar.update_cookies(cookies)
+        async with aiohttp.ClientSession(timeout=_timeout(20), cookie_jar=jar) as session:
+            async with session.get(QR_LOGIN_URL, params=params, headers=headers) as response:
+                text = await response.text()
+                if response.status != 200:
+                    raise BaiduQrError(f"百度登录 HTTP {response.status}: {text[:200]}")
+    except BaiduQrError:
+        raise
+    except Exception as exc:
+        raise BaiduQrError(f"百度登录网络错误: {exc}") from exc
     data = _parse_login_payload(text)
     session_data = data.get("data", {}).get("session") if isinstance(data.get("data"), dict) else {}
     if not isinstance(session_data, dict):
