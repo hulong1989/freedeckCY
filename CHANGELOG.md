@@ -2,6 +2,24 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.11.0
+
+### 新增
+
+- **补齐模拟器平台**：
+  - 3DS：Azahar（官方 AppImage，**仅 x86_64**；需要 system files）
+  - PS2：PCSX2 2.8.2（**仅 x86_64**；需要 PS2 BIOS，安装时复制到 PCSX2 bios 目录）
+  - PS3：RPCS3（**仅 x86_64**；需要 PS3 固件）
+  - Switch：Eden 0.2.1（**x86_64 + aarch64**；需要 prod.keys 与固件）
+- **架构能力矩阵**：x86_64 显示全部 10 个平台；aarch64 只显示有官方 arm64 包的平台（GBA/PSP/NDS/PS1/FC/MD/Switch），3DS/PS2/PS3 自动隐藏（目录条目与平台筛选条都不显示）。
+- 模拟器 setup 提示：BIOS（PS1/PS2）、固件/keys/system files（PS3/Switch/3DS）会在安装弹窗和安装消息里提示；不阻断安装。
+- 新环境变量：`FREEDECKCY_AZAHAR_BIN`、`FREEDECKCY_PCSX2_BIN`、`FREEDECKCY_RPCS3_BIN`、`FREEDECKCY_EDEN_BIN`。
+
+### 变更
+
+- 目录列表支持平台白名单：按当前架构过滤条目、平台/分类计数。
+- 测试 295 → 302。
+
 ## v0.10.0
 
 ### 变更

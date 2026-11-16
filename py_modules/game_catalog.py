@@ -532,10 +532,10 @@ class GameCatalog:
             "preview": [e.to_dict() for e in self.entries[:8]],
         }
 
-    def platform_counts(self) -> List[Dict[str, object]]:
+    def platform_counts(self, entries: Optional[List[GameCatalogEntry]] = None) -> List[Dict[str, object]]:
         """各平台条目数（按数量降序）。"""
         counter: Dict[str, int] = {}
-        for entry in self.entries:
+        for entry in (entries if entries is not None else self.entries):
             counter[entry.platform] = counter.get(entry.platform, 0) + 1
         rows = [
             {"value": platform, "label": platform.upper() if len(platform) <= 4 else platform, "count": count}
@@ -544,10 +544,14 @@ class GameCatalog:
         rows.sort(key=lambda item: (-int(item["count"]), str(item["value"])))
         return rows
 
-    def category_counts(self, limit: int = CATEGORY_FILTER_LIMIT) -> List[Dict[str, object]]:
+    def category_counts(
+        self,
+        limit: int = CATEGORY_FILTER_LIMIT,
+        entries: Optional[List[GameCatalogEntry]] = None,
+    ) -> List[Dict[str, object]]:
         """分类条目数（取前 N 个，按数量降序）。"""
         counter: Dict[str, int] = {}
-        for entry in self.entries:
+        for entry in (entries if entries is not None else self.entries):
             for name in _CATEGORY_SPLIT_RE.split(str(entry.categories or "")):
                 text = name.strip()
                 if text:
@@ -564,16 +568,22 @@ class GameCatalog:
         platform: str = "",
         category: str = "",
         sort: str = "",
+        allowed_platforms: Optional[List[str]] = None,
     ) -> Dict[str, object]:
-        """按关键词/平台/分类分页检索，支持排序。"""
+        """按关键词/平台/分类分页检索，支持排序与平台白名单。"""
         q = (query or "").strip().lower()
         platform_filter = _normalize_platform(platform, default="") if str(platform or "").strip() else ""
         category_filter = str(category or "").strip().lower()
         normalized_page = max(1, int(page))
         normalized_size = max(1, min(200, int(page_size)))
 
+        allowed = {str(item).strip().lower() for item in (allowed_platforms or []) if str(item).strip()}
+        base_entries = [
+            entry for entry in self.entries if not allowed or entry.platform in allowed
+        ]
+
         matched: List[GameCatalogEntry] = []
-        for item in self.entries:
+        for item in base_entries:
             if platform_filter and platform_filter not in {"all", "*"} and item.platform != platform_filter:
                 continue
             if category_filter and category_filter not in item.categories.lower():
@@ -609,8 +619,8 @@ class GameCatalog:
             "platform": platform_filter,
             "category": str(category or "").strip(),
             "sort": sort_key,
-            "platforms": self.platform_counts(),
-            "categories": self.category_counts(),
+            "platforms": self.platform_counts(base_entries),
+            "categories": self.category_counts(entries=base_entries),
             "items": [e.to_dict() for e in matched[start:end]],
         }
 

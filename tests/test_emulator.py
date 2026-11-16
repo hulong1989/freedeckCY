@@ -163,7 +163,7 @@ def test_gba_plan_reports_missing_rom(monkeypatch, tmp_path):
 
 def test_unsupported_platform_still_rejected(monkeypatch, tmp_path):
     service = _service(tmp_path)
-    service.catalog = _FakeCatalog(_entry(platform="switch", openpath="game.nsp"))
+    service.catalog = _FakeCatalog(_entry(platform="wiiu", openpath="game.wud"))
 
     with pytest.raises(ValueError) as exc:
         asyncio.run(service._build_install_plan(game_id="gba-1"))
@@ -247,7 +247,7 @@ def test_installed_view_exposes_emulator_fields():
 def test_registry_has_psp_and_nds_assets():
     assert emu.emulator_name_for_platform("psp") == "ppsspp"
     assert emu.emulator_name_for_platform("nds") == "melonds"
-    assert emu.emulator_name_for_platform("switch") == ""
+    assert emu.emulator_name_for_platform("switch") == "eden"
     psp = emu.get_spec("psp")
     assert psp is not None
     assert psp.assets["x86_64"].endswith("x86_64.AppImage")
@@ -410,3 +410,69 @@ def test_ps1_launch_args(tmp_path):
     assert "-batch" in text
     assert "-fullscreen" in text
     assert "game.cue" in text
+
+
+def test_registry_ps2_ps3_3ds_switch_assets():
+    assert emu.emulator_name_for_platform("ps2") == "pcsx2"
+    assert emu.emulator_name_for_platform("ps3") == "rpcs3"
+    assert emu.emulator_name_for_platform("3ds") == "azahar"
+    assert emu.emulator_name_for_platform("switch") == "eden"
+
+    for platform, adapter in (("ps2", "pcsx2"), ("ps3", "rpcs3"), ("3ds", "azahar")):
+        spec = emu.get_spec(platform)
+        assert spec is not None
+        assert "x86_64" in spec.assets
+        assert "aarch64" not in spec.assets
+
+    switch = emu.get_spec("switch")
+    assert switch is not None
+    assert switch.assets["aarch64"].startswith("Eden-Linux")
+    assert switch.setup_required is True
+
+
+def test_available_platforms_by_arch():
+    x86 = set(emu.available_platforms("x86_64"))
+    arm = set(emu.available_platforms("aarch64"))
+    assert {"gba", "psp", "nds", "ps1", "fc", "md", "3ds", "ps2", "ps3", "switch"} <= x86
+    assert arm == {"gba", "psp", "nds", "ps1", "fc", "md", "switch"}
+    assert "3ds" not in arm and "ps2" not in arm and "ps3" not in arm
+
+
+def test_ps2_hidden_on_arm(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(emu, "runtime_arch", lambda: "aarch64")
+    status = emu.emulator_status("ps2", str(tmp_path / "plugin"))
+    assert status["available"] is False
+    assert "没有 PCSX2 官方包" in status["message"]
+
+
+def test_ps2_bios_prepare(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    source = tmp_path / "state" / "bios" / "ps2"
+    source.mkdir(parents=True)
+    (source / "scph70012.bin").write_bytes(b"bios")
+
+    spec = emu.get_spec("ps2")
+    messages = emu.prepare_bios(spec)
+    assert messages
+    target = tmp_path / "home" / ".local" / "share" / "PCSX2" / "bios" / "scph70012.bin"
+    assert target.is_file()
+
+
+def test_ps2_launch_args(tmp_path):
+    wrapper = tmp_path / "ps2.sh"
+    emu.create_launch_wrapper(
+        command=["/usr/bin/pcsx2"],
+        rom_path="/roms/game.iso",
+        wrapper_path=str(wrapper),
+        platform_name="ps2",
+    )
+    text = wrapper.read_text(encoding="utf-8")
+    assert "-batch" in text and "-fullscreen" in text and "game.iso" in text
+
+
+def test_ps2_rom_prefers_iso(tmp_path):
+    (tmp_path / "game.bin").write_bytes(b"x")
+    (tmp_path / "game.iso").write_bytes(b"x")
+    assert emu.find_rom_file(str(tmp_path), "game.zip", "ps2").endswith("game.iso")

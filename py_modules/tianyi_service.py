@@ -32,6 +32,7 @@ import config
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
 from emulator_manager import (
+    available_platforms,
     bios_dir,
     bios_present,
     create_launch_wrapper,
@@ -1815,6 +1816,7 @@ class TianyiService:
         # page_size 默认跟随设置，但允许前端覆盖。
         if page_size <= 0:
             page_size = self.store.settings.page_size
+        allowed = ["pc", *available_platforms()]
         return self.catalog.list(
             query=query,
             page=page,
@@ -1822,6 +1824,7 @@ class TianyiService:
             platform=platform,
             category=category,
             sort=sort,
+            allowed_platforms=allowed,
         )
 
     def _load_cover_cache(self) -> None:
@@ -5193,7 +5196,7 @@ class TianyiService:
         emulator = emulator_name_for_platform(platform)
         if platform != "pc" and not emulator:
             raise ValueError(
-                f"当前只支持 PC 与已接入模拟器的平台（GBA/PSP/NDS/PS1/FC/MD），{platform.upper()} 暂未接入模拟器"
+                f"当前只支持 PC 与已接入模拟器的平台（GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch），{platform.upper()} 暂未接入模拟器"
             )
         emulator_info: Dict[str, Any] = {}
         if emulator:
@@ -6821,10 +6824,15 @@ class TianyiService:
             result["emulator"] = spec.adapter if spec else emulator_name_for_platform(platform)
             if bios_messages:
                 result["bios_messages"] = bios_messages
+            warnings: List[str] = []
             if spec is not None and spec.bios_required and not bios_present(platform):
-                result["warning"] = (
-                    f"{spec.name} 需要 BIOS：请把 scph*.bin 放到 {bios_dir(platform)}"
+                warnings.append(
+                    f"{spec.name} 需要 BIOS：请把 BIOS 文件放到 {bios_dir(platform)}"
                 )
+            if spec is not None and spec.setup_required and spec.setup_hint:
+                warnings.append(spec.setup_hint)
+            if warnings:
+                result["warning"] = "；".join(warnings)
             return result
         except Exception as exc:
             config.logger.exception("Auto add emulator game to Steam exception game=%s", game_id or display_name)

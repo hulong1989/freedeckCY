@@ -285,3 +285,22 @@ def test_list_sorting_by_title_and_size(tmp_path):
 
     unknown = catalog.list(query="", page=1, page_size=10, sort="bogus")
     assert [item["game_id"] for item in unknown["items"]] == ["1", "2", "3"]
+
+
+def test_list_allowed_platforms_filters_items_and_counts(tmp_path):
+    csv_path = _write_catalog(
+        tmp_path,
+        [
+            _row("1", "PC Game", platform="pc", categories="动作冒险"),
+            _row("2", "GBA Game", platform="gba", categories="模拟器"),
+            _row("3", "Switch Game", platform="switch", categories="角色扮演"),
+        ],
+    )
+    catalog = GameCatalog(csv_path)
+    catalog.load()
+
+    data = catalog.list(query="", page=1, page_size=10, allowed_platforms=["pc", "gba"])
+    assert data["total"] == 2
+    assert {item["game_id"] for item in data["items"]} == {"1", "2"}
+    assert {row["value"] for row in data["platforms"]} == {"pc", "gba"}
+    assert data["platforms"][0]["count"] + data["platforms"][1]["count"] == 2

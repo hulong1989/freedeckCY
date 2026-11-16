@@ -42,6 +42,8 @@ class EmulatorSpec:
     state_key: str = ""
     executables: Tuple[str, ...] = ()
     bios_required: bool = False
+    setup_required: bool = False
+    setup_hint: str = ""
 
 
 MGBA_VERSION = "0.10.5"
@@ -157,7 +159,83 @@ EMULATORS: Dict[str, EmulatorSpec] = {
         state_key="mesen",
         executables=("Mesen",),
     ),
+    "3ds": EmulatorSpec(
+        platform="3ds",
+        name="Azahar",
+        adapter="azahar",
+        repo="azahar-emu/azahar",
+        download_base="https://github.com/azahar-emu/azahar/releases/download/2126.2",
+        assets={"x86_64": "azahar.AppImage"},
+        archive="appimage",
+        launch_args=("{rom}",),
+        rom_extensions=(".3ds", ".cia", ".cci", ".cxi", ".app"),
+        env_var="FREEDECKCY_AZAHAR_BIN",
+        notes="Azahar 官方 AppImage（仅 x86_64）；需要 3DS system files",
+        min_bytes=60 * 1024 * 1024,
+        state_key="azahar",
+        setup_required=True,
+        setup_hint="3DS 需要 system files：请在 Azahar 首次启动时按提示配置（或把 sysdata 放入其数据目录）",
+    ),
+    "ps2": EmulatorSpec(
+        platform="ps2",
+        name="PCSX2",
+        adapter="pcsx2",
+        repo="PCSX2/pcsx2",
+        download_base="https://github.com/PCSX2/pcsx2/releases/download/v2.8.2",
+        assets={"x86_64": "pcsx2-v2.8.2-linux-appimage-x64-Qt.AppImage"},
+        archive="appimage",
+        launch_args=("-batch", "-fullscreen", "{rom}"),
+        rom_extensions=(".iso", ".chd", ".cue", ".bin", ".gz"),
+        env_var="FREEDECKCY_PCSX2_BIN",
+        notes="PCSX2 官方 AppImage（仅 x86_64）；需要 PS2 BIOS",
+        min_bytes=40 * 1024 * 1024,
+        state_key="pcsx2",
+        bios_required=True,
+    ),
+    "ps3": EmulatorSpec(
+        platform="ps3",
+        name="RPCS3",
+        adapter="rpcs3",
+        repo="RPCS3/rpcs3-binaries-linux",
+        download_base="https://github.com/RPCS3/rpcs3-binaries-linux/releases/download/build-8d6b42e78adae5cc4685b45ecf2f370273e91810",
+        assets={"x86_64": "rpcs3-v0.0.43-20606-8d6b42e7_linux64.AppImage"},
+        archive="appimage",
+        launch_args=("--no-gui", "{rom}"),
+        rom_extensions=(".iso", ".pkg", ".elf", ".self"),
+        env_var="FREEDECKCY_RPCS3_BIN",
+        notes="RPCS3 官方 AppImage（仅 x86_64）；需要 PS3 固件",
+        min_bytes=60 * 1024 * 1024,
+        state_key="rpcs3",
+        setup_required=True,
+        setup_hint="PS3 需要固件：请在 RPCS3 首次启动时安装 PS3UPDAT.PUP",
+    ),
+    "switch": EmulatorSpec(
+        platform="switch",
+        name="Eden",
+        adapter="eden",
+        repo="eden-emu/eden",
+        download_base="https://stable.eden-emu.dev/v0.2.1",
+        assets={
+            "x86_64": "Eden-Linux-v0.2.1-amd64-gcc-standard.AppImage",
+            "aarch64": "Eden-Linux-v0.2.1-aarch64-gcc-standard.AppImage",
+        },
+        archive="appimage",
+        launch_args=("{rom}",),
+        rom_extensions=(".nsp", ".xci"),
+        env_var="FREEDECKCY_EDEN_BIN",
+        notes="Eden 官方 AppImage（x64/arm64）；需要 prod.keys 与固件",
+        min_bytes=50 * 1024 * 1024,
+        state_key="eden",
+        setup_required=True,
+        setup_hint="Switch 需要 prod.keys 与固件：请在 Eden 首次启动时配置（keys 放 Eden 数据目录）",
+    ),
 }
+
+
+def available_platforms(arch: str = "") -> Tuple[str, ...]:
+    """当前架构有官方包的平台列表。"""
+    target = arch or runtime_arch()
+    return tuple(platform for platform, spec in EMULATORS.items() if target in spec.assets)
 
 SUPPORTED_PLATFORMS: Tuple[str, ...] = tuple(EMULATORS.keys())
 
@@ -338,6 +416,29 @@ def prepare_bios(spec: EmulatorSpec) -> List[str]:
             messages.append(f"已复制 {copied} 个 BIOS 到 {target}")
         elif not any(target.iterdir()):
             messages.append(f"未找到可用的 PS1 BIOS（请把 scph*.bin 放到 {source}）")
+    elif spec.platform == "ps2":
+        targets = [
+            Path.home() / ".local" / "share" / "PCSX2" / "bios",
+            Path.home() / ".config" / "PCSX2" / "bios",
+        ]
+        copied = 0
+        for target in targets:
+            target.mkdir(parents=True, exist_ok=True)
+            for path in source.iterdir():
+                if not path.is_file() or path.suffix.lower() not in {".bin", ".rom"}:
+                    continue
+                destination = target / path.name
+                if destination.is_file():
+                    continue
+                try:
+                    shutil.copy2(path, destination)
+                    copied += 1
+                except Exception as exc:
+                    messages.append(f"复制 BIOS 失败 {path.name}: {exc}")
+        if copied:
+            messages.append(f"已复制 {copied} 个 PS2 BIOS")
+        elif not any(target.is_dir() and any(target.iterdir()) for target in targets):
+            messages.append(f"未找到可用的 PS2 BIOS（请把 *.bin 放到 {source}）")
     return messages
 
 
@@ -370,6 +471,8 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
             "bios_required": spec.bios_required,
             "bios_present": bios_present(spec.platform) if spec.bios_required else True,
             "bios_dir": str(bios_dir(spec.platform)) if spec.bios_required else "",
+            "setup_required": spec.setup_required,
+            "setup_hint": spec.setup_hint,
         }
     arch = runtime_arch()
     asset = spec.assets.get(arch)
@@ -378,7 +481,7 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
             "available": False,
             "source": "",
             "name": spec.name,
-            "message": f"{spec.name} 暂无 {arch} 官方包",
+            "message": f"当前架构（{arch}）没有 {spec.name} 官方包，已隐藏该平台",
         }
     return {
         "available": True,
@@ -392,6 +495,8 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
         "bios_required": spec.bios_required,
         "bios_present": bios_present(spec.platform) if spec.bios_required else True,
         "bios_dir": str(bios_dir(spec.platform)) if spec.bios_required else "",
+        "setup_required": spec.setup_required,
+        "setup_hint": spec.setup_hint,
         "message": f"首次安装会从官方 release 下载 {spec.name}（{asset}）",
     }
 

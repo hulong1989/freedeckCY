@@ -1115,9 +1115,9 @@ createApp({
     async openInstallConfirm(item) {
       if (!item || !item.game_id) return;
       const platform = String(item.platform || "pc").toLowerCase();
-      const emulatorPlatforms = new Set(["pc", "gba", "psp", "nds", "ps1", "fc", "md"]);
+      const emulatorPlatforms = new Set(["pc", "gba", "psp", "nds", "ps1", "fc", "md", "3ds", "ps2", "ps3", "switch"]);
       if (!emulatorPlatforms.has(platform)) {
-        this.flash(`当前支持 PC / GBA / PSP / NDS / PS1 / FC / MD，${platform.toUpperCase()} 暂未接入模拟器`);
+        this.flash(`当前平台 ${platform.toUpperCase()} 在本设备架构上没有可用模拟器`);
         return;
       }
       void this.fetchCoverForItem(item, { force: true });

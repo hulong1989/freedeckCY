@@ -710,10 +710,10 @@ def test_uninstall_preview_and_compatdata_cleanup(service, tmp_path, monkeypatch
 
 def test_non_pc_platform_install_is_rejected(service, tmp_path, monkeypatch):
     """模拟器资源当前只可浏览，安装应得到明确提示而不是去下整包。"""
-    csv_path = tmp_path / "switch_catalog.csv"
+    csv_path = tmp_path / "wiiu_catalog.csv"
     csv_path.write_text(
         "game_id,title,categories,down_url,pwd,openpath,platform,filesize_z,list_filesize\n"
-        "9001,SwitchGame,角色扮演,https://cloud.189.cn/t/abcdef,1234,SwitchGame/mario.nsp,switch,1000,1 KB\n",
+        "9001,WiiUGame,角色扮演,https://cloud.189.cn/t/abcdef,1234,WiiUGame/game.wud,wiiu,1000,1 KB\n",
         encoding="utf-8-sig",
     )
     catalog = svc_module.GameCatalog(str(csv_path))

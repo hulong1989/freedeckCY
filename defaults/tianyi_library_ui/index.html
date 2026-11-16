@@ -208,7 +208,11 @@
               <p
                 class="modal-warning"
                 v-if="installDialog.plan.emulator_info && installDialog.plan.emulator_info.bios_required && !installDialog.plan.emulator_info.bios_present"
-              >需要 PS1 BIOS：请把 scph*.bin 放到 {{ installDialog.plan.emulator_info.bios_dir }}</p>
+              >需要 BIOS：请把 BIOS 文件放到 {{ installDialog.plan.emulator_info.bios_dir }}</p>
+              <p
+                class="modal-warning"
+                v-if="installDialog.plan.emulator_info && installDialog.plan.emulator_info.setup_required && installDialog.plan.emulator_info.setup_hint"
+              >{{ installDialog.plan.emulator_info.setup_hint }}</p>
 
               <div class="space-block">
                 <div class="space-row">
