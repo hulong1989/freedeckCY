@@ -30,7 +30,7 @@ import { FaCloudDownloadAlt } from "react-icons/fa";
 type ApiStatus = "success" | "error";
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.23.0";
+const PLUGIN_UI_BUILD = "0.24.0";
 
 interface ApiResponse<T> {
   status: ApiStatus;
@@ -3274,7 +3274,18 @@ function Content() {
     }
     // 优先用 QAM 原生 Modal，避免路由未注册时被 Steam 当成网页路径。
     try {
-      showModal(<LibraryPage />);
+      let modal: { Close: () => void } | null = null;
+      modal = showModal(
+        <LibraryPage
+          onClose={() => {
+            try {
+              modal?.Close();
+            } catch {
+              // 忽略关闭失败。
+            }
+          }}
+        />,
+      );
       return;
     } catch {
       // 继续尝试全屏路由。
@@ -3688,7 +3699,7 @@ function Content() {
 }
 
 
-function LibraryPage() {
+function LibraryPage({ onClose }: { onClose?: () => void }) {
   const [tab, setTab] = useState<"catalog" | "installed">("catalog");
   const [query, setQuery] = useState<string>("");
   const [activeQuery, setActiveQuery] = useState<string>("");
@@ -3885,10 +3896,66 @@ function LibraryPage() {
     );
   }, [loadInstalled]);
 
+  const handleClose = useCallback(() => {
+    if (onClose) {
+      try {
+        onClose();
+      } catch {
+        // 忽略关闭回调失败。
+      }
+      return;
+    }
+    try {
+      Navigation.NavigateBack();
+    } catch {
+      try {
+        Router.CloseSideMenus?.();
+      } catch {
+        // 忽略关闭失败。
+      }
+    }
+  }, [onClose]);
+
+  const handleSteamLibrary = useCallback(() => {
+    try {
+      onClose?.();
+    } catch {
+      // 忽略关闭失败。
+    }
+    try {
+      Router.NavigateToLibraryTab?.();
+    } catch {
+      try {
+        Navigation.NavigateBack();
+      } catch {
+        // 忽略关闭失败。
+      }
+    }
+  }, [onClose]);
+
   const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
 
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: "0 8px 32px" }}>
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "8px",
+          padding: "8px 0",
+          background: "rgba(14, 17, 22, 0.94)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <div style={{ display: "flex", gap: "6px" }}>
+          <DialogButton onClick={handleClose} style={{ padding: "6px 12px" }}>返回</DialogButton>
+          <DialogButton onClick={handleSteamLibrary} style={{ padding: "6px 12px" }}>Steam 库</DialogButton>
+        </div>
+        <DialogButton onClick={() => { if (tab === "catalog") void loadCatalog(page); else void loadInstalled(); }} style={{ padding: "6px 12px" }}>刷新</DialogButton>
+      </div>
       <PanelSection>
         <PanelSectionRow>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }}>
@@ -3897,6 +3964,7 @@ function LibraryPage() {
               <div style={{ fontSize: "11px", opacity: 0.65 }}>{`原生 UI · v${PLUGIN_UI_BUILD}`}</div>
             </div>
             <Focusable style={{ display: "flex", gap: "6px" }}>
+              <DialogButton onClick={handleClose} style={{ padding: "6px 12px" }}>返回</DialogButton>
               <DialogButton
                 onClick={() => setTab("catalog")}
                 style={{ padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }}

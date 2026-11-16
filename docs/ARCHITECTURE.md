@@ -1,6 +1,6 @@
 # freedeckCY 架构说明
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.23.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.24.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -18,11 +18,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 这是阅读本仓库最容易踩的坑：**GitHub Releases 里的成品功能远多于仓库代码**。
 
-> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.23.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
+> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.24.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.23.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈 |
+| 本仓库 `main` | `package.json` 版本 `0.24.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭 |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -31,6 +31,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 - **仓库代码只是早期版本**：releases 里的百度网盘、模拟器、资源池等模块在 `main` 上完全不存在。不要在本仓库里寻找它们。
 - **仓库缺运行时二进制**：`aria2_manager.py` / `seven_zip_manager.py` / `tianyi_client.py` 会优先查找 `defaults/runtime/` 下的 `aria2c`、`7zz`、`node`，但仓库本身不提交这些文件（已在 `.gitignore` 中）。插件可以不带它们启动，但要完整跑通下载/安装/云存档，克隆后必须先执行 `make runtime` 补齐，否则会分别报"下载组件不可用 / 解压组件不可用 / 未找到 node 运行时"。release zip 约 50 MB 与源码约 1 MB 的差值，主要就是这些二进制。
 - **作者已停止维护**：NewFreedeck v0.1 的发布说明原文是"目前我没有精力与时间继续维护，抱歉，所以可以根据我整理的 skill 自行修改，最后可以给我推 pr"。
+- **v0.24.0 原生库返回/关闭修复**：`LibraryPage` 新增 `onClose?`——modal 模式 `showModal(<LibraryPage onClose={() => modal.Close()} />)`，route 模式无 `onClose` 时 `handleClose` 用 `Navigation.NavigateBack()`；顶部新增 **sticky 固定栏**（返回/Steam 库/刷新，滚动仍可见），标题栏也保留「返回」；「Steam 库」关闭 modal/返回后 `Router.NavigateToLibraryTab()` 回 Steam 库（失败再 `NavigateBack`）（见 5.16）。
 - **v0.23.0 原生库兜底 + 百度扫码超时/反馈**：QAM「游戏库」改为 **`showModal(<LibraryPage />)` 优先**、失败才 `Navigation.Navigate(LIBRARY_ROUTE)`（全屏路由保留）；主页显示 `QAM 原生 UI v0.23.0`、库页标题下显示 `原生 UI · v0.23.0` 便于确认前端是否更新；百度扫码点击立即 toast，前端 `withTimeout`（start 20s/poll 15s）、后端 `wait_for(request_qr, 12)`/图片 10s，超时给出明确文案并记 `Baidu QR ...` 日志（见 5.13 / 5.16）。
 - **v0.22.0 诊断自检 + 一键诊断包**：QAM 设置新增「诊断」页（运行自检/导出诊断包）；`run_diagnostics()` 检查插件/目录/runtime/目录数据/Steam/存储/天翼网络/百度扫码/任务/日志，每项 `ok|warn|fail|skip` + detail/fix；`export_diagnostics()` 的 zip 新增 `self-check.json`，`export_diagnostics_to_downloads()` 写到下载目录（0600，`freedeckcy-diagnostics-<时间>.zip`）；百度 QR 自检只返回 sign 长度，不输出 sign/cookie（见 5.17）。
 - **v0.21.0 扫描已安装迁移 + 自动补 Steam 快捷方式**：「扫描已安装游戏」从原生库「已安装」页移到 **QAM 设置 → 安装**；`scan_installed_games()` 新增 `list_all_shortcuts_sync()` 同名/同 exe 查重，PC 用 `_find_scanned_executable()` 找 exe、模拟器用 `ensure_emulator(allow_download=False)` + wrapper **自动补建 Steam 快捷方式**（模拟器未安装只记 `shortcut_error`、不自动下载）；第二遍为已有记录 `steam_app_id=0` 的 PC 补建；返回 `steam_added`/`steam_recovered_count`/`shortcut_error`（见 5.14 / 5.16）。
@@ -110,7 +111,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 repo/
 ├── main.py                     # 插件入口：Plugin 类，24 个可调用 RPC，大部分薄转发给 TianyiService / server_manager
 ├── plugin.json                 # Decky 元信息（api_version=1, flags=[]，publish 描述已更新）
-├── package.json                # 版本 0.23.0；build=rollup；前端依赖
+├── package.json                # 版本 0.24.0；build=rollup；前端依赖
 ├── decky.pyi                   # Decky Python API 类型存根
 ├── Makefile                    # runtime / package / test / doctor / validate-catalog / validate-submissions / clean / help 目标（见 DEVELOPMENT.md）
 ├── requirements-dev.txt        # 开发与 CI 依赖（pytest 等，运行期依赖由 Decky 自带）
@@ -652,9 +653,16 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **路由与入口（v0.23.0：modal 优先、route 兜底）**：
 
-- [src/index.tsx:32](../src/index.tsx) `LIBRARY_ROUTE = "/freedeckcy/library"`；[src/index.tsx:3691](../src/index.tsx) `LibraryPage()` 是页面组件；[src/index.tsx:4063](../src/index.tsx) `routerHook.addRoute(LIBRARY_ROUTE, LibraryPage)` 在插件挂载时注册，`onDismount()` 里 `removeRoute`；
+- [src/index.tsx:32](../src/index.tsx) `LIBRARY_ROUTE = "/freedeckcy/library"`；[src/index.tsx:3702](../src/index.tsx) `LibraryPage()` 是页面组件；[src/index.tsx:4131](../src/index.tsx) `routerHook.addRoute(LIBRARY_ROUTE, LibraryPage)` 在插件挂载时注册，`onDismount()` 里 `removeRoute`；
 - QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)` 原生弹层**，失败才 `Navigation.Navigate(LIBRARY_ROUTE)`（全屏路由保留）；不再调用后端打开网页；网页库入口仍保留作备用；
-- **版本标识**：主页显示 `QAM 原生 UI v0.23.0`，库页标题下显示 `原生 UI · v0.23.0`（`PLUGIN_UI_BUILD`），用于确认前端是否已更新；**前端未重载/旧 dist 仍会打开网页或看不到该标识**。
+- **版本标识**：主页显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`，库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`，用于确认前端是否已更新；**前端未重载/旧 dist 仍会打开网页或看不到该标识**。
+
+**返回 / 关闭链路（v0.24.0）**：
+
+- `LibraryPage({ onClose? })`：**modal 模式**由 `onOpenLibrary` 传 `onClose={() => modal.Close()}`；**route 模式**不传 `onClose`，`handleClose()` 走 `Navigation.NavigateBack()`（失败回退 `Router.CloseSideMenus`）；
+- 顶部 **sticky 固定栏**（`position: sticky; top: 0`）：「返回」「Steam 库」「刷新」，页面滚动时仍可点；页面标题栏也保留「返回」按钮；
+- `handleSteamLibrary()`：先关闭 modal（`onClose?.()`），再 `Router.NavigateToLibraryTab()` 直接回 Steam 库页；该 API 不可用时回退 `Navigation.NavigateBack()`；
+- **边界**：Steam 覆盖层里手柄 B/键盘 Esc 不一定能关掉 QAM modal（不同 Steam UI 版本行为不同），所以提供**显式返回/Steam 库按钮**兜底；如果 modal 打开失败会走全屏 route（无 `onClose`，返回用 `NavigateBack`）；若当前不在路由页/导航栈为空，返回按钮可能只关侧栏或无效。
 
 **页面能力**：
 
@@ -1080,7 +1088,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### P2：工程性
 
-21. `tianyi_service.py` 约 9500 行、单类 100+ 方法；`src/index.tsx` 约 4100 行单文件。已补 `tests/`（353 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+21. `tianyi_service.py` 约 9500 行、单类 100+ 方法；`src/index.tsx` 约 4200 行单文件。已补 `tests/`（353 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
 22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
 23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
 24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）
@@ -1108,6 +1116,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 46. **扫描补 Steam 快捷方式的边界（v0.21.0）**：只对扫描到/已存在但 `steam_app_id=0` 的 PC 记录补建；模拟器快捷方式要求模拟器已安装（`allow_download=False`，不会自动下载），否则记 `shortcut_error=emulator_not_ready`；PC 找不到 exe/ROM 时跳过并记 `exe_not_found`/`rom_not_found`；只写 `shortcuts.vdf`，**Steam 需重启/切用户/重开库页才可见**；不覆盖已有同名同 exe 快捷方式。（已知限制）
 47. **诊断自检的边界（v0.22.0）**：自检是一次性快照（版本/目录/运行时/Steam/存储/网络/百度 QR/任务/日志），网络项受连通性影响；「运行自检」不自动修复，只给 detail/fix；`baidu_qr` 只输出 sign 长度（不输出 sign/cookie）；导出诊断包会写 0600 zip 到下载目录并包含 300 行日志（已脱敏），仍建议提交前自行过目；不支持在线查看日志或上传诊断包。（已知限制）
 48. **原生库兜底/扫码超时的边界（v0.23.0）**：`showModal(<LibraryPage />)` 失败才走全屏路由，两者都失败才 toast；**前端未重载/旧 `dist` 仍可能打开旧网页或没有版本标识**（以 `QAM 原生 UI v0.23.0`/`原生 UI · v0.23.0` 为准）；百度扫码前后端超时（start 20s/12s、poll 15s）依赖网络/TLS，超时只提示不自动重试；`Baidu QR` 日志只记 sign 长度，不记 sign/cookie。（已知限制）
+49. **原生库返回/关闭的边界（v0.24.0）**：modal 模式依赖 `onClose` 回调关闭，route 模式用 `Navigation.NavigateBack()`；Steam 覆盖层的 B/Esc 不一定能关闭 modal，需用显式「返回」/「Steam 库」按钮；`Router.NavigateToLibraryTab()` 不可用时只回退 `NavigateBack`；sticky 栏只覆盖库页内部滚动，不改变 Steam 全局导航行为。（已知限制）
 
 ---
 

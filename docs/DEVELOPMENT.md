@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.23.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.24.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -866,7 +866,18 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 
 **入口（v0.23.0）**：QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)`**，失败才 `Navigation.Navigate("/freedeckcy/library")`；`routerHook.addRoute` 仍注册全屏入口，卸载移除。旧的网页库（`defaults/tianyi_library_ui/`）保留为备用（桌面浏览器/回退），两者共用同一后端。
 
-**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v0.23.0`，库页标题下显示 `原生 UI · v0.23.0`（`PLUGIN_UI_BUILD`）。看不到这两个标识说明 **前端 dist 未更新/插件未重载**，仍可能打开旧网页；`pnpm build` + 重载 Decky 插件后再看。
+**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。⚠️ 当前源码 `PLUGIN_UI_BUILD` 仍为 `0.23.0`（见 `src/index.tsx` 顶部常量），发布 v0.24.0 前应同步为 `0.24.0` 并重新构建，否则标识会显示旧版本。
+
+**返回/关闭测试（v0.24.0）**：
+
+| 场景 | 操作 | 预期 |
+|---|---|---|
+| modal 模式 | 点「游戏库」→ 顶部或标题栏「返回」 | `onClose` 关闭 modal，回到 QAM |
+| modal 模式 → Steam 库 | 点「Steam 库」 | 关闭 modal 后 `Router.NavigateToLibraryTab()` 回 Steam 库 |
+| route 模式 | 直接访问 `/freedeckcy/library`（无 `onClose`）→「返回」 | `Navigation.NavigateBack()` 返回上一页 |
+| 滚动后返回 | 库页列表向下滚动 → 点 sticky 栏「返回」 | 固定栏仍可见、可点（`position: sticky`） |
+
+**"困在库页"排查**：先确认用的是 v0.24.0 前端（版本标识/dist）；modal 内点「返回」无反应时改用「Steam 库」（`NavigateToLibraryTab`）或键盘/手柄 B、Esc；route 模式返回依赖导航栈，栈空时只能关侧栏；仍不行重载插件/重启 Steam 再试。
 
 **调试 callable**（`main.py`，均返回 `{status,data,message}`）：
 
@@ -885,6 +896,7 @@ scan_tianyi_installed_games()
 
 | 现象 | 处理 |
 |---|---|
+| **游戏库无法返回/困在库页** | v0.24.0 起顶部 sticky 栏和标题栏都有「返回」；modal 用 `onClose`→`modal.Close()`，route 用 `Navigation.NavigateBack()`；「Steam 库」走 `Router.NavigateToLibraryTab()`；B/Esc 在 Steam 覆盖层不一定生效，优先点显式按钮；route 返回依赖导航栈 |
 | QAM 点「游戏库」仍打开网页/没页面 | v0.23.0 起优先 `showModal(<LibraryPage />)`、失败才走路由；先确认主页有 `QAM 原生 UI v0.23.0`、库页有 `原生 UI · v0.23.0`（没有即 dist 未更新/未重载）；再看 Decky 日志里 modal/route 报错 |
 | 列表空/搜索无结果 | 目录 CSV 是否加载；`list_tianyi_catalog` 的 query/platform/category/sort/page_size 参数；空查询应返回全部 |
 | 点安装报"磁盘空间不足" | `prepare_tianyi_install` 返回 `can_install=false`，看 `required_download/install`、目标目录与 SD 卡剩余（§6.13） |
@@ -1100,6 +1112,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
 - [ ] 改模拟器存档发现/恢复后跑 `pytest tests/test_emulator_saves.py -q`：单游戏不退化成整目录、共享目录去重、PARAM.SFO/3DS 拆分、恢复目标白名单、开关关闭；PS1 多碟跑 `tests/test_emulator.py` 的 m3u 用例；
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
+- [ ] 改原生库返回逻辑后验证三种路径：modal「返回」、modal「Steam 库」、route「返回」；滚动后 sticky 栏仍可点；必要时用 `Navigation.NavigateBack` 回退验证；
 - [ ] 改原生库入口/百度 QR 后跑 `pnpm build`、重载插件：确认 `QAM 原生 UI v0.23.0`/`原生 UI · v0.23.0`、点游戏库走 modal；QR 超时日志包含 `Baidu QR ...`；
 - [ ] 改诊断后跑 `pytest tests/test_diagnostics.py -q`，确认 checks 结构/summary；导出包含 `self-check.json` 且权限 0600；
 - [ ] 改原生库后跑 `pnpm build`、重载插件；确认 `/freedeckcy/library` 路由、搜索/筛选/分页、安装确认与已安装动作；`make test` 仍 351；

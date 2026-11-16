@@ -89,7 +89,7 @@ function FaCloudDownloadAlt (props) {
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.23.0";
+const PLUGIN_UI_BUILD = "0.24.0";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const getTianyiStorageOptions = callable("get_tianyi_storage_options");
 const listTianyiCatalog = callable("list_tianyi_catalog");
@@ -2368,7 +2368,15 @@ function Content() {
         }
         // 优先用 QAM 原生 Modal，避免路由未注册时被 Steam 当成网页路径。
         try {
-            DFL.showModal(SP_JSX.jsx(LibraryPage, {}));
+            let modal = null;
+            modal = DFL.showModal(SP_JSX.jsx(LibraryPage, { onClose: () => {
+                    try {
+                        modal?.Close();
+                    }
+                    catch {
+                        // 忽略关闭失败。
+                    }
+                } }));
             return;
         }
         catch {
@@ -2610,7 +2618,7 @@ function Content() {
                                         }, children: uninstalling ? "卸载中..." : "卸载" }) })] }) }, `${item.game_id || item.title || "game"}_${index}`));
                 }) }))] }));
 }
-function LibraryPage() {
+function LibraryPage({ onClose }) {
     const [tab, setTab] = SP_REACT.useState("catalog");
     const [query, setQuery] = SP_REACT.useState("");
     const [activeQuery, setActiveQuery] = SP_REACT.useState("");
@@ -2784,8 +2792,62 @@ function LibraryPage() {
                 })();
             }, onCancel: () => { } }));
     }, [loadInstalled]);
+    const handleClose = SP_REACT.useCallback(() => {
+        if (onClose) {
+            try {
+                onClose();
+            }
+            catch {
+                // 忽略关闭回调失败。
+            }
+            return;
+        }
+        try {
+            DFL.Navigation.NavigateBack();
+        }
+        catch {
+            try {
+                DFL.Router.CloseSideMenus?.();
+            }
+            catch {
+                // 忽略关闭失败。
+            }
+        }
+    }, [onClose]);
+    const handleSteamLibrary = SP_REACT.useCallback(() => {
+        try {
+            onClose?.();
+        }
+        catch {
+            // 忽略关闭失败。
+        }
+        try {
+            DFL.Router.NavigateToLibraryTab?.();
+        }
+        catch {
+            try {
+                DFL.Navigation.NavigateBack();
+            }
+            catch {
+                // 忽略关闭失败。
+            }
+        }
+    }, [onClose]);
     const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
-    return (SP_JSX.jsxs("div", { style: { height: "100%", overflowY: "auto", padding: "0 8px 32px" }, children: [SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column" }, children: [SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65 }, children: `原生 UI · v${PLUGIN_UI_BUILD}` })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
+    return (SP_JSX.jsxs("div", { style: { height: "100%", overflowY: "auto", padding: "0 8px 32px" }, children: [SP_JSX.jsxs("div", { style: {
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 20,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "8px",
+                    padding: "8px 0",
+                    background: "rgba(14, 17, 22, 0.94)",
+                    backdropFilter: "blur(8px)",
+                }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { padding: "6px 12px" }, children: "\u8FD4\u56DE" }), SP_JSX.jsx(DFL.DialogButton, { onClick: handleSteamLibrary, style: { padding: "6px 12px" }, children: "Steam \u5E93" })] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
+                            void loadCatalog(page);
+                        else
+                            void loadInstalled(); }, style: { padding: "6px 12px" }, children: "\u5237\u65B0" })] }), SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column" }, children: [SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65 }, children: `原生 UI · v${PLUGIN_UI_BUILD}` })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { padding: "6px 12px" }, children: "\u8FD4\u56DE" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
                                             void loadCatalog(page);
                                         else
                                             void loadInstalled(); }, style: { padding: "6px 12px" }, children: "\u5237\u65B0" })] })] }) }) }), tab === "catalog" ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u641C\u7D22\u4E0E\u7B5B\u9009", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u641C\u7D22\u6E38\u620F", value: query, onChange: (event) => setQuery(getTextFieldValue(event)), onKeyDown: (event) => {
