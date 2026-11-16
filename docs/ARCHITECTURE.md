@@ -582,9 +582,9 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 - **OpenAPI 回退**（自建应用）：[baidu_openapi_client.py:1540](../py_modules/baidu_openapi_client.py) `resolve_baidu_openapi_share_url()` + [baidu_openapi_client.py:1987](../py_modules/baidu_openapi_client.py) `fetch_baidu_openapi_download_url()`，OAuth 流程 [baidu_openapi_client.py:359](../py_modules/baidu_openapi_client.py) `build_baidu_oauth_authorize_url()` / [baidu_openapi_client.py:387](../py_modules/baidu_openapi_client.py) `exchange_baidu_oauth_code()` / [baidu_openapi_client.py:418](../py_modules/baidu_openapi_client.py) `refresh_baidu_oauth_token()`；任务 `provider="baidu_openapi"`，aria2 空 cookie + 同 Referer/UA；安装后 [tianyi_service.py:7234](../py_modules/tianyi_service.py) `_cleanup_baidu_transfer_files()` 调 [baidu_openapi_client.py:1285](../py_modules/baidu_openapi_client.py) `delete_baidu_openapi_transfer_file()` 清理 `/FreedeckTmp` 转存（Cookie 链路无转存）；
 - QAM：新增「百度网盘（扫码登录）」区（二维码/等待/已扫码/取消/退出）；原「百度网盘 OpenAPI」改为「（可选，需开发者资质）」保留；面板状态 `baidu_login`；HTTP `/api/tianyi/baidu/qr/{start,poll,cancel}` 与 `/api/tianyi/baidu/clear`，`main.py` 4 个同名 callable。
 
-**错误诊断（v0.18.0）**：
+**错误诊断（v0.18.0 起，v0.19.1 增强 TLS/urllib 回退）**：
 
-- `request_qr()` 现在先访问 `https://passport.baidu.com/` 拿 **BAIDUID**，再用同一个 `CookieJar` 请求 `getqrcode`，并把 Cookie 存入内存 session；`poll_qr()` / `complete_login()` 也带同一组 Cookie（部分风控环境需要 BAIDUID/会话连续性）；
+- `request_qr()` 直接请求 `getqrcode`；v0.19.1 起 aiohttp 依次尝试系统证书、跳过证书校验，仍失败回退 urllib（兼容部分 Decky/SteamOS 环境），错误消息带具体异常/HTTP 状态/响应片段；
 - HTTP 非 200 会抛带状态码/响应片段的 `BaiduQrError`（如 `获取百度二维码 HTTP 403: ...`）；轮询时 HTTP ≥400 或连接重置/DNS/SSL 等非超时错误返回 `{"status":"error"}`，服务层转 `stage=failed` 并把真实异常写进 QAM 消息，不再一直显示 waiting；超时仍视为 waiting；
 - `start_baidu_qr_login()` 会对任何取码异常记日志并返回"获取百度二维码失败：<原因>"；`poll_baidu_qr_login()` 的 `stage` 为 waiting/scanned/success/expired/failed，`failed` 带具体原因；`complete_login()` 非 200/无 BDUSS 时抛 `BaiduQrError`。
 

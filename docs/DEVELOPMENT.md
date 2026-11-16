@@ -743,7 +743,7 @@ make validate-catalog                      # 合并后再跑目录体检
 
 **扫码错误诊断（v0.18.0）**：
 
-- `request_qr()` 先访问 `https://passport.baidu.com/` 拿 **BAIDUID**，再请求 `getqrcode`，二维码/轮询/`qrbdusslogin` 共用同一组 Cookie（`CookieJar`）；QAM 服务层把 Cookie 存进内存 session；
+- `request_qr()` 直接请求 `getqrcode`；v0.19.1 起 aiohttp 会依次尝试系统证书、跳过证书校验，仍失败则回退 urllib（部分 Decky/SteamOS 环境 aiohttp TLS 不可用）；错误消息带具体异常类型/HTTP 状态/响应片段；
 - HTTP 非 200 时错误消息带状态码/响应片段（如 `获取百度二维码 HTTP 403: ...`）；轮询遇到 HTTP ≥400 或连接重置/DNS/SSL 等**非超时**错误返回 `status=error`，服务层转 `stage=failed` 并在 QAM 显示具体原因，不再一直 waiting；超时仍视为 waiting；
 - `start_baidu_qr_login` 的异常会写日志 `Baidu QR request failed: ...` 并返回"获取百度二维码失败：<原因>"；`poll_baidu_qr_login` 的 `stage` 可能是 waiting/scanned/success/expired/failed；
 - 调试：看 QAM 二维码区/提示、`/tmp/freedeckcy.log` 里的 `Baidu QR` 关键字、以及 `/api/tianyi/baidu/qr/poll` 返回的 `stage/message`。

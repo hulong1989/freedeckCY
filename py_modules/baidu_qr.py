@@ -5,15 +5,24 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import ssl
 import time
-from typing import Any, Dict, Optional
+import urllib.request
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlencode
 
 import aiohttp
 
 QRCODE_URL = "https://passport.baidu.com/v2/api/getqrcode"
 UNICAST_URL = "https://passport.baidu.com/channel/unicast"
 QR_LOGIN_URL = "https://passport.baidu.com/v3/login/main/qrbdusslogin"
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
+HEADERS = {
+    "User-Agent": UA,
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Referer": "https://passport.baidu.com/",
+}
 
 
 class BaiduQrError(RuntimeError):
@@ -24,32 +33,79 @@ def _timeout(total: float = 12.0) -> aiohttp.ClientTimeout:
     return aiohttp.ClientTimeout(total=total, connect=8, sock_connect=8, sock_read=total)
 
 
-async def request_qr() -> Dict[str, Any]:
-    params = {"lp": "pc", "qrloginfrom": "pc"}
-    headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
-    jar = aiohttp.CookieJar(unsafe=True)
+def _ssl_context():
     try:
-        async with aiohttp.ClientSession(timeout=_timeout(15), cookie_jar=jar) as session:
-            # 先访问 passport 首页拿 BAIDUID，部分风控环境下的二维码接口需要它。
+        return ssl.create_default_context()
+    except Exception:
+        return False
+
+
+def _parse_jsonish(text: str) -> Dict[str, Any]:
+    raw = str(text or "").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    match = re.search(r"\{.*\}", raw, re.S)
+    if match:
+        try:
+            data = json.loads(match.group(0))
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            pass
+    return {}
+
+
+def _urllib_qr(url: str, params: Dict[str, Any]) -> str:
+    query = urlencode({str(k): str(v) for k, v in params.items()})
+    request_url = f"{url}?{query}"
+    request = urllib.request.Request(request_url, headers=HEADERS)
+    context = _ssl_context()
+    try:
+        with urllib.request.urlopen(request, timeout=15, context=context) as response:
+            return response.read().decode("utf-8", "replace")
+    except Exception as exc:
+        if context is not False:
             try:
-                async with session.get("https://passport.baidu.com/", headers=headers):
-                    pass
+                with urllib.request.urlopen(request, timeout=15, context=ssl._create_unverified_context()) as response:
+                    return response.read().decode("utf-8", "replace")
             except Exception:
                 pass
-            async with session.get(QRCODE_URL, params=params, headers=headers) as response:
-                text = await response.text()
-                if response.status != 200:
-                    raise BaiduQrError(f"获取百度二维码 HTTP {response.status}: {text[:200]}")
-    except BaiduQrError:
-        raise
-    except Exception as exc:
-        raise BaiduQrError(f"获取百度二维码网络错误: {exc}") from exc
-    try:
-        data = json.loads(text)
-    except Exception as exc:
-        raise BaiduQrError(f"百度二维码响应异常: {text[:200]}") from exc
+        raise exc
+
+
+async def request_qr() -> Dict[str, Any]:
+    params = {"lp": "pc", "qrloginfrom": "pc"}
+    text = ""
+    last_error = ""
+    # 1) aiohttp 主路径；证书/连接错误时重试不校验证书。
+    for verify in (True, False):
+        try:
+            connector = aiohttp.TCPConnector(ssl=_ssl_context() if verify else False)
+            jar = aiohttp.CookieJar(unsafe=True)
+            async with aiohttp.ClientSession(timeout=_timeout(15), cookie_jar=jar, connector=connector) as session:
+                async with session.get(QRCODE_URL, params=params, headers=HEADERS) as response:
+                    text = await response.text()
+                    if response.status == 200 and text.strip():
+                        break
+                    last_error = f"HTTP {response.status}: {text[:200]}"
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+    # 2) urllib 回退（部分 Decky/SteamOS 环境的 aiohttp TLS 不可用）。
+    if not text.strip():
+        try:
+            text = await asyncio.to_thread(_urllib_qr, QRCODE_URL, params)
+        except Exception as exc:
+            detail = last_error or f"{type(exc).__name__}: {exc}"
+            raise BaiduQrError(f"获取百度二维码失败（{detail}）") from exc
+    data = _parse_jsonish(text)
+    if not data:
+        raise BaiduQrError(f"百度二维码响应异常: {text[:300]}")
     if int(data.get("errno", 0) or 0) != 0:
-        raise BaiduQrError(str(data.get("prompt") or "获取百度二维码失败"))
+        raise BaiduQrError(str(data.get("prompt") or f"百度二维码 errno={data.get('errno')}"))
     sign = str(data.get("sign", "") or "").strip()
     imgurl = str(data.get("imgurl", "") or "").strip()
     if not sign:
@@ -60,7 +116,7 @@ async def request_qr() -> Dict[str, Any]:
         "sign": sign,
         "imgurl": imgurl,
         "prompt": str(data.get("prompt", "") or ""),
-        "cookies": {cookie.key: cookie.value for cookie in jar},
+        "cookies": {},
     }
 
 
@@ -68,12 +124,20 @@ async def fetch_qr_image(imgurl: str) -> bytes:
     url = str(imgurl or "").strip()
     if not url:
         return b""
-    headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
-    async with aiohttp.ClientSession(timeout=_timeout(15)) as session:
-        async with session.get(url, headers=headers) as response:
-            if response.status != 200:
-                return b""
-            return await response.read()
+    try:
+        connector = aiohttp.TCPConnector(ssl=_ssl_context())
+        async with aiohttp.ClientSession(timeout=_timeout(15), connector=connector) as session:
+            async with session.get(url, headers=HEADERS) as response:
+                if response.status != 200:
+                    return b""
+                return await response.read()
+    except Exception:
+        try:
+            request = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(request, timeout=15, context=_ssl_context()) as response:
+                return response.read()
+        except Exception:
+            return b""
 
 
 async def poll_qr(
