@@ -910,6 +910,49 @@ def _derive_tianyi_launch_token(game_id: str) -> str:
     return token or "game"
 
 
+def list_all_shortcuts_sync() -> Dict[str, Any]:
+    """List all Steam shortcuts (not only freedeckCY) for duplicate detection."""
+    steam_root = _find_steam_root()
+    if not steam_root:
+        return {"ok": False, "message": "未找到 Steam 安装目录", "rows": [], "by_name": {}}
+    user_id = _detect_active_user(steam_root)
+    if not user_id:
+        return {"ok": False, "message": "未找到已登录 Steam 用户", "rows": [], "by_name": {}}
+    shortcuts_file = _shortcuts_path(steam_root, user_id)
+    payload = _load_shortcuts_vdf(shortcuts_file)
+    shortcuts = payload.get("shortcuts") if isinstance(payload, dict) else {}
+    if not isinstance(shortcuts, dict):
+        shortcuts = {}
+    rows: List[Dict[str, Any]] = []
+    by_name: Dict[str, Dict[str, Any]] = {}
+    for _, item in shortcuts.items():
+        if not isinstance(item, dict):
+            continue
+        app_name = str(item.get("AppName", "") or "").strip()
+        exe_path = str(item.get("Exe", "") or "").strip().strip('"')
+        app_id = _safe_int(item.get("appid"), 0)
+        row = {
+            "app_name": app_name,
+            "exe": exe_path,
+            "exe_real": os.path.realpath(os.path.expanduser(exe_path)) if exe_path else "",
+            "appid": int(app_id),
+            "appid_unsigned": int(app_id) & 0xFFFFFFFF if app_id else 0,
+            "launch_options": str(item.get("LaunchOptions", "") or "").strip(),
+        }
+        rows.append(row)
+        key = "".join(char for char in app_name.lower() if char.isalnum() or "\u4e00" <= char <= "\u9fff")
+        if key:
+            by_name.setdefault(key, row)
+    return {
+        "ok": True,
+        "steam_root": steam_root,
+        "user_id": user_id,
+        "shortcut_path": shortcuts_file,
+        "rows": rows,
+        "by_name": by_name,
+    }
+
+
 def list_tianyi_shortcuts_sync() -> Dict[str, Any]:
     """List freedeckCY Tianyi shortcuts in one pass for fast appid mapping."""
     steam_root = _find_steam_root()

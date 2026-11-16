@@ -1711,6 +1711,7 @@ function SettingsPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [clearingLogin, setClearingLogin] = useState<boolean>(false);
+  const [scanningInstalled, setScanningInstalled] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("paths");
   const [settings, setSettings] = useState<SettingsState>(EMPTY_SETTINGS);
   const [storageOptions, setStorageOptions] = useState<StorageOption[]>([]);
@@ -2128,6 +2129,30 @@ function SettingsPage() {
     }
   }, [baiduQrBusy]);
 
+  const onScanInstalledSettings = useCallback(async () => {
+    if (scanningInstalled) return;
+    setScanningInstalled(true);
+    try {
+      const result = await scanTianyiInstalledGames();
+      if (result.status !== "success") {
+        throw new Error(result.message || "扫描已安装游戏失败");
+      }
+      const data = (result.data || {}) as Record<string, unknown>;
+      const message = String(data.message || "扫描完成");
+      const steamAdded = (Array.isArray(data.added_games)
+        ? (data.added_games as Record<string, unknown>[]).filter((item) => Boolean(item.steam_added)).length
+        : 0) + Number(data.steam_recovered_count || 0);
+      toaster.toast({
+        title: "freedeckCY",
+        body: `${message}${steamAdded ? `（自动加入 Steam：${steamAdded}）` : ""}`,
+      });
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setScanningInstalled(false);
+    }
+  }, [scanningInstalled]);
+
   const onSaveBaiduApp = useCallback(async () => {
     if (baiduBusy) return;
     setBaiduBusy(true);
@@ -2473,6 +2498,7 @@ function SettingsPage() {
         id: "install",
         title: "安装",
         content: (
+          <>
           <PanelSection title="安装行为">
             <PanelSectionRow>
               <ToggleField
@@ -2489,6 +2515,19 @@ function SettingsPage() {
               </div>
             </PanelSectionRow>
           </PanelSection>
+          <PanelSection title="扫描已安装">
+            <PanelSectionRow>
+              <div style={{ fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }}>
+                扫描设置里的安装目录一层，把目录名匹配标题的游戏补回列表；Steam 里没有的会自动创建快捷方式。
+              </div>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <ButtonItem layout="below" onClick={onScanInstalledSettings} disabled={scanningInstalled || saving}>
+                {scanningInstalled ? "扫描中..." : "扫描已安装游戏"}
+              </ButtonItem>
+            </PanelSectionRow>
+          </PanelSection>
+          </>
         ),
       },
       {
@@ -3688,22 +3727,6 @@ function LibraryPage() {
     );
   }, [loadInstalled]);
 
-  const onScanInstalled = useCallback(async () => {
-    if (loadingInstalled) return;
-    setLoadingInstalled(true);
-    try {
-      const result = await scanTianyiInstalledGames();
-      if (result.status !== "success") throw new Error(result.message || "扫描失败");
-      const message = String((result.data as Record<string, unknown>)?.message || "扫描完成");
-      toaster.toast({ title: "freedeckCY", body: message });
-      await loadInstalled();
-    } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
-    } finally {
-      setLoadingInstalled(false);
-    }
-  }, [loadingInstalled, loadInstalled]);
-
   const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
 
   return (
@@ -3829,11 +3852,9 @@ function LibraryPage() {
         </>
       ) : (
         <PanelSection title={`已安装（${installed.total}）`}>
-          <PanelSectionRow>
-            <ButtonItem layout="below" onClick={onScanInstalled} disabled={loadingInstalled}>
-              {loadingInstalled ? "处理中..." : "扫描已安装"}
-            </ButtonItem>
-          </PanelSectionRow>
+          {loadingInstalled ? (
+            <PanelSectionRow><div style={{ fontSize: "12px" }}>加载中...</div></PanelSectionRow>
+          ) : null}
           {installed.items.length === 0 ? (
             <PanelSectionRow><div style={{ fontSize: "12px" }}>还没有已安装游戏</div></PanelSectionRow>
           ) : (

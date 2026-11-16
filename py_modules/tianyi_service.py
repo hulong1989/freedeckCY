@@ -76,6 +76,7 @@ from steam_shortcuts import (
     detect_proton_tool,
     is_droiddeck,
     find_compatdata_dirs,
+    list_all_shortcuts_sync,
     list_tianyi_shortcuts_sync,
     remove_tianyi_shortcut,
     resolve_tianyi_shortcut_sync,
@@ -6793,6 +6794,54 @@ class TianyiService:
         data["install_dir"] = str(self.store.settings.install_dir or "")
         return data
 
+    def _find_scanned_executable(self, install_path: str, entry: Any) -> str:
+        """在扫描到的安装目录里找可执行文件（优先 openpath 的 exe）。"""
+        root = os.path.realpath(os.path.expanduser(str(install_path or "").strip()))
+        if not root or not os.path.isdir(root):
+            return ""
+        openpath = str(getattr(entry, "openpath", "") or "").replace("\\", "/").strip("/")
+        if openpath and openpath.lower().endswith(".exe"):
+            target = os.path.realpath(os.path.join(root, *openpath.split("/")))
+            if os.path.isfile(target):
+                return target
+            target_name = os.path.basename(openpath).lower()
+            for dirpath, _dirnames, filenames in os.walk(root):
+                for name in filenames:
+                    if name.lower() == target_name:
+                        return os.path.join(dirpath, name)
+        candidates: List[str] = []
+        for dirpath, dirnames, filenames in os.walk(root):
+            if dirpath.count(os.sep) - root.count(os.sep) >= 4:
+                dirnames[:] = []
+            for name in filenames:
+                if not name.lower().endswith(".exe"):
+                    continue
+                lower = name.lower()
+                if any(token in lower for token in ("unins", "setup", "redist", "vcredist", "crashreport", "dxsetup")):
+                    continue
+                candidates.append(os.path.join(dirpath, name))
+                if len(candidates) >= 200:
+                    break
+            if len(candidates) >= 200:
+                break
+        if not candidates:
+            return ""
+        title_key = self._normalize_scan_title(str(getattr(entry, "title", "") or ""))
+        dir_key = self._normalize_scan_title(os.path.basename(root))
+        def rank(path: str):
+            stem = self._normalize_scan_title(os.path.splitext(os.path.basename(path))[0])
+            score = 0
+            if title_key and (stem == title_key or stem.startswith(title_key) or title_key.startswith(stem)):
+                score -= 100
+            if dir_key and (stem == dir_key or stem.startswith(dir_key) or dir_key.startswith(stem)):
+                score -= 50
+            try:
+                size = os.path.getsize(path)
+            except Exception:
+                size = 0
+            return (score, -size, path)
+        return sorted(candidates, key=rank)[0]
+
     async def scan_installed_games(self) -> Dict[str, Any]:
         """扫描安装目录，把旧版本/手动安装的游戏补回已安装列表。"""
         install_root = self._normalize_existing_dir(str(self.store.settings.install_dir or "").strip())
@@ -6814,8 +6863,9 @@ class TianyiService:
                     title_index[key] = entry
 
         shortcut_by_name: Dict[str, int] = {}
+        shortcut_by_exe: Dict[str, int] = {}
         try:
-            shortcut_result = await asyncio.to_thread(list_tianyi_shortcuts_sync)
+            shortcut_result = await asyncio.to_thread(list_all_shortcuts_sync)
             for row in list(shortcut_result.get("rows") or []):
                 if not isinstance(row, dict):
                     continue
@@ -6823,6 +6873,9 @@ class TianyiService:
                 appid = _safe_int(row.get("appid_unsigned"), 0)
                 if name_key and appid > 0:
                     shortcut_by_name.setdefault(name_key, appid)
+                exe_real = str(row.get("exe_real", "") or "").strip()
+                if exe_real and appid > 0:
+                    shortcut_by_exe.setdefault(exe_real, appid)
         except Exception as exc:
             config.logger.warning("扫描 Steam 快捷方式失败: %s", exc)
 
@@ -6880,7 +6933,77 @@ class TianyiService:
                     rom_path = find_rom_file(install_path, str(match.openpath or ""), platform)
                 except Exception:
                     rom_path = ""
+            display_title = self._derive_display_title_for_steam(str(match.title or normalized_name))
             appid = shortcut_by_name.get(self._normalize_scan_title(str(match.title or "")), 0)
+            exe_path = ""
+            launcher_path = ""
+            shortcut_added = False
+            shortcut_error = ""
+            if appid <= 0 and platform == "pc":
+                exe_path = self._find_scanned_executable(install_path, match)
+                if exe_path:
+                    appid = shortcut_by_exe.get(os.path.realpath(exe_path), 0)
+            if appid <= 0:
+                try:
+                    launch_options = ""
+                    shortcut_appid = 0
+                    if platform == "pc":
+                        if not exe_path:
+                            shortcut_error = "exe_not_found"
+                        else:
+                            launch_token = re.sub(r"[^a-zA-Z0-9._-]+", "_", game_id or normalized_name).strip("_") or "game"
+                            launch_options = f"freedeckcy:tianyi:{launch_token}"
+                            shortcut = await add_or_update_tianyi_shortcut(
+                                game_id=game_id,
+                                display_name=display_title,
+                                exe_path=exe_path,
+                                launch_options=launch_options,
+                                proton_tool=str(self.store.settings.proton_tool or "auto"),
+                                cover_landscape_url=str(match.cover_url or ""),
+                                cover_portrait_url=str(match.cover_portrait_url or ""),
+                                steam_app_id=_safe_int(match.steam_appid, 0),
+                            )
+                            if shortcut.get("ok"):
+                                shortcut_appid = _safe_int(shortcut.get("appid_unsigned"), 0)
+                                shortcut_added = shortcut_appid > 0
+                            else:
+                                shortcut_error = str(shortcut.get("message", "") or "shortcut_failed")
+                    elif rom_path:
+                        try:
+                            command = await ensure_emulator(platform, self.plugin_dir, allow_download=False)
+                            launcher_path = os.path.join(install_path, "launch-freedeckcy.sh")
+                            await asyncio.to_thread(
+                                create_launch_wrapper,
+                                command=command,
+                                rom_path=rom_path,
+                                wrapper_path=launcher_path,
+                                platform_name=platform,
+                            )
+                            launch_token = re.sub(r"[^a-zA-Z0-9._-]+", "_", game_id or normalized_name).strip("_") or "game"
+                            shortcut = await add_or_update_tianyi_shortcut(
+                                game_id=game_id,
+                                display_name=display_title,
+                                exe_path=launcher_path,
+                                launch_options=f"freedeckcy:tianyi:{launch_token}",
+                                proton_tool="none",
+                                cover_landscape_url=str(match.cover_url or ""),
+                                cover_portrait_url=str(match.cover_portrait_url or ""),
+                                steam_app_id=_safe_int(match.steam_appid, 0),
+                            )
+                            if shortcut.get("ok"):
+                                shortcut_appid = _safe_int(shortcut.get("appid_unsigned"), 0)
+                                shortcut_added = shortcut_appid > 0
+                            else:
+                                shortcut_error = str(shortcut.get("message", "") or "shortcut_failed")
+                        except Exception as exc:
+                            shortcut_error = f"emulator_not_ready: {exc}"
+                    else:
+                        shortcut_error = "rom_not_found"
+                    if shortcut_added and shortcut_appid > 0:
+                        appid = shortcut_appid
+                except Exception as exc:
+                    shortcut_error = f"shortcut_failed: {exc}"
+
             record = TianyiInstalledGame(
                 game_id=game_id,
                 game_title=str(match.title or normalized_name),
@@ -6889,7 +7012,9 @@ class TianyiService:
                 size_bytes=size_bytes,
                 steam_app_id=appid,
                 platform=platform,
+                emulator=emulator_name_for_platform(platform) if platform != "pc" else "",
                 rom_path=rom_path,
+                launcher_path=launcher_path,
             )
             self.store.upsert_installed_game(record)
             existing_paths.add(install_path)
@@ -6901,10 +7026,55 @@ class TianyiService:
                     "platform": platform,
                     "install_path": install_path,
                     "steam_app_id": appid,
+                    "steam_added": shortcut_added,
+                    "shortcut_error": shortcut_error,
                 }
             )
 
-        if added:
+        # 第二遍：已存在记录但 Steam 里没有快捷方式的 PC 游戏，也补一个。
+        shortcut_recovered: List[Dict[str, Any]] = []
+        for record in list(self.store.installed_games or []):
+            if str(record.platform or "pc").lower() != "pc" or _safe_int(record.steam_app_id, 0) > 0:
+                continue
+            record_path = self._normalize_dir_path(str(record.install_path or "").strip())
+            if not record_path or not (record_path == install_root or record_path.startswith(install_root.rstrip(os.sep) + os.sep)):
+                continue
+            try:
+                entry = self.catalog.get_by_game_id(record.game_id)
+            except Exception:
+                entry = None
+            if entry is None:
+                entry = next(
+                    (item for item in list(self.catalog.entries or []) if str(item.game_id) == str(record.game_id)),
+                    None,
+                )
+            if entry is None:
+                continue
+            exe_path = self._find_scanned_executable(record_path, entry)
+            if not exe_path:
+                continue
+            try:
+                launch_token = re.sub(r"[^a-zA-Z0-9._-]+", "_", str(record.game_id or "")).strip("_") or "game"
+                shortcut = await add_or_update_tianyi_shortcut(
+                    game_id=str(record.game_id or ""),
+                    display_name=self._derive_display_title_for_steam(str(record.game_title or entry.title or "")),
+                    exe_path=exe_path,
+                    launch_options=f"freedeckcy:tianyi:{launch_token}",
+                    proton_tool=str(self.store.settings.proton_tool or "auto"),
+                    cover_landscape_url=str(entry.cover_url or ""),
+                    cover_portrait_url=str(entry.cover_portrait_url or ""),
+                    steam_app_id=_safe_int(entry.steam_appid, 0),
+                )
+                if shortcut.get("ok"):
+                    appid = _safe_int(shortcut.get("appid_unsigned"), 0)
+                    if appid > 0:
+                        record.steam_app_id = appid
+                        record.updated_at = _now_wall_ts()
+                        shortcut_recovered.append({"game_id": record.game_id, "title": record.game_title, "steam_app_id": appid})
+            except Exception as exc:
+                config.logger.warning("扫描补 Steam 快捷方式失败 game=%s: %s", record.game_id, exc)
+
+        if added or shortcut_recovered:
             await asyncio.to_thread(self.store.save)
             self._invalidate_panel_cache(all_data=True)
         return {
@@ -6912,13 +7082,15 @@ class TianyiService:
             "scanned": len(children),
             "added_count": len(added),
             "added_games": added[:24],
+            "steam_recovered_count": len(shortcut_recovered),
+            "steam_recovered": shortcut_recovered[:24],
             "skipped_count": len(skipped),
             "unresolved_count": len(unresolved),
             "unresolved_dirs": unresolved[:24],
             "installed_total": len(self.store.installed_games or []),
             "message": (
-                f"已补回 {len(added)} 个已安装游戏"
-                if added
+                f"已补回 {len(added)} 个已安装游戏，补建 {len(shortcut_recovered)} 个 Steam 快捷方式"
+                if added or shortcut_recovered
                 else "没有发现可补回的已安装游戏（目录名需与目录标题匹配）"
             ),
         }

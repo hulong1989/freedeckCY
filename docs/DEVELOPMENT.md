@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.20.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.21.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -47,7 +47,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（351 个用例；原生库为前端构建验证）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（352 个用例；原生库为前端构建验证）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -336,7 +336,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **351 个用例**（`make test` 实测 `351 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **352 个用例**（`make test` 实测 `352 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -796,9 +796,9 @@ curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep
 | 想用 OpenAPI 而不是扫码 | QAM 清空百度登录（或不要扫码），配置 OpenAPI 应用并授权；安装计划会在无 Cookie 时回退 OpenAPI |
 | 为什么不做 CDP | 不逆向网页接口；Cookie 只通过百度 Passport 官方扫码（`getqrcode/unicast/qrbdusslogin`）获取 |
 
-### 6.12 扫描已安装游戏（v0.18.0）
+### 6.12 扫描已安装游戏（v0.18.0；v0.21.0 入口迁移 + 自动补 Steam）
 
-**用途**：插件重装/state 丢失/游戏是旧版本或手动安装时，把 `settings.install_dir` 里已有的游戏补回「已安装」列表。
+**用途**：插件重装/state 丢失/游戏是旧版本或手动安装时，把 `settings.install_dir` 里已有的游戏补回「已安装」列表，并自动补齐 Steam 快捷方式。**v0.21.0 起入口在 QAM 设置 → 安装 → 「扫描已安装游戏」**（原生库已安装页不再有扫描按钮；网页库按钮保留为备用）。
 
 **命令/API**：
 
@@ -807,14 +807,21 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/installed/scan | python3 -m js
 # 返回：scanned / added_count / added_games / skipped_count / unresolved_count / unresolved_dirs / installed_total / message
 ```
 
-网页库「已安装」工具栏点「扫描已安装」（`app.js` 的 `scanInstalled()`），完成后刷新列表并 flash「已补回 N 个」；无匹配时提示"目录名需与目录标题匹配"。
+QAM 设置页点「扫描已安装游戏」（`onScanInstalledSettings`），toast 显示"已补回 N 个…（自动加入 Steam：M）"；网页库「已安装」工具栏「扫描已安装」（`app.js` 的 `scanInstalled()`）作为备用。
 
 **匹配规则**：
 
 - 只扫 `settings.install_dir` **一层子目录**（最多 500 项），跳过隐藏目录和 `compatdata/steamapps/downloads/lost+found/.freedeckcy/.cache`；
 - 目录名经 `_normalize_scan_title()`（小写、去分隔符）与目录条目标题（`[/|｜]` 拆段）做等值/前缀匹配，取最长；已记录 path → `already_recorded`，已记录 game_id → `game_id_recorded`；
-- 匹配到 Steam 快捷方式（app_name 归一化）回填 `steam_app_id`；模拟器平台用 `find_rom_file()` 找 ROM（找不到也建记录，`rom_path` 空）；
+- 匹配到 Steam 快捷方式（`list_all_shortcuts_sync()` 的 app_name 归一化/同 exe realpath）回填 `steam_app_id`，不重复添加；模拟器平台用 `find_rom_file()` 找 ROM（找不到也建记录，`rom_path` 空）；
+- **没有快捷方式时自动补建**（v0.21.0）：
+  - PC：`_find_scanned_executable()` 优先 `entry.openpath` 的 .exe，否则递归找 .exe（排除 `unins/setup/redist/vcredist/crashreport/dxsetup`，按标题/目录名/大小排序），再 `add_or_update_tianyi_shortcut()`；
+  - 模拟器：`ensure_emulator(platform, allow_download=False)`（**不自动下载**）+ `create_launch_wrapper()` 生成 `launch-freedeckcy.sh`，注册原生快捷方式（Proton=none）；模拟器未安装记 `shortcut_error=emulator_not_ready: ...`，ROM 找不到记 `rom_not_found`；
+  - **第二遍**：已有记录但 `steam_app_id=0` 的 PC 也补建，结果在 `steam_recovered`；
+- 返回字段：`added_count/added_games`（每条含 `steam_added`/`shortcut_error`）、`steam_recovered_count/steam_recovered`、`skipped_count/unresolved_dirs/installed_total/message`；
 - 未匹配进 `unresolved_dirs`，原因 `catalog_no_match`/`catalog_missing_game_id`。
+
+**手工检查 Steam 快捷方式**：`shortcuts.vdf` 在 `<Steam>/userdata/<id>/config/shortcuts.vdf`（二进制 VDF，插件写前备份、写后回读）；日志搜 `扫描补 Steam 快捷方式失败`。**新快捷方式需要重启 Steam/切换用户/重开库页才可见**——插件只写文件，不重启 Steam。
 
 **排障/日志**：
 
@@ -879,7 +886,7 @@ scan_tianyi_installed_games()
 | 点安装报"磁盘空间不足" | `prepare_tianyi_install` 返回 `can_install=false`，看 `required_download/install`、目标目录与 SD 卡剩余（§6.13） |
 | 安装计划里没有模拟器/BIOS/setup 提示 | 看 `emulator_info.name/setup_hint/bios_required`；模拟器渠道/平台白名单（§6.8） |
 | 安装后库页没进度 | 进度在 QAM 主页任务区，不在库页；`start_tianyi_install` 只负责入队 |
-| 已安装页空/扫描无效 | 扫描仍以 `settings.install_dir` 为根、只扫一层、目录名匹配标题（§6.12）；路径/名称不符会进 `unresolved_dirs` |
+| 已安装页空/扫描无效 | v0.21.0 起扫描入口在 **QAM 设置 → 安装**；仍以 `settings.install_dir` 为根、只扫一层、目录名匹配标题（§6.12），路径/名称不符会进 `unresolved_dirs`；自动补 Steam 失败看 `shortcut_error`（`exe_not_found`/`emulator_not_ready`/`rom_not_found`） |
 | 卸载行为与主页不同 | 原生库卸载固定 `delete_files=true`（不弹 compatdata 回收）；需要回收前缀用主页/网页库卸载选项 |
 
 **Web 库保留**：`defaults/tianyi_library_ui/` 仍可用 `http://127.0.0.1:59271/` 打开（桌面/调试/回退）；原生库通过 callable 直连 Python，不依赖本地 HTTP 与 CORS。
@@ -916,7 +923,7 @@ scan_tianyi_installed_games()
 | 库页 **看不到平台筛选条** | 平台条只在 `platforms` 数量 > 1 时显示；确认加载的是 `freedeckcy_catalog.csv`（7084 条 / 11 平台）而不是回退的旧目录（全 PC）。可在日志看"已加载游戏目录 total=… platforms=…"或用 `curl '127.0.0.1:59271/api/tianyi/catalog?q=&page=1'` 看 `platforms` 字段 |
 | **QAM 游戏库打不开/列表不显示** | v0.20.0 起游戏库是原生路由 `/freedeckcy/library`；确认插件已重载、Decky 日志无路由报错；列表空看目录加载与筛选参数；安装进度在主页任务区 |
 | **SD 卡/外置存储没出现** | 只显示已挂载且可写的 `/run/media`、`/media`、`/mnt`、`/storage`、`/sdcard` 子挂载；挂载根会被跳过；只读/未挂载不显示；看 `curl /api/tianyi/storage/options` 的 `external` 与 `/proc/mounts` |
-| **扫描已安装没有补回游戏** | 只扫 `settings.install_dir` 一层；目录名要能与目录标题归一化匹配（改名/英文名可能 `catalog_no_match`）；嵌套目录/0 字节目录跳过；扫描只补记录、不建 Steam 快捷方式；看接口返回 `unresolved_dirs` |
+| **扫描已安装没有补回游戏/没补 Steam 快捷方式** | v0.21.0 起入口在设置 → 安装；只扫 `settings.install_dir` 一层，目录名要匹配标题（改名可能 `catalog_no_match`）；PC 找 exe 失败 `exe_not_found`，模拟器未安装 `emulator_not_ready`（不自动下载），ROM 找不到 `rom_not_found`；看返回 `unresolved_dirs`/`steam_added`/`steam_recovered_count`；Steam 需重启/切用户/重开库页才显示新快捷方式 |
 | **百度扫码报错/一直 waiting** | v0.18.0 起错误会带 HTTP 状态/原因（`stage=failed`），看 QAM 提示与 `/tmp/freedeckcy.log` 的 `Baidu QR`；网络需能访问 `passport.baidu.com`；二维码 180s 过期；可重试或改用 OpenAPI 回退 |
 | **点了非 PC 卡片只弹提示、装不了** | 当前架构有官方包的平台（x86_64：10 个；aarch64：GBA/PSP/NDS/PS1/FC/MD/Switch）应可正常安装（见 §6.8）；其它情况是预期：3DS/PS2/PS3 在 aarch64 上无官方包会被目录白名单隐藏/后端拒绝。报错多为模拟器缺失、ROM 名不匹配或 BIOS/setup 文件未配 |
 | 目录里 **`/web/share?code=` 链接没被加载** | v0.3.0 起 `_is_valid_tianyi_url()` 与 `tianyi_client.parse_share_url()` 都支持该形式；检查链接是否带 `code=`、域名是否 `cloud.189.cn`。旧版本目录需重载插件生效 |
@@ -971,7 +978,8 @@ scan_tianyi_installed_games()
 
 ## 8. 已知限制
 
-- **Decky 原生游戏库（v0.20.0）**：库页只有列表/分页/安装与已安装动作，任务进度仍在 QAM 主页任务区；无封面卡片视图，固定 20 条/页；扫描仍只认 `settings.install_dir` 一层；卸载固定 `delete_files=true`（不弹 compatdata 回收）；网页库保留为备用，两套 UI 可能短暂不同步。
+- **Decky 原生游戏库（v0.20.0）**：库页只有列表/分页/安装与已安装动作，任务进度仍在 QAM 主页任务区；无封面卡片视图，固定 20 条/页；**v0.21.0 起扫描入口在设置（不在库页）**，仍只认 `settings.install_dir` 一层；卸载固定 `delete_files=true`（不弹 compatdata 回收）；网页库保留为备用，两套 UI 可能短暂不同步。
+- **扫描补 Steam 快捷方式（v0.21.0）**：PC 需能找到 .exe（排除常见安装器/运行库），模拟器需已安装（不自动下载），否则记 `shortcut_error`；只写 `shortcuts.vdf`，Steam 需重启/切用户/重开库页才可见；不覆盖已有同名同 exe 快捷方式。
 
 - **存储位置选择（v0.19.0）**：只显示已挂载且可写的外置子挂载（挂载根跳过）；容量为快照；不会自动创建/挂载/格式化，也不检测 Steam 库是否同盘；建议子目录固定 `freedeckCY/{downloads,installed}`。
 
@@ -1048,7 +1056,7 @@ scan_tianyi_installed_games()
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 351 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 352 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
@@ -1058,7 +1066,7 @@ scan_tianyi_installed_games()
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
 - [ ] 改原生库后跑 `pnpm build`、重载插件；确认 `/freedeckcy/library` 路由、搜索/筛选/分页、安装确认与已安装动作；`make test` 仍 351；
 - [ ] 改存储检测后跑 `pytest tests/test_storage_options.py -q`，确认系统挂载过滤、外置目录/容量字段；QAM 路径页按钮能切换且刷新；
-- [ ] 改扫描已安装后跑 `pytest tests/test_install_pipeline.py -q`（扫描回填用例），确认只扫一层、path/game_id 去重、模拟器 ROM 查找；
+- [ ] 改扫描已安装后跑 `pytest tests/test_install_pipeline.py -q`（扫描回填/自动补快捷方式用例），确认只扫一层、path/game_id 去重、同名同 exe 不重复、PC exe 查找与模拟器 wrapper；Steam 重启后再核对 `shortcuts.vdf`；
 - [ ] 改百度相关代码后跑 `python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`（mock HTTP/扫码，不联网）；确认扫码 Cookie 只存 state、不写日志/诊断；
 - [ ] 改提交校验/合并后跑 `make validate-submissions`、`python scripts/merge_submissions.py --dry-run`，确认无 JSON 时 CI 也通过；`make validate-catalog` 确认合并后的 CSV 合法；
 - [ ] 改动模拟器注册表后验证 `available_platforms()`：x86_64 应有 10 个平台、aarch64 只有 7 个（3DS/PS2/PS3 无包），并确认 `/api/tianyi/catalog` 的 `platforms` 计数同步裁剪；

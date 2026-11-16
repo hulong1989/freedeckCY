@@ -872,3 +872,47 @@ def test_scan_installed_games_backfills_catalog_match(tmp_path, monkeypatch):
     assert result["added_count"] == 1
     assert service.store.installed_games[0].game_id == "9001"
     assert service.store.installed_games[0].install_path == str(game_dir)
+
+
+def test_scan_installed_games_adds_missing_steam_shortcut(tmp_path, monkeypatch):
+    install_root = tmp_path / "installed"
+    game_dir = install_root / "My Game"
+    game_dir.mkdir(parents=True)
+    (game_dir / "MyGame.exe").write_bytes(b"MZ" + b"0" * 64)
+
+    service = TianyiService.__new__(TianyiService)
+    service.store = TianyiStateStore(str(tmp_path / "state.json"))
+    service.store.settings = TianyiSettings(install_dir=str(install_root))
+    service.plugin = SimpleNamespace(downloads_dir=str(tmp_path), server_running=False, server_port=0)
+    service.plugin_dir = str(tmp_path)
+    service.catalog = SimpleNamespace(
+        entries=[
+            GameCatalogEntry(
+                game_id="9002",
+                title="My Game",
+                category_parent="5",
+                categories="动作",
+                down_url="https://cloud.189.cn/t/abc",
+                pwd="x",
+                openpath="My Game/MyGame.exe",
+                size_bytes=1,
+                size_text="1 B",
+                platform="pc",
+            )
+        ]
+    )
+    service._invalidate_panel_cache = lambda **kwargs: None
+    monkeypatch.setattr("tianyi_service.list_all_shortcuts_sync", lambda: {"rows": []})
+    calls = []
+
+    async def _fake_shortcut(**kwargs):
+        calls.append(kwargs)
+        return {"ok": True, "appid_unsigned": 12345}
+
+    monkeypatch.setattr("tianyi_service.add_or_update_tianyi_shortcut", _fake_shortcut)
+
+    result = asyncio.run(service.scan_installed_games())
+    assert result["added_count"] == 1
+    assert calls and calls[0]["exe_path"].endswith("MyGame.exe")
+    assert service.store.installed_games[0].steam_app_id == 12345
+    assert result["added_games"][0]["steam_added"] is True
