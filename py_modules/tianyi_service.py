@@ -32,11 +32,15 @@ import config
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
 from emulator_manager import (
+    bios_dir,
+    bios_present,
     create_launch_wrapper,
     emulator_name_for_platform,
     emulator_status,
     ensure_emulator,
     find_rom_file,
+    get_spec,
+    prepare_bios,
     supported_platforms,
 )
 from gamewatch import GameWatcher
@@ -5189,7 +5193,7 @@ class TianyiService:
         emulator = emulator_name_for_platform(platform)
         if platform != "pc" and not emulator:
             raise ValueError(
-                f"当前只支持 PC 与已接入模拟器的平台（GBA/PSP/NDS），{platform.upper()} 暂未接入模拟器"
+                f"当前只支持 PC 与已接入模拟器的平台（GBA/PSP/NDS/PS1/FC/MD），{platform.upper()} 暂未接入模拟器"
             )
         emulator_info: Dict[str, Any] = {}
         if emulator:
@@ -6599,6 +6603,9 @@ class TianyiService:
         else:
             reason = str(steam_result.get("message", "") or "").strip() or "未知错误"
             message_parts.append(f"Steam 导入失败: {reason}")
+        warning = str(steam_result.get("warning", "") or "").strip()
+        if warning:
+            message_parts.append(warning)
 
         if bool(settings.auto_delete_package):
             deleted = 0
@@ -6743,7 +6750,15 @@ class TianyiService:
         try:
             command = await ensure_emulator(platform, self.plugin_dir)
         except Exception as exc:
-            return {"ok": False, "message": f"mGBA 不可用: {exc}"}
+            return {"ok": False, "message": f"模拟器不可用: {exc}"}
+
+        spec = get_spec(platform)
+        bios_messages: List[str] = []
+        if spec is not None and spec.bios_required:
+            try:
+                bios_messages = await asyncio.to_thread(prepare_bios, spec)
+            except Exception as exc:
+                bios_messages = [f"BIOS 处理失败: {exc}"]
 
         wrapper_path = os.path.join(target_dir, "launch-freedeckcy.sh")
         try:
@@ -6781,7 +6796,7 @@ class TianyiService:
                 categories=categories,
             )
         except Exception as exc:
-            config.logger.warning("Resolve GBA cover failed for %s: %s", game_id or display_name, exc)
+            config.logger.warning("Resolve emulator cover failed for %s: %s", game_id or display_name, exc)
 
         try:
             result = await add_or_update_tianyi_shortcut(
@@ -6796,17 +6811,23 @@ class TianyiService:
             )
             if not result.get("ok"):
                 config.logger.warning(
-                    "Auto add GBA to Steam failed game=%s exe=%s reason=%s",
+                    "Auto add emulator game to Steam failed game=%s exe=%s reason=%s",
                     game_id or display_name,
                     wrapper_path,
                     result.get("message", ""),
                 )
             result["rom_path"] = rom_path
             result["launcher_path"] = wrapper_path
-            result["emulator"] = "mgba"
+            result["emulator"] = spec.adapter if spec else emulator_name_for_platform(platform)
+            if bios_messages:
+                result["bios_messages"] = bios_messages
+            if spec is not None and spec.bios_required and not bios_present(platform):
+                result["warning"] = (
+                    f"{spec.name} 需要 BIOS：请把 scph*.bin 放到 {bios_dir(platform)}"
+                )
             return result
         except Exception as exc:
-            config.logger.exception("Auto add GBA to Steam exception game=%s", game_id or display_name)
+            config.logger.exception("Auto add emulator game to Steam exception game=%s", game_id or display_name)
             return {"ok": False, "message": str(exc)}
 
     def _derive_display_title_for_steam(self, title: str) -> str:

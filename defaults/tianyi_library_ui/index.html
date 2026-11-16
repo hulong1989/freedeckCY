@@ -205,6 +205,10 @@
             </div>
             <div class="modal-side">
               <p class="modal-sub">{{ installDialog.plan.emulator_info && installDialog.plan.emulator_info.name ? "模拟器：" + installDialog.plan.emulator_info.name + " · " : "" }}确认后自动下载并解压安装</p>
+              <p
+                class="modal-warning"
+                v-if="installDialog.plan.emulator_info && installDialog.plan.emulator_info.bios_required && !installDialog.plan.emulator_info.bios_present"
+              >需要 PS1 BIOS：请把 scph*.bin 放到 {{ installDialog.plan.emulator_info.bios_dir }}</p>
 
               <div class="space-block">
                 <div class="space-row">

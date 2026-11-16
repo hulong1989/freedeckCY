@@ -2,6 +2,22 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.9.0
+
+### 新增
+
+- **PS1（DuckStation）**：官方 AppImage（x86_64 / arm64），支持 `.cue/.m3u/.chd/.iso/.pbp/.bin`；启动 `-batch -fullscreen`。
+  - **BIOS**：把 `scph*.bin` 放到 `~/.local/share/freedeckCY/bios/ps1/`，安装时自动复制到 DuckStation 的 bios 目录；缺 BIOS 时安装消息/库页弹窗会提示。
+- **FC（Mesen2）**：支持 `.nes/.fds/.unf/.unif`，官方 Linux x64/arm64 zip，启动 `/fullscreen`。
+- **MD（Mesen2）**：支持 `.md/.gen/.smd/.bin/.32x`，与 FC 共用同一份 Mesen2 缓存。
+- 模拟器支持范围扩展到 PC + GBA/PSP/NDS/PS1/FC/MD；PS2/PS3/3DS/Switch 因仅 x86 或依赖 BIOS/固件暂未接入。
+
+### 变更
+
+- 新环境变量：`FREEDECKCY_DUCKSTATION_BIN`、`FREEDECKCY_MESEN_BIN`。
+- 模拟器状态新增 `bios_required` / `bios_present` / `bios_dir`；库页弹窗显示 BIOS 提示。
+- 测试 289 → 295。
+
 ## v0.8.0
 
 ### 新增

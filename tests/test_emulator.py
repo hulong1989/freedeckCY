@@ -337,3 +337,80 @@ def test_psp_plan_allowed(monkeypatch, tmp_path):
     assert plan["platform"] == "psp"
     assert plan["emulator"] == "ppsspp"
     assert [item["name"] for item in plan["files"]] == ["PSPCH001.7z"]
+
+
+def test_registry_ps1_fc_md():
+    assert emu.emulator_name_for_platform("ps1") == "duckstation"
+    assert emu.emulator_name_for_platform("fc") == "mesen"
+    assert emu.emulator_name_for_platform("md") == "mesen"
+
+    ps1 = emu.get_spec("ps1")
+    assert ps1 is not None and ps1.bios_required
+    assert ps1.assets["aarch64"] == "DuckStation-arm64.AppImage"
+
+    fc = emu.get_spec("fc")
+    md = emu.get_spec("md")
+    assert fc is not None and md is not None
+    assert fc.state_key == md.state_key == "mesen"
+    assert fc.assets["x86_64"].endswith(".zip")
+
+
+def test_ps1_rom_prefers_cue(tmp_path):
+    for name in ("game.bin", "game.cue", "game.iso"):
+        (tmp_path / name).write_bytes(b"x")
+    assert emu.find_rom_file(str(tmp_path), "game.zip", "ps1").endswith("game.cue")
+
+
+def test_fc_md_rom_extensions(tmp_path):
+    (tmp_path / "game.nes").write_bytes(b"x")
+    (tmp_path / "game.md").write_bytes(b"x")
+    assert emu.find_rom_file(str(tmp_path), "rom.zip", "fc").endswith("game.nes")
+    assert emu.find_rom_file(str(tmp_path), "rom.zip", "md").endswith("game.md")
+
+
+def test_zip_emulator_extraction(tmp_path):
+    import zipfile
+
+    spec = emu.get_spec("md")
+    archive = tmp_path / "mesen.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("Mesen", b"#!/bin/sh\n")
+    root = tmp_path / "mesen-root"
+    found = emu._extract_zip_emulator(spec, str(archive), root)
+    assert found.endswith("/Mesen")
+    assert os.access(found, os.X_OK)
+
+
+def test_ps1_bios_prepare_and_status(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    source = tmp_path / "state" / "bios" / "ps1"
+    source.mkdir(parents=True)
+    (source / "scph5501.bin").write_bytes(b"bios")
+
+    assert emu.bios_present("ps1") is True
+    spec = emu.get_spec("ps1")
+    messages = emu.prepare_bios(spec)
+    assert any("BIOS" in message for message in messages)
+
+    target = tmp_path / "home" / ".local" / "share" / "duckstation" / "bios" / "scph5501.bin"
+    assert target.is_file()
+
+    status = emu.emulator_status("ps1", str(tmp_path / "plugin"))
+    assert status["bios_required"] is True
+    assert status["bios_present"] is True
+    assert status["bios_dir"].endswith("/bios/ps1")
+
+
+def test_ps1_launch_args(tmp_path):
+    wrapper = tmp_path / "ps1.sh"
+    emu.create_launch_wrapper(
+        command=["/usr/bin/duckstation"],
+        rom_path="/roms/game.cue",
+        wrapper_path=str(wrapper),
+        platform_name="ps1",
+    )
+    text = wrapper.read_text(encoding="utf-8")
+    assert "-batch" in text
+    assert "-fullscreen" in text
+    assert "game.cue" in text

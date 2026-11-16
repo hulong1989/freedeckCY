@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.8.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.9.0**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,7 +21,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.8.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.9.0**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -43,7 +43,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **平台与分类筛选**：库页可切换平台（PC / FC / NDS / PSP / GBA / 3DS / PS2 / PS1 / PS3 / MD / Switch）与分类，支持手柄导航
 - **浏览 / 分页 / 排序**：打开库页即浏览全部资源，按平台/分类筛选，支持排序与 L1/R1 翻页
 - **已安装管理**：已安装页签可启动游戏、打开目录、卸载（`steam://rungameid`）
-- **模拟器闭环**：GBA（mGBA，内置）/ PSP（PPSSPP，按需下载）/ NDS（melonDS，按需下载 zip），启动脚本走原生 Linux、不写 Proton
+- **模拟器闭环**：GBA（mGBA，内置）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation，需 BIOS）/ FC/MD（Mesen2），按需下载官方包，启动脚本走原生 Linux、不写 Proton
 - **自动云存档**：Ludusavi 清单（53k+ 游戏）+ gamewatch 进程检测；游戏退出后只上传该游戏，存档未变化自动跳过；QAM 可关闭
 - **诊断与更新**：一键导出脱敏诊断 zip；检查 GitHub 最新 Release
 - **全量资源目录**：内置 7084 条资源（来自 v0.6），合并封面索引后 6823 条有封面（96.3%；原始自带 3473 条，索引命中 3311）；分类已清洗（不含平台名），可用 `scripts/merge_v06_catalog.py` 复现/更新
@@ -71,7 +71,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
 make emulator-runtime   # 下载 mGBA AppImage（GBA 安装后启动用）
-make package     # 产出 dist-artifacts/freedeckCY-v0.8.0.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.9.0.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -94,8 +94,8 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.8.0.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.8.0-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.9.0.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.9.0-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
@@ -115,7 +115,7 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 289）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 295）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
@@ -136,6 +136,8 @@ make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 | `FREEDECKCY_PPSSPP_BIN` | 覆盖 PPSSPP 路径（默认用已下载/系统版本） |
 | `FREEDECKCY_MELONDS_BIN` | 覆盖 melonDS 路径（默认用已下载/系统版本） |
 | `FREEDECKCY_LUDUSAVI_MANIFEST` | 覆盖 Ludusavi 清单 JSON 路径（默认 `defaults/ludusavi/manifest.json.gz`） |
+| `FREEDECKCY_DUCKSTATION_BIN` | 覆盖 DuckStation 路径（默认用已下载/系统版本） |
+| `FREEDECKCY_MESEN_BIN` | 覆盖 Mesen2 路径（默认用已下载/系统版本） |
 | `FREEDECKCY_CATALOG_JSON` | 运行时改读 NewFreedeck 兼容 JSON：本地路径或 `https://` URL；远程缓存 6 小时，失败回退旧缓存/CSV |
 | `FREEDECKCY_STEAM_ROOT` | 覆盖 Steam 根目录（Flatpak/自定义安装时用） |
 | `FREEDECKCY_STATE_FILE` | `clear_freedeckcy_tasks.sh` 使用的 state.json 路径 |
@@ -174,7 +176,7 @@ py_modules/
   server_manager.py         aiohttp 生命周期、Host/Origin 校验、设置持久化
   aria2_manager.py          aria2 运行时复用（meta+flock）+ JSON-RPC + changeUri
   seven_zip_manager.py      7zz 解压/压缩 + `7z t` 校验
-  emulator_manager.py       通用模拟器注册表（GBA/PSP/NDS：官方资产/按需下载/解包/ROM/启动脚本）
+  emulator_manager.py       通用模拟器注册表（GBA/PSP/NDS/PS1/FC/MD：官方资产/按需下载/解包/PS1 BIOS/ROM/启动脚本）
   save_manifest.py          Ludusavi 存档清单匹配与 Proton 路径解析
   gamewatch.py              游戏进程检测（自动云存档触发）
   steam_shortcuts.py        快捷方式/Proton/封面/写前备份/compatdata 定位
@@ -188,7 +190,7 @@ backend/*.js                Node 辅助脚本（分享解析兜底、云盘上�
 scripts/                    运行时获取（含 mGBA）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗 / 远程目录 / 清单转换
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
 catalog-json/               NewFreedeck 兼容目录 JSON + schema（可直接读/自托管）
-tests/                      pytest 用例（289 个）
+tests/                      pytest 用例（295 个）
 CHANGELOG.md                版本变更记录
 Makefile                    构建入口：runtime / emulator-runtime / catalog-json / ludusavi-manifest / package / package-droiddeck / test / doctor / validate-catalog / normalize-catalog / clean
 ```
@@ -214,8 +216,8 @@ Makefile                    构建入口：runtime / emulator-runtime / catalog-
 - 全中文硬编码，无 i18n
 - 云存档的上传/恢复仍依赖 `node`（`make runtime` 会准备；未执行则该功能不可用）
 - 下载完整性做「大小 + 文件头 + `7z t`」，但没有哈希校验；7z 不可用时自动跳过校验（best-effort）
-- **模拟器已接入 GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）**：GBA 随包内置，PSP/NDS 首次安装时按需下载官方 AppImage；其余平台（FC/3DS/PS2/PS1/PS3/MD/Switch）仍只可浏览
-- **模拟器边界**：PSP/NDS 首次安装需联网从 GitHub 下载官方 AppImage（约 32–48MB）；PS1 因 BIOS 依赖暂未接入；所有 AppImage 会解包到 `~/.local/share/freedeckCY/emulators/`，多占一份空间；ARM64 未真机验证
+- **模拟器已接入 GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC、MD（Mesen2）**：GBA 随包内置，其余首次安装按需下载官方包；PS2/PS3/3DS/Switch 仍只可浏览（原因见下一条）
+- **模拟器边界**：PSP/NDS/PS1/FC/MD 首次安装需联网下载官方包（约 15–91MB）；PS1 需要自备 BIOS（`~/.local/share/freedeckCY/bios/ps1/scph*.bin`）；PS2/PS3/3DS/Switch 暂未接入；解包目录会多占空间；ARM64 未真机验证
 - **自动云存档边界**：只覆盖 Ludusavi 清单/Proton 前缀能识别的 PC 存档；模拟器存档（`.sav` 等）暂未纳入；首次自动上传依赖清单匹配与登录态
 - **DroidDeck 适配未真机验证**：FEX / ARM Proton / Android 存储映射可能有差异，排障见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
 - **更新检查依赖 GitHub API**：未认证限流 60 次/小时/IP，失败只提示、不缓存失败结果；成功结果缓存 1 小时

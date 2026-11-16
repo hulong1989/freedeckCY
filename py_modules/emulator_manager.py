@@ -39,6 +39,9 @@ class EmulatorSpec:
     env_var: str = ""
     notes: str = ""
     min_bytes: int = 8 * 1024 * 1024
+    state_key: str = ""
+    executables: Tuple[str, ...] = ()
+    bios_required: bool = False
 
 
 MGBA_VERSION = "0.10.5"
@@ -97,6 +100,63 @@ EMULATORS: Dict[str, EmulatorSpec] = {
         notes="melonDS 官方 AppImage（zip 内）；首次安装按需下载",
         min_bytes=15 * 1024 * 1024,
     ),
+    "ps1": EmulatorSpec(
+        platform="ps1",
+        name="DuckStation",
+        adapter="duckstation",
+        repo="stenzek/duckstation",
+        download_base="https://github.com/stenzek/duckstation/releases/download/latest",
+        assets={
+            "x86_64": "DuckStation-x64.AppImage",
+            "aarch64": "DuckStation-arm64.AppImage",
+        },
+        archive="appimage",
+        launch_args=("-batch", "-fullscreen", "{rom}"),
+        rom_extensions=(".cue", ".m3u", ".chd", ".iso", ".pbp", ".bin"),
+        env_var="FREEDECKCY_DUCKSTATION_BIN",
+        notes="DuckStation 官方 AppImage；需要自备 PS1 BIOS（scph*.bin）",
+        min_bytes=40 * 1024 * 1024,
+        state_key="duckstation",
+        bios_required=True,
+    ),
+    "fc": EmulatorSpec(
+        platform="fc",
+        name="Mesen2",
+        adapter="mesen",
+        repo="SourMesen/Mesen2",
+        download_base="https://github.com/SourMesen/Mesen2/releases/download/2.1.1",
+        assets={
+            "x86_64": "Mesen_2.1.1_Linux_x64.zip",
+            "aarch64": "Mesen_2.1.1_Linux_ARM64.zip",
+        },
+        archive="zip",
+        launch_args=("/fullscreen", "{rom}"),
+        rom_extensions=(".nes", ".fds", ".unf", ".unif"),
+        env_var="FREEDECKCY_MESEN_BIN",
+        notes="Mesen2 官方 zip（x64/arm64）；FC/NES",
+        min_bytes=10 * 1024 * 1024,
+        state_key="mesen",
+        executables=("Mesen",),
+    ),
+    "md": EmulatorSpec(
+        platform="md",
+        name="Mesen2",
+        adapter="mesen",
+        repo="SourMesen/Mesen2",
+        download_base="https://github.com/SourMesen/Mesen2/releases/download/2.1.1",
+        assets={
+            "x86_64": "Mesen_2.1.1_Linux_x64.zip",
+            "aarch64": "Mesen_2.1.1_Linux_ARM64.zip",
+        },
+        archive="zip",
+        launch_args=("/fullscreen", "{rom}"),
+        rom_extensions=(".md", ".gen", ".smd", ".bin", ".32x"),
+        env_var="FREEDECKCY_MESEN_BIN",
+        notes="Mesen2 官方 zip（x64/arm64）；MD/Genesis",
+        min_bytes=10 * 1024 * 1024,
+        state_key="mesen",
+        executables=("Mesen",),
+    ),
 }
 
 SUPPORTED_PLATFORMS: Tuple[str, ...] = tuple(EMULATORS.keys())
@@ -139,7 +199,7 @@ def _plugin_dir(plugin_dir: str = "") -> Path:
 
 
 def _state_root(spec: EmulatorSpec, arch: str = "") -> Path:
-    return emulator_state_dir() / spec.platform / (arch or runtime_arch())
+    return emulator_state_dir() / (spec.state_key or spec.platform) / (arch or runtime_arch())
 
 
 def _legacy_state_root(arch: str = "") -> Path:
@@ -171,11 +231,28 @@ def _find_binary(root: Path) -> Optional[str]:
     return None
 
 
+def _find_spec_executable(spec: EmulatorSpec, root: Path) -> Optional[str]:
+    if not root.is_dir():
+        return None
+    for name in spec.executables:
+        for path in root.rglob(name):
+            if path.is_file():
+                try:
+                    os.chmod(path, 0o755)
+                except Exception:
+                    pass
+                return str(path)
+    return None
+
+
 def installed_command(spec: EmulatorSpec, arch: str = "") -> Optional[str]:
     roots = [_state_root(spec, arch)]
     if spec.platform == "gba":
         roots.append(_legacy_state_root(arch))
     for root in roots:
+        found = _find_spec_executable(spec, root)
+        if found:
+            return found
         found = _find_binary(root / "squashfs-root")
         if found:
             return found
@@ -202,6 +279,8 @@ def system_command(spec: EmulatorSpec) -> Optional[str]:
         "mgba": ("mgba", "mgba-qt"),
         "ppsspp": ("ppsspp", "PPSSPP", "ppsspp-sdl"),
         "melonds": ("melonds", "melonDS"),
+        "duckstation": ("duckstation", "DuckStation", "duckstation-qt"),
+        "mesen": ("Mesen", "mesen"),
     }.get(spec.adapter, ())
     for name in names:
         found = shutil.which(name)
@@ -243,6 +322,52 @@ def resolve_command(spec: EmulatorSpec, plugin_dir: str = "") -> Optional[List[s
     return flatpak_command(spec)
 
 
+def bios_dir(platform_name: str) -> Path:
+    return Path(config.DECKY_SEND_DIR) / "bios" / str(platform_name)
+
+
+def bios_present(platform_name: str) -> bool:
+    root = bios_dir(platform_name)
+    if not root.is_dir():
+        return False
+    return any(
+        path.is_file() and path.suffix.lower() in {".bin", ".rom"}
+        for path in root.iterdir()
+    )
+
+
+def prepare_bios(spec: EmulatorSpec) -> List[str]:
+    """把用户 BIOS 拷到模拟器默认目录（目前仅 PS1/DuckStation）。"""
+    if not spec.bios_required:
+        return []
+    source = bios_dir(spec.platform)
+    if not source.is_dir():
+        return [f"未找到 BIOS 目录: {source}"]
+    messages: List[str] = []
+    if spec.platform == "ps1":
+        target = Path.home() / ".local" / "share" / "duckstation" / "bios"
+        target.mkdir(parents=True, exist_ok=True)
+        copied = 0
+        for path in source.iterdir():
+            if not path.is_file():
+                continue
+            if path.suffix.lower() not in {".bin", ".rom"}:
+                continue
+            destination = target / path.name
+            if destination.is_file():
+                continue
+            try:
+                shutil.copy2(path, destination)
+                copied += 1
+            except Exception as exc:
+                messages.append(f"复制 BIOS 失败 {path.name}: {exc}")
+        if copied:
+            messages.append(f"已复制 {copied} 个 BIOS 到 {target}")
+        elif not any(target.iterdir()):
+            messages.append(f"未找到可用的 PS1 BIOS（请把 scph*.bin 放到 {source}）")
+    return messages
+
+
 def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
     spec = get_spec(platform_name)
     if spec is None:
@@ -271,6 +396,9 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
             "name": spec.name,
             "version": spec.download_base.rsplit("/", 1)[-1],
             "notes": spec.notes,
+            "bios_required": spec.bios_required,
+            "bios_present": bios_present(spec.platform) if spec.bios_required else True,
+            "bios_dir": str(bios_dir(spec.platform)) if spec.bios_required else "",
         }
     arch = runtime_arch()
     asset = spec.assets.get(arch)
@@ -290,6 +418,9 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
         "asset": asset,
         "url": f"{spec.download_base}/{asset}",
         "notes": spec.notes,
+        "bios_required": spec.bios_required,
+        "bios_present": bios_present(spec.platform) if spec.bios_required else True,
+        "bios_dir": str(bios_dir(spec.platform)) if spec.bios_required else "",
         "message": f"首次安装会从官方 release 下载 {spec.name}（{asset}）",
     }
 
@@ -308,15 +439,20 @@ def _run_appimage_extract(appimage: str, dest_dir: Path) -> None:
         raise RuntimeError(f"解包 AppImage 失败: {message[:300]}")
 
 
-def _extract_zip_appimage(archive: str, dest_dir: Path) -> str:
+def _extract_zip_emulator(spec: EmulatorSpec, archive: str, dest_dir: Path) -> str:
     dest_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive) as zf:
         zf.extractall(dest_dir)
+    for name in spec.executables:
+        for path in dest_dir.rglob(name):
+            if path.is_file():
+                os.chmod(path, 0o755)
+                return str(path)
     for path in dest_dir.rglob("*"):
         if path.is_file() and path.suffix.lower() == ".appimage":
             os.chmod(path, 0o755)
             return str(path)
-    raise RuntimeError("压缩包内未找到 AppImage")
+    raise RuntimeError("压缩包内未找到可执行文件")
 
 
 async def _download_asset(spec: EmulatorSpec, arch: str) -> str:
@@ -395,10 +531,11 @@ async def ensure_emulator(
 
     asset_path = await _download_asset(spec, runtime_arch())
     if spec.archive == "zip":
-        appimage = _extract_zip_appimage(asset_path, _state_root(spec))
-    else:
-        appimage = asset_path
-    return _ensure_extracted(spec, appimage)
+        executable = _extract_zip_emulator(spec, asset_path, _state_root(spec))
+        if executable.lower().endswith(".appimage"):
+            return _ensure_extracted(spec, executable)
+        return [executable]
+    return _ensure_extracted(spec, asset_path)
 
 
 async def ensure_mgba(plugin_dir: str = "", *, allow_download: bool = True) -> List[str]:
