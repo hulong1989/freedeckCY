@@ -260,6 +260,7 @@ class Plugin:
         auto_install: bool = True,
         proton_tool: str = "auto",
         cloud_save_auto_upload: bool = True,
+        cloud_save_include_emulators: bool = True,
     ) -> dict:
         """保存天翼下载设置。"""
         try:
@@ -272,6 +273,7 @@ class Plugin:
                 auto_install = bool(payload.get("auto_install", auto_install))
                 proton_tool = str(payload.get("proton_tool", proton_tool))
                 cloud_save_auto_upload = bool(payload.get("cloud_save_auto_upload", cloud_save_auto_upload))
+                cloud_save_include_emulators = bool(payload.get("cloud_save_include_emulators", cloud_save_include_emulators))
             elif isinstance(payload, str) and not download_dir:
                 download_dir = payload
 
@@ -284,6 +286,7 @@ class Plugin:
                 auto_install=auto_install,
                 proton_tool=proton_tool,
                 cloud_save_auto_upload=cloud_save_auto_upload,
+                cloud_save_include_emulators=cloud_save_include_emulators,
             )
             return {"status": "success", "data": data}
         except Exception as exc:

@@ -91,6 +91,8 @@ class TianyiSettings:
     proton_tool: str = "auto"
     # 游戏退出后自动上传云存档
     cloud_save_auto_upload: bool = True
+    # 云存档上传时是否包含模拟器存档（GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch）
+    cloud_save_include_emulators: bool = True
 
 
 @dataclass
@@ -283,6 +285,7 @@ class TianyiStateStore:
                     auto_install=_to_bool(settings_raw.get("auto_install", True), True),
                     proton_tool=str(settings_raw.get("proton_tool", "auto") or "auto").strip() or "auto",
                     cloud_save_auto_upload=_to_bool(settings_raw.get("cloud_save_auto_upload", True), True),
+                    cloud_save_include_emulators=_to_bool(settings_raw.get("cloud_save_include_emulators", True), True),
                 )
 
             next_tasks: List[TianyiTaskRecord] = []
@@ -405,6 +408,7 @@ class TianyiStateStore:
         auto_install: Optional[bool] = None,
         proton_tool: Optional[str] = None,
         cloud_save_auto_upload: Optional[bool] = None,
+        cloud_save_include_emulators: Optional[bool] = None,
     ) -> None:
         """更新设置。"""
         with self._lock:
@@ -424,6 +428,8 @@ class TianyiStateStore:
                 self.settings.proton_tool = str(proton_tool).strip() or "auto"
             if cloud_save_auto_upload is not None:
                 self.settings.cloud_save_auto_upload = bool(cloud_save_auto_upload)
+            if cloud_save_include_emulators is not None:
+                self.settings.cloud_save_include_emulators = bool(cloud_save_include_emulators)
             self.save()
 
     def upsert_tasks(self, records: List[TianyiTaskRecord]) -> None:

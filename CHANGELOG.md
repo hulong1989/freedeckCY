@@ -2,6 +2,24 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.15.0
+
+### 新增
+
+- **模拟器存档纳入云存档**：自动发现 GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch 的存档/记忆卡，随游戏退出自动上传；`source_strategy=emulator_saves`。
+  - 单游戏存档（GBA/FC/MD/NDS）按 ROM 文件名匹配，避免把同目录其它游戏一起打包。
+  - PSP/PS1/PS2/3DS/PS3/Switch 为共享记忆卡/标题目录，按路径签名去重，避免每个游戏重复上传。
+  - 覆盖标准目录、portable 目录、Flatpak 数据目录（mGBA/PPSSPP/DuckStation/PCSX2/Azahar）。
+  - QAM 新增「包含模拟器存档」开关（默认开）；关闭后只上传 PC/Proton 存档。
+
+### 变更
+
+- 测试 330 → 337（新增模拟器存档发现与开关用例）。
+
+### 说明
+
+- 目前只做**上传**；云端模拟器存档的恢复路径映射尚未做（PC 存档恢复不变）。
+
 ## v0.14.1
 
 ### 修复

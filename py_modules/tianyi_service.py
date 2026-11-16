@@ -54,6 +54,7 @@ from emulator_manager import (
     get_spec,
     supported_platforms,
 )
+from emulator_saves import collect_emulator_save_paths
 from gamewatch import GameWatcher
 from save_manifest import load_manifest, match_manifest, resolve_manifest_paths
 from game_catalog import (
@@ -3194,6 +3195,9 @@ class TianyiService:
         temp_dir = str(bundle.get("temp_dir", "") or "")
         extract_dir = str(bundle.get("extract_dir", "") or "")
         manifest = dict(bundle.get("manifest") or {})
+        if str(manifest.get("source_strategy", "") or "").strip() == "emulator_saves":
+            self._cleanup_cloud_save_temp_paths([temp_dir, extract_dir])
+            raise TianyiApiError("模拟器存档目前只支持上传，暂不支持恢复（共享记忆卡可能覆盖其它游戏）")
         manifest_playtime = self._extract_manifest_playtime_payload(manifest)
         entries = [dict(item) for item in list(bundle.get("entries") or []) if isinstance(item, dict)]
         available_entry_ids = [str(item.get("entry_id", "") or "").strip() for item in entries if str(item.get("entry_id", "") or "").strip()]
@@ -4128,6 +4132,7 @@ class TianyiService:
         candidates: List[Dict[str, Any]] = []
         ignored: List[Dict[str, Any]] = []
         dedupe_keys = set()
+        shared_emulator_saves = set()
 
         for record in records:
             game_id = str(record.game_id or "").strip()
@@ -4154,6 +4159,51 @@ class TianyiService:
                 game_title=game_title,
                 install_path=install_path,
             )
+
+            platform = str(record.platform or "pc").strip().lower() or "pc"
+            if platform != "pc" and not bool(getattr(self.store.settings, "cloud_save_include_emulators", True)):
+                ignored.append(
+                    {
+                        "game_id": game_id,
+                        "game_title": game_title,
+                        "reason": "emulator_saves_disabled",
+                    }
+                )
+                continue
+            if platform != "pc":
+                emulator_result = await asyncio.to_thread(collect_emulator_save_paths, record)
+                signature = tuple(emulator_result.paths)
+                if emulator_result.paths and not emulator_result.per_game:
+                    if signature in shared_emulator_saves:
+                        ignored.append(
+                            {
+                                "game_id": game_id,
+                                "game_title": game_title,
+                                "reason": "emulator_saves_shared",
+                            }
+                        )
+                        continue
+                    shared_emulator_saves.add(signature)
+                playtime = self._snapshot_record_playtime(record)
+                candidates.append(
+                    {
+                        "game_id": game_id,
+                        "game_title": game_title,
+                        "game_key": game_key,
+                        "install_path": install_path,
+                        "source_paths": list(emulator_result.paths),
+                        "source_strategy": "emulator_saves",
+                        "skip_reason": "" if emulator_result.paths else emulator_result.reason,
+                        "playtime": {
+                            "seconds": max(0, _safe_int(playtime.get("seconds"), 0)),
+                            "sessions": max(0, _safe_int(playtime.get("sessions"), 0)),
+                            "last_played_at": max(0, _safe_int(playtime.get("last_played_at"), 0)),
+                            "captured_at": _now_wall_ts(),
+                        },
+                        "diagnostics": {"emulator_saves": emulator_result.to_dict()},
+                    }
+                )
+                continue
 
             shortcut_result: Dict[str, Any] = {}
             compat_user_dir = ""
@@ -5260,6 +5310,7 @@ class TianyiService:
         auto_install: Optional[bool] = None,
         proton_tool: Optional[str] = None,
         cloud_save_auto_upload: Optional[bool] = None,
+        cloud_save_include_emulators: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """更新下载设置。"""
         if download_dir is not None:

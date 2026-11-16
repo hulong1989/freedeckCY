@@ -87,6 +87,7 @@ interface SettingsState {
   auto_delete_package: boolean;
   auto_install: boolean;
   cloud_save_auto_upload: boolean;
+  cloud_save_include_emulators: boolean;
 }
 
 interface BaiduOpenApiLoginState {
@@ -115,6 +116,7 @@ interface SettingsPayload {
   auto_delete_package: boolean;
   auto_install: boolean;
   cloud_save_auto_upload: boolean;
+  cloud_save_include_emulators: boolean;
 }
 
 interface UrlResponse {
@@ -388,6 +390,7 @@ const EMPTY_SETTINGS: SettingsState = {
   auto_delete_package: false,
   auto_install: true,
   cloud_save_auto_upload: true,
+  cloud_save_include_emulators: true,
 };
 
 const EMPTY_CLOUD_SAVE_STATE: CloudSaveUploadState = {
@@ -694,6 +697,7 @@ function toPayload(settings: SettingsState): SettingsPayload {
     auto_delete_package: Boolean(settings.auto_delete_package),
     auto_install: true,
     cloud_save_auto_upload: Boolean(settings.cloud_save_auto_upload),
+    cloud_save_include_emulators: Boolean(settings.cloud_save_include_emulators),
   };
 }
 
@@ -2375,6 +2379,15 @@ function SettingsPage() {
                   description="后台检测游戏进程，退出后自动打包上传；默认开启"
                   checked={Boolean(settings.cloud_save_auto_upload)}
                   onChange={(value: boolean) => savePatch({ cloud_save_auto_upload: value })}
+                  disabled={saving}
+                />
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <ToggleField
+                  label="包含模拟器存档"
+                  description="GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch 的存档与记忆卡"
+                  checked={Boolean(settings.cloud_save_include_emulators)}
+                  onChange={(value: boolean) => savePatch({ cloud_save_include_emulators: value })}
                   disabled={saving}
                 />
               </PanelSectionRow>

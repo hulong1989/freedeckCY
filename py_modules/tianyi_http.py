@@ -435,6 +435,7 @@ async def handle_settings_set(request: web.Request, plugin: Any) -> web.Response
             auto_install=body.get("auto_install"),
             proton_tool=body.get("proton_tool"),
             cloud_save_auto_upload=body.get("cloud_save_auto_upload"),
+            cloud_save_include_emulators=body.get("cloud_save_include_emulators"),
         )
         return _json_ok({"data": data})
     except Exception as exc:

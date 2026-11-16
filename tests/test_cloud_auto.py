@@ -161,10 +161,11 @@ def test_settings_cloud_save_auto_upload_roundtrip(tmp_path):
     state_file = tmp_path / "state.json"
     store = TianyiStateStore(str(state_file))
     assert store.settings.cloud_save_auto_upload is True
-    store.set_settings(cloud_save_auto_upload=False)
+    store.set_settings(cloud_save_auto_upload=False, cloud_save_include_emulators=False)
     reloaded = TianyiStateStore(str(state_file))
     reloaded.load()
     assert reloaded.settings.cloud_save_auto_upload is False
+    assert reloaded.settings.cloud_save_include_emulators is False
 
 
 def test_cloud_save_fingerprint_detects_changes(tmp_path):
