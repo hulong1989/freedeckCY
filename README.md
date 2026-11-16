@@ -75,7 +75,14 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 ### 方式 B：直接拿 Release 包
 
-上游 Releases 里的 zip 已包含运行时二进制，可直接安装（但那是另一套更新更全的代码，与本仓库不一致）。
+本仓库 [Releases](https://github.com/hulong1989/freedeckCY/releases) 提供已带运行时二进制的安装包：
+
+| 包 | 适用设备 |
+|---|---|
+| `freedeckCY-v0.4.0.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.4.0-arm64.zip` | DroidDeck / Android ARM64 |
+
+下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
 ## 从源码开发
 
