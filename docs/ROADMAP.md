@@ -1,12 +1,12 @@
 # freedeckCY 后续路线图（ROADMAP）
 
-> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配 + v0.5.0 第一梯队 + v0.6.0 GBA 闭环 + v0.7.0 模拟器注册表 + v0.8.0 自动云存档 + v0.9.0 模拟器六平台 + v0.10.0 模拟器全部在线下载 + v0.11.0 十平台 + 架构能力矩阵 + v0.12.0 模拟器 BIOS/固件部署 + v0.13.0 仓库游戏提交 + v0.14.0 百度网盘官方 OpenAPI 之后**（v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 平台字段/封面缓存/分类筛选；v0.3.0 全量目录与平台筛选 UI；v0.3.1 分类清洗 + 数据体检 CI；v0.4.0 Android/ARM64 的 DroidDeck 适配；v0.5.0 目录浏览/分页/排序/已安装页签/诊断导出/更新检查；v0.6.0 GBA 模拟器闭环；v0.6.1/v0.6.2 远程 JSON 目录；v0.7.0 通用模拟器注册表 + PSP/NDS；v0.8.0 Ludusavi + gamewatch 自动云存档；v0.9.0 模拟器扩到 PS1/FC/MD；v0.10.0 模拟器全部在线下载、插件包不集成；v0.11.0 补齐 3DS/PS2/PS3/Switch、10 平台 + 架构白名单；v0.12.0 模拟器 BIOS/固件部署 + portable 配置；v0.13.0 仓库游戏提交（Issue/PR → 目录）；v0.14.0 百度网盘官方 OpenAPI）值得继续做、以及明确不建议做的方向。当前版本 **v0.14.0**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
+> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配 + v0.5.0 第一梯队 + v0.6.0 GBA 闭环 + v0.7.0 模拟器注册表 + v0.8.0 自动云存档 + v0.9.0 模拟器六平台 + v0.10.0 模拟器全部在线下载 + v0.11.0 十平台 + 架构能力矩阵 + v0.12.0 模拟器 BIOS/固件部署 + v0.13.0 仓库游戏提交 + v0.14.0 百度网盘官方 OpenAPI + v0.14.1 3DS SteamOS 兼容修复之后**（v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 平台字段/封面缓存/分类筛选；v0.3.0 全量目录与平台筛选 UI；v0.3.1 分类清洗 + 数据体检 CI；v0.4.0 Android/ARM64 的 DroidDeck 适配；v0.5.0 目录浏览/分页/排序/已安装页签/诊断导出/更新检查；v0.6.0 GBA 模拟器闭环；v0.6.1/v0.6.2 远程 JSON 目录；v0.7.0 通用模拟器注册表 + PSP/NDS；v0.8.0 Ludusavi + gamewatch 自动云存档；v0.9.0 模拟器扩到 PS1/FC/MD；v0.10.0 模拟器全部在线下载、插件包不集成；v0.11.0 补齐 3DS/PS2/PS3/Switch、10 平台 + 架构白名单；v0.12.0 模拟器 BIOS/固件部署 + portable 配置；v0.13.0 仓库游戏提交（Issue/PR → 目录）；v0.14.0 百度网盘官方 OpenAPI；v0.14.1 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak））值得继续做、以及明确不建议做的方向。当前版本 **v0.14.1**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
 >
 > 背景：上游作者已停止维护，`main` 只是早期版本，Releases 里的百度网盘 / 模拟器 / 资源池代码**不在本仓库**（见 [ARCHITECTURE.md](ARCHITECTURE.md) §2）。
 >
 > ⚠️ 合规提示：本项目分发的资源链接来自互联网，属于盗版资源分发，违反云盘服务条款并涉及版权风险。本路线图只讨论**工程改进**，不建议部署使用，更不建议扩大资源分发能力。
 >
-> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0/v0.3.0 —— 目录平台字段 + `cover_index.csv` + 封面磁盘缓存 + **全量目录（7084 条 / 11 平台）+ 平台/分类双筛选 UI**（§9.6）；v0.3.1 —— 分类清洗（606 行，「模拟器」606 条）+ `validate_catalog --strict` 进 CI；v0.4.0 —— **DroidDeck（Android/ARM64）适配**：ARM64 运行时/ARM Proton 解析/双 Steam 根/`PACKAGE_ARCH` 打包（见 [DROIDDECK.md](DROIDDECK.md)，尚未真机验证）；v0.5.0 —— **第一梯队**：目录浏览/分页/排序、已安装页签（启动/打开目录/卸载）、诊断 JSON+zip 导出（脱敏）、GitHub 更新检查（1 h 缓存）；v0.6.0 —— **GBA 模拟器闭环**：内置 mGBA AppImage、分享分页找 ROM、启动脚本 + 原生 Steam 快捷方式（不写 Proton）；v0.6.1/v0.6.2 —— **远程 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 读本地/HTTP JSON（远程缓存 6 h、失败回退 CSV，默认关闭）；v0.7.0 —— **通用模拟器注册表**：`EmulatorSpec` 接入 GBA/PSP/NDS，GBA 内置、PSP/NDS 首次安装按需下载官方 AppImage，启动脚本按平台参数生成；v0.8.0 —— **自动云存档**：内置 Ludusavi 清单（53,549 游戏）+ gamewatch 进程检测，游戏退出后只上传该游戏（30 s 防抖、指纹去重 reason=unchanged、设置 `cloud_save_auto_upload` 默认开）；v0.9.0 —— **模拟器扩到 6 平台**：PS1（DuckStation，需自备 BIOS，安装时复制到 DuckStation 目录）、FC/MD（Mesen2，共享缓存、zip 内可执行文件）；v0.10.0 —— **模拟器全部在线下载**：删除 `fetch_emulator.sh`/`make emulator-runtime` 与包内 mGBA，6 个平台（含 GBA）首次安装都从官方 release 下载，包体积约 68MB→45MB，离线可手动预置缓存；v0.11.0 —— **10 平台 + 架构能力矩阵**：新增 3DS（Azahar）/PS2（PCSX2）/PS3（RPCS3）/Switch（Eden）；3DS/PS2/PS3 仅 x86_64，aarch64 上目录白名单自动隐藏（条目/筛选条不出现）；Switch 有 x64/arm64 双包；PS2 BIOS 复制到 PCSX2 两处目录，3DS/PS3/Switch 给 setup 提示；v0.12.0 —— **BIOS/固件部署 + portable 配置**：新增 `emulator_setup.py`，把 `bios/<platform>/`（含压缩包）部署到模拟器目录，写 DuckStation/PCSX2 INI 与 mGBA/PPSSPP 全屏，RPCS3 自动 `--installfw`；部署消息并入安装完成消息；v0.13.0 —— **仓库游戏提交**：Issue 表单 + `submissions/*.json` PR，`submission.py` 校验/兼容平台别名/拒绝重复 shareCode，`merge_submissions.py` 合并进目录 CSV 并归档 `submissions/merged/`；网页库「提交游戏」按钮、CI 校验、`make validate-submissions`；v0.14.0 —— **百度网盘官方 OpenAPI**：OAuth oob 授权 + token 自动刷新、公开分享转存 `/FreedeckTmp`、dlink 下载（专用 Referer/UA）、安装后清理；`provider/share_ctx` 任务分流；**不接 BDUSS/Cookie/CDP**；仓库提交/目录支持百度（`server=b`）。
+> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0/v0.3.0 —— 目录平台字段 + `cover_index.csv` + 封面磁盘缓存 + **全量目录（7084 条 / 11 平台）+ 平台/分类双筛选 UI**（§9.6）；v0.3.1 —— 分类清洗（606 行，「模拟器」606 条）+ `validate_catalog --strict` 进 CI；v0.4.0 —— **DroidDeck（Android/ARM64）适配**：ARM64 运行时/ARM Proton 解析/双 Steam 根/`PACKAGE_ARCH` 打包（见 [DROIDDECK.md](DROIDDECK.md)，尚未真机验证）；v0.5.0 —— **第一梯队**：目录浏览/分页/排序、已安装页签（启动/打开目录/卸载）、诊断 JSON+zip 导出（脱敏）、GitHub 更新检查（1 h 缓存）；v0.6.0 —— **GBA 模拟器闭环**：内置 mGBA AppImage、分享分页找 ROM、启动脚本 + 原生 Steam 快捷方式（不写 Proton）；v0.6.1/v0.6.2 —— **远程 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 读本地/HTTP JSON（远程缓存 6 h、失败回退 CSV，默认关闭）；v0.7.0 —— **通用模拟器注册表**：`EmulatorSpec` 接入 GBA/PSP/NDS，GBA 内置、PSP/NDS 首次安装按需下载官方 AppImage，启动脚本按平台参数生成；v0.8.0 —— **自动云存档**：内置 Ludusavi 清单（53,549 游戏）+ gamewatch 进程检测，游戏退出后只上传该游戏（30 s 防抖、指纹去重 reason=unchanged、设置 `cloud_save_auto_upload` 默认开）；v0.9.0 —— **模拟器扩到 6 平台**：PS1（DuckStation，需自备 BIOS，安装时复制到 DuckStation 目录）、FC/MD（Mesen2，共享缓存、zip 内可执行文件）；v0.10.0 —— **模拟器全部在线下载**：删除 `fetch_emulator.sh`/`make emulator-runtime` 与包内 mGBA，6 个平台（含 GBA）首次安装都从官方 release 下载，包体积约 68MB→45MB，离线可手动预置缓存；v0.11.0 —— **10 平台 + 架构能力矩阵**：新增 3DS（Azahar）/PS2（PCSX2）/PS3（RPCS3）/Switch（Eden）；3DS/PS2/PS3 仅 x86_64，aarch64 上目录白名单自动隐藏（条目/筛选条不出现）；Switch 有 x64/arm64 双包；PS2 BIOS 复制到 PCSX2 两处目录，3DS/PS3/Switch 给 setup 提示；v0.12.0 —— **BIOS/固件部署 + portable 配置**：新增 `emulator_setup.py`，把 `bios/<platform>/`（含压缩包）部署到模拟器目录，写 DuckStation/PCSX2 INI 与 mGBA/PPSSPP 全屏，RPCS3 自动 `--installfw`；部署消息并入安装完成消息；v0.13.0 —— **仓库游戏提交**：Issue 表单 + `submissions/*.json` PR，`submission.py` 校验/兼容平台别名/拒绝重复 shareCode，`merge_submissions.py` 合并进目录 CSV 并归档 `submissions/merged/`；网页库「提交游戏」按钮、CI 校验、`make validate-submissions`；v0.14.0 —— **百度网盘官方 OpenAPI**：OAuth oob 授权 + token 自动刷新、公开分享转存 `/FreedeckTmp`、dlink 下载（专用 Referer/UA）、安装后清理；`provider/share_ctx` 任务分流；**不接 BDUSS/Cookie/CDP**；仓库提交/目录支持百度（`server=b`）；v0.14.1 —— **3DS SteamOS 兼容修复**：Azahar AppImage 有上游 #127/#953 问题，SteamOS 3.9.5 优先 Flathub `org.azahar_emu.Azahar`（自动 remote-add/install，失败回退 AppImage）；3DS wrapper 强制 XWayland；已有 3DS 快捷方式后台自动重写（无需重装）；system files 增 Flatpak 数据目录。
 
 ---
 
@@ -40,7 +40,7 @@
 
 - 拆出至少 4 个模块（建议：`install_flow.py`、`cloud_save_flow.py`、`login_flow.py`、`playtime.py`），`TianyiService` 只做编排与状态持有；
 - `main.py` / `tianyi_http.py` 的调用面不变（RPC 与 HTTP 契约不动）；
-- `make test`（当前 326 个用例）保持全绿，新增用例覆盖搬迁后的模块；
+- `make test`（当前 330 个用例）保持全绿，新增用例覆盖搬迁后的模块；
 - 单个 Python 文件 < 1500 行；`docs/ARCHITECTURE.md` 的引用与模块图同步更新。
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_http.py`、`docs/ARCHITECTURE.md`。
@@ -280,7 +280,7 @@
 - **平台/分类双筛选 UI**：库页两行筛选条（全部平台 + 各平台；全部分类 + Top12 分类），手柄焦点顺序 搜索框→搜索按钮→平台条→分类条→卡片；
 - **链接格式**：`_is_valid_tianyi_url()` / `parse_share_url()` 支持 `/t/<code>` 与 `/web/share?code=` 两种天翼分享链接；
 - **数据质量（v0.3.1）**：`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底），数据 606 行改写、「模拟器」606 条；`scripts/validate_catalog.py --strict` 进 CI，重复 `game_id`/非法链接/空标题/分类混平台名会让 CI 红；
-- 测试：`make test` 326 用例（含 `tests/test_catalog_platform.py` / `tests/test_droiddeck.py` / `tests/test_emulator.py` / `tests/test_cloud_auto.py` / `tests/test_submissions.py` / `tests/test_baidu_integration.py` 与分类清洗/默认目录洁净度用例）。
+- 测试：`make test` 330 用例（含 `tests/test_catalog_platform.py` / `tests/test_droiddeck.py` / `tests/test_emulator.py` / `tests/test_cloud_auto.py` / `tests/test_submissions.py` / `tests/test_baidu_integration.py` 与分类清洗/默认目录洁净度用例）。
 
 **仍未做**：封面索引的**生成流水线**（`generate_*_cover_urls.py` 类脚本；当前 index 直接来自 v0.6）、无网络时纯离线封面库；模拟器 10 平台已全部接入（见 9.8）。
 
@@ -313,12 +313,13 @@
   - **PS3 = RPCS3 build-8d6b42e（仅 x86_64，需固件）**；
   - **Switch = Eden v0.2.1（x86_64 + aarch64，需 prod.keys + 固件）**；
 - **架构能力矩阵**：`available_platforms(arch)` 按 `spec.assets` 过滤——x86_64 可用全部 10 个；aarch64（DroidDeck）只有 GBA/PSP/NDS/PS1/FC/MD/Switch，3DS/PS2/PS3 **没有 arm64 官方包**，目录查询用白名单过滤后条目与平台筛选条都不出现（`emulator_status` 返回"已隐藏该平台"）；
-- 解析顺序（无内置包分支）：`FREEDECKCY_<PLATFORM>_BIN` → 已下载/已解包（`emulators/<state_key>/<arch>/`）→ 系统命令 → Flatpak（仅 mGBA）；`emulator_status` 可按需返回 `source=download`，安装时 `ensure_emulator` 下载并按 AppImage/zip 分别解包（不依赖 FUSE）；
+- 解析顺序（无内置包分支）：`FREEDECKCY_<PLATFORM>_BIN` → 已下载/已解包（`emulators/<state_key>/<arch>/`）→ 系统命令 → Flatpak（mGBA 的 `io.mgba.mGBA`；3DS 用 `org.azahar_emu.Azahar`，SteamOS 自动安装）；`emulator_status` 可按需返回 `source=download`，安装时 `ensure_emulator` 下载并按 AppImage/zip 分别解包（不依赖 FUSE）；
 - BIOS/固件部署（v0.12.0）：`emulator_setup.setup_emulator()` 扫描 `bios/<platform>/`（含 `.zip/.7z/.rar`，7zz 解压到 `_extracted/` 缓存），部署到各模拟器目录并写 portable 配置（PS1 `<AppDir>/bios`+DuckStation INI、PS2 三处 BIOS+PCSX2 INI、NDS bios/firmware、Switch keys/`.nca`、PS3 `--installfw`、3DS sysdata、GBA/PSP 全屏配置）；只补缺失/只改单个键，部署消息并入安装完成消息；
 - **v0.10.0 打包变化**：`scripts/fetch_emulator.sh` 与 `make emulator-runtime` 删除、`defaults/runtime/mgba/` 不再打包，插件包不集成模拟器（约 68MB→45MB）；离线可手动预置缓存或用 `FREEDECKCY_*_BIN`；
-- 测试 `tests/test_emulator.py` / `tests/test_catalog_platform.py`（架构白名单与目录计数）；`make test` 326 用例。
+- **v0.14.1 3DS SteamOS 修复**：Azahar 官方 AppImage 在 SteamOS 有上游 #127/#953 兼容问题，SteamOS 3.9.5 上优先 Flathub Flatpak `org.azahar_emu.Azahar`（`_is_steamos`/`flatpak_installed`/`_ensure_flatpak`，自动 `remote-add` + `install`，失败重试 system 安装后回退 AppImage）；3DS wrapper 强制 XWayland（`QT_QPA_PLATFORM=xcb`/`SDL_VIDEODRIVER=x11`）；已安装 3DS 记录由后台 `_repair_emulator_launchers` 自动重写启动脚本，无需重装；system files 增 Flatpak 数据目录；测试 330；
+- 测试 `tests/test_emulator.py` / `tests/test_catalog_platform.py`（架构白名单、目录计数、3DS Flatpak/wrapper）；`make test` 330 用例。
 
-**剩余 / 边界**：模拟器真机验证（DroidDeck/ARM64）、模拟器存档纳入云存档、多碟游戏（`.m3u`/多 `.cue`）与 BIOS/固件版本校验；BIOS/固件/keys 由用户自备（版权原因，插件只部署不下载）；3DS/PS2/PS3 的 arm64 官方包不存在，ARM 设备无法安装；所有已接平台**不含存档管理**。
+**剩余 / 边界**：3DS Flatpak 真机验证（SteamOS 3.9.5/Deck）、无 Flatpak 环境的 AppImage 兼容增强（如自带 runtime/依赖）、模拟器真机验证（DroidDeck/ARM64）、模拟器存档纳入云存档、多碟游戏（`.m3u`/多 `.cue`）与 BIOS/固件版本校验；BIOS/固件/keys 由用户自备（版权原因，插件只部署不下载）；3DS/PS2/PS3 的 arm64 官方包不存在，ARM 设备无法安装；所有已接平台**不含存档管理**。
 
 **涉及文件**：`py_modules/emulator_manager.py`、`py_modules/game_catalog.py`（`allowed_platforms` 白名单）、`py_modules/tianyi_service.py`、`defaults/tianyi_library_ui/`、`tests/test_emulator.py`、`tests/test_catalog_platform.py`、`docs/`。
 
@@ -387,4 +388,4 @@
 - 架构与问题清单：[ARCHITECTURE.md](ARCHITECTURE.md)
 - 与作者 v0.6 的能力对照：[ARCHITECTURE.md](ARCHITECTURE.md) §13
 - 本地开发、调试、故障排查：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 当前测试基线：`make test` → 326 passed（2026-11 v0.14.0）
+- 当前测试基线：`make test` → 330 passed（2026-11 v0.14.1）

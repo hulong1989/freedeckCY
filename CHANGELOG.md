@@ -2,6 +2,18 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.14.1
+
+### 修复
+
+- **3DS（Azahar）在 SteamOS 3.9.5 无法启动**：
+  - SteamOS 上优先使用官方 **Flatpak（Flathub `org.azahar_emu.Azahar`）**，首次安装时自动 `flatpak remote-add` + `flatpak install`；Flatpak 自带运行时，避开官方 AppImage 在 Steam Deck 上的 glibc/AppImage 兼容问题。
+  - 非 SteamOS / 无 Flatpak 环境回退官方 AppImage；`FREEDECKCY_AZAHAR_BIN` 优先于 Flatpak。
+  - 3DS 启动脚本强制 `QT_QPA_PLATFORM=xcb`、`SDL_VIDEODRIVER=x11`，规避 Game Mode/Wayland 崩溃。
+  - 3DS system files 增加 Flatpak 数据目录：`~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`。
+  - 已安装的 3DS 游戏在插件启动后自动修复启动脚本（AppImage → Flatpak），无需重装游戏。
+- 测试 326 → 330。
+
 ## v0.14.0
 
 ### 新增

@@ -1,6 +1,6 @@
 # 在 DroidDeck 上使用 freedeckCY
 
-[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）也可在 DroidDeck 上使用；本文是安装与排障说明。
+[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）也可在 DroidDeck 上使用；本文是安装与排障说明。
 
 > 适配基于 DroidDeck 的源码与 ARM64 运行时结构，**尚未在真机上完整验证**。遇到问题请按文末“排障”收集日志。
 
@@ -20,6 +20,7 @@ freedeckCY 的处理方式：
 - 检测到 DroidDeck 标记（`~/.droiddeck-x64`、`~/.droiddeck-decky-enabled`、`<Steam>/package/droiddeck-installed`）时，Proton 映射自动改用 `droiddeck-proton-arm64`；若 `config.vdf` 里已出现 `droiddeck-proton-11-arm64` 则优先用它。
 - 若 DroidDeck 的 x64 Steam 客户端正在运行（`steam.pid` 存在），优先把快捷方式写到它的 `~/.droiddeck-x64/.local/share/Steam`，否则回退标准路径。
 - GBA 闭环（v0.6.0 起）使用 **mGBA arm64 AppImage**：v0.10.0 起**不再随包内置**，首次安装 GBA 时自动从官方 release 下载，再用 `--appimage-extract` 解包到 `~/.local/share/freedeckCY/emulators/gba/aarch64/squashfs-root`（GBA 兼容旧 `emulators/aarch64/`；**不依赖 FUSE**，proot 环境可用）；Steam 快捷方式的 Exe 是生成的 `launch-freedeckcy.sh`，**不写 Proton 映射**（原生 Linux 启动）。
+- 3DS（Azahar，v0.14.1）：SteamOS 3.9.5 上优先官方 Flathub Flatpak `org.azahar_emu.Azahar`（AppImage 有上游 #127/#953 兼容问题）；**DroidDeck/aarch64 没有 3DS 官方 arm64 包，目录里仍不显示 3DS**（架构白名单，见 §9.8）。如果设备能跑 x86_64 且装有 flatpak，则自动用 Flatpak、失败回退 AppImage；3DS 启动脚本会强制 XWayland（`QT_QPA_PLATFORM=xcb`/`SDL_VIDEODRIVER=x11`）；system files 放 `~/.local/share/freedeckCY/bios/3ds/sysdata/`，会部署到 azahar/citra 与 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`。已有 3DS 快捷方式由后台自动重写，无需重装。
 - 百度网盘（v0.14.0，官方 OpenAPI）：aarch64 与 x86_64 行为一致（纯 HTTPS API，无本地二进制）。QAM「百度网盘（官方 OpenAPI）」→ 填百度开放平台 **App Key/Secret Key** →「保存应用」→「获取授权链接」→ 浏览器授权后把**授权码**粘回 →「完成授权」；之后百度分享链接可直接安装，不要求天翼登录。token 过期自动 refresh；也可用 env `FREEDECKCY_BAIDU_OPENAPI_APP_KEY` / `SECRET_KEY` / `REFRESH_TOKEN`。**不接 BDUSS/Cookie 网页抓取/CDP**。详见 [ARCHITECTURE.md](ARCHITECTURE.md) §5.13 / [DEVELOPMENT.md](DEVELOPMENT.md) §6.11。
 - 仓库游戏提交（v0.13.0）：网页库工具栏有「提交游戏」按钮，点击后用系统浏览器/Steam 内置浏览器打开 GitHub Issue 表单（`https://github.com/hulong1989/freedeckCY/issues/new?template=submit-game.yml`）；也可以直接提 PR 改 `submissions/*.json`。字段与原版资源池投稿一致（名称/英文名/平台/分享链接/提取码/版本/可执行文件名 + `openpath`），**只提交分享链接，不上传游戏文件**；这条链路与设备无关，DroidDeck 上不需要任何额外配置。详见 [submissions/README.md](../submissions/README.md)。
 - 自动云存档（v0.8.0）：内置 Ludusavi 清单（53,549 游戏）按标题/SteamID 匹配，并把 Windows 存档路径解析到 **ARM Proton 前缀**（`compatdata/.../pfx` 内布局与 x86_64 一致）；`gamewatch` 每 8 秒扫 `/proc/*/cmdline`（proot 下通常可用；没有 `/proc` 时回退 `pgrep -f`，需要系统有 pgrep），检测到游戏退出后只上传该游戏。自动上传**默认开启**，可在 QAM「云存档上传」里关闭。
@@ -84,7 +85,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | FC 模拟器（Mesen2，v0.9.0） | ✅ 可安装/启动：官方 ARM64 zip 内单文件 `Mesen`（按需下载） |
 | MD 模拟器（Mesen2，v0.9.0） | ✅ 可安装/启动：与 FC 共用 Mesen2（`emulators/mesen/aarch64/`），ROM 扩展名不同 |
 | Switch 模拟器（Eden，v0.11.0） | ✅ 可安装/启动：有 **arm64 官方 AppImage**；需要 `prod.keys` + 固件（`setup_hint` 提示，缺失不阻断但装完不能直接玩） |
-| 3DS / PS2 / PS3（v0.11.0） | ⚠️ **仅 x86_64，DroidDeck 自动隐藏**：Azahar/PCSX2/RPCS3 官方包没有 arm64，目录白名单过滤后条目与平台筛选条都不出现（不是 bug） |
+| 3DS / PS2 / PS3（v0.11.0） | ⚠️ **仅 x86_64，DroidDeck 自动隐藏**：Azahar/PCSX2/RPCS3 官方包没有 arm64，目录白名单过滤后条目与平台筛选条都不出现（不是 bug）；3DS 在 x86_64 上 v0.14.1 起优先 Flatpak、回退 AppImage |
 | 模拟器 BIOS/固件部署（v0.12.0） | ✅ 安装后自动部署 `bios/<platform>/`（支持压缩包，7zz 解压缓存）；aarch64 可用 PS1/NDS/Switch 的部署与 GBA/PSP 全屏配置；PS2/PS3/3DS 仅 x86_64 |
 | 仓库游戏提交（v0.13.0） | ✅ 网页库「提交游戏」按钮打开 GitHub Issue 表单；或直接 PR `submissions/*.json`。无设备特定逻辑，DroidDeck 与 Steam Deck 行为一致 |
 | 百度网盘（官方 OpenAPI，v0.14.0） | ✅ aarch64 同样可用（纯 HTTPS API）；需自建百度开放平台应用并完成 OAuth oob 授权，分享文件转存 `/FreedeckTmp` 后下载、安装后清理；不接 BDUSS/Cookie/CDP |
@@ -202,6 +203,12 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 转存空间：分享文件会转存到百度网盘 `/FreedeckTmp`，安装结束自动清理；失败会保留，可手动删除该目录。
 - 链接格式：支持 `pan.baidu.com/s/<surl>`、`/share/init?surl=...`、`yun.baidu.com`/`eyun.baidu.com`；短链先展开。
 
+**3DS 相关（DroidDeck/aarch64）**
+
+- DroidDeck 上目录不显示 3DS 是预期：3DS 只有 x86_64 官方包，`available_platforms("aarch64")` 不含它；不要尝试用 `FREEDECKCY_AZAHAR_BIN` 绕过目录白名单。
+- 在 x86_64 + flatpak 环境（如 SteamOS 主机）上：先 `flatpak remote-add --user --if-not-exists flathub ...`、`flatpak install -y --user flathub org.azahar_emu.Azahar`；诊断 `emulators.3ds.source` 应为 `flatpak`，否则回退 AppImage。
+- 3DS system files 放 `~/.local/share/freedeckCY/bios/3ds/sysdata/`；Flatpak 环境还会复制到 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`。
+
 **日志**
 
 - 插件日志：`/tmp/freedeckcy.log`
@@ -213,6 +220,7 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 未在真机验证：DroidDeck 的 FEX/ARM Proton、不同 Android 机型的存储映射都可能影响结果。
 - aarch64 上可安装 **GBA/PSP/NDS/PS1/FC/MD/Switch** 共 7 个平台（mGBA/PPSSPP/melonDS/DuckStation/Mesen2/Eden；v0.6.0~v0.12.0，全部在线下载）；v0.12.0 安装后自动部署 `bios/<platform>/`（含压缩包）并写 portable 配置（PS1/NDS/Switch/GBA/PSP；PS2/PS3/3DS 仅 x86_64）；**3DS/PS2/PS3 官方包仅 x86_64，DroidDeck 上被目录白名单自动隐藏**（条目/筛选条都不出现，见 [ROADMAP.md](ROADMAP.md) 9.8）。**插件包不集成任何模拟器，7 个平台（含 GBA）首次安装都需要联网**从官方 release 下载 arm64 包（包体积约 45MB），离线可手动预置缓存或用 `FREEDECKCY_*_BIN`；**PS1 需自备 BIOS、Switch 需 keys+固件**（setup_hint 提示，缺失不阻断但装完不能直接玩）；各平台只识别各自 ROM 扩展名，不含存档管理；ARM64 上这些平台尚未真机验证。
 - **自动云存档边界（v0.8.0）**：只对 gamewatch 检测到"退出"的游戏自动上传，没有自动恢复/冲突策略；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档在模拟器配置目录，暂未纳入清单/Proton 扫描；指纹只看相对路径+大小+mtime（≤5000 文件）；`/proc` 不可用时依赖 `pgrep`；ARM64 上该链路尚未真机验证。
+- 3DS（v0.14.1）在 DroidDeck/aarch64 上仍不可用（无 arm64 官方包，目录隐藏）；SteamOS/x86_64 优先 Flatpak（需系统有 flatpak 且能访问 Flathub），无 Flatpak 时回退 AppImage（可能仍有上游 #127/#953 问题）；3DS wrapper 走 XWayland；已有快捷方式自动重写但未在 DroidDeck 真机验证。
 - 百度网盘（v0.14.0）只走官方 OpenAPI：必须自建应用并授权（无公共 App Key），分享文件需要转存 `/FreedeckTmp`（会占百度网盘空间，安装后清理，失败则保留）；不接 BDUSS/Cookie/CDP；公开分享页结构变化可能影响元数据解析；aarch64 与 x86_64 行为一致。
 - 仓库游戏提交（v0.13.0）只依赖网页/GitHub，无设备特定逻辑；DroidDeck 上没有额外限制（除了需要能打开 GitHub 的浏览器）。
 - DroidDeck 升级/重装 Decky 可能清空插件，需重新导入 zip。

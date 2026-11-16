@@ -50,6 +50,7 @@ from emulator_manager import (
     emulator_status,
     ensure_emulator,
     find_rom_file,
+    flatpak_installed,
     get_spec,
     supported_platforms,
 )
@@ -462,6 +463,8 @@ class TianyiService:
         self.seven_zip = SevenZipManager(plugin_dir=plugin_dir)
         self._lock = asyncio.Lock()
         self._post_process_jobs: Dict[str, asyncio.Task] = {}
+        self._launcher_repair_task: Optional[asyncio.Task] = None
+        self._launcher_repair_done = False
         # 后台维护（不依赖前端轮询）与安装互斥。
         self._maintenance_lock = asyncio.Lock()
         self._install_locks: Dict[str, asyncio.Lock] = {}
@@ -594,6 +597,13 @@ class TianyiService:
         async with self._qr_login_lock:
             await self._close_qr_login_context_locked()
         await self._finalize_active_playtime_sessions(reason="service_shutdown")
+        if self._launcher_repair_task and not self._launcher_repair_task.done():
+            self._launcher_repair_task.cancel()
+            try:
+                await self._launcher_repair_task
+            except BaseException:
+                pass
+        self._launcher_repair_task = None
         if self._auto_cloud_upload_task and not self._auto_cloud_upload_task.done():
             self._auto_cloud_upload_task.cancel()
             try:
@@ -647,6 +657,7 @@ class TianyiService:
                 self._maybe_schedule_group_post_process(task)
             scheduled = len(set(self._post_process_jobs) - jobs_before)
             self._poll_game_watch()
+            self._maybe_schedule_launcher_repair()
 
             return {
                 "ok": True,
@@ -4547,6 +4558,58 @@ class TianyiService:
             return parent
         raise ValueError("无法确定打包工作目录")
 
+    def _maybe_schedule_launcher_repair(self) -> None:
+        """升级后自动修复已有 3DS 快捷方式（AppImage → Flatpak）。"""
+        if self._launcher_repair_done:
+            return
+        if self._launcher_repair_task is not None and not self._launcher_repair_task.done():
+            return
+        records = [
+            record
+            for record in list(self.store.installed_games or [])
+            if str(record.platform or "pc") == "3ds" and str(record.rom_path or "").strip()
+        ]
+        if not records:
+            self._launcher_repair_done = True
+            return
+        self._launcher_repair_task = asyncio.create_task(
+            self._repair_emulator_launchers(records),
+            name="freedeckcy-repair-3ds-launchers",
+        )
+
+    async def _repair_emulator_launchers(self, records: Sequence[Any]) -> None:
+        changed = False
+        for record in records:
+            try:
+                command = await ensure_emulator("3ds", self.plugin_dir, allow_download=True)
+                wrapper_path = str(record.launcher_path or "").strip()
+                if not wrapper_path:
+                    wrapper_path = os.path.join(str(record.install_path or ""), "launch-freedeckcy.sh")
+                if not wrapper_path:
+                    continue
+                try:
+                    if "org.azahar_emu.Azahar" in Path(wrapper_path).read_text(encoding="utf-8"):
+                        continue
+                except Exception:
+                    pass
+                await asyncio.to_thread(
+                    create_launch_wrapper,
+                    command=command,
+                    rom_path=str(record.rom_path or ""),
+                    wrapper_path=wrapper_path,
+                    platform_name="3ds",
+                )
+                record.launcher_path = wrapper_path
+                record.updated_at = _now_wall_ts()
+                changed = True
+                config.logger.info("Repaired 3DS launcher for %s -> %s", record.game_title, command[0])
+            except Exception as exc:
+                config.logger.warning("Repair 3DS launcher failed game=%s: %s", record.game_id, exc)
+        self._launcher_repair_done = True
+        if changed:
+            await asyncio.to_thread(self.store.save)
+            self._invalidate_panel_cache(installed=True)
+
     def _poll_game_watch(self) -> None:
         """后台维护周期里检查游戏进程起停（失败不影响下载/安装）。"""
         try:
@@ -6282,6 +6345,34 @@ class TianyiService:
         app_id = self._resolve_record_app_id(record)
         if app_id <= 0:
             raise ValueError("该游戏缺少 Steam AppID，请从 Steam 库手动启动")
+
+        if str(record.platform or "pc") == "3ds":
+            wrapper_path = str(record.launcher_path or "").strip()
+            wrapper_text = ""
+            if wrapper_path:
+                try:
+                    wrapper_text = Path(wrapper_path).read_text(encoding="utf-8")
+                except Exception:
+                    wrapper_text = ""
+            if "org.azahar_emu.Azahar" not in wrapper_text:
+                if flatpak_installed("org.azahar_emu.Azahar"):
+                    try:
+                        command = await ensure_emulator("3ds", self.plugin_dir, allow_download=False)
+                        await asyncio.to_thread(
+                            create_launch_wrapper,
+                            command=command,
+                            rom_path=str(record.rom_path or ""),
+                            wrapper_path=wrapper_path or os.path.join(str(record.install_path or ""), "launch-freedeckcy.sh"),
+                            platform_name="3ds",
+                        )
+                        record.launcher_path = wrapper_path or os.path.join(str(record.install_path or ""), "launch-freedeckcy.sh")
+                        await asyncio.to_thread(self.store.save)
+                    except Exception as exc:
+                        raise ValueError(f"3DS 启动器修复失败：{exc}") from exc
+                else:
+                    self._maybe_schedule_launcher_repair()
+                    raise ValueError("正在安装 Azahar Flatpak，请等待 1–2 分钟后重试")
+
         await asyncio.to_thread(_launch_external, f"steam://rungameid/{app_id}")
         return {
             "game_id": str(record.game_id or ""),

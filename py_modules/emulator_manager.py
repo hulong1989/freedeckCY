@@ -2,7 +2,7 @@
 
 设计：
   - 每个平台一条 EmulatorSpec（官方 release 资产、启动参数、ROM 扩展名）。
-  - GBA（mGBA）默认随包内置；PSP（PPSSPP）/ NDS（melonDS）首次安装时按需下载官方 AppImage。
+  - 所有模拟器首次安装时在线获取；3DS 在 SteamOS 上优先官方 Flatpak，其余用 AppImage。
   - AppImage 统一用 `--appimage-extract` 解包运行，不依赖 FUSE（DroidDeck/proot 可用）。
   - 启动脚本由安装流程生成，Steam 快捷方式不写 Proton 映射。
 """
@@ -15,6 +15,7 @@ import platform
 import shlex
 import shutil
 import subprocess
+import time
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,6 +43,7 @@ class EmulatorSpec:
     state_key: str = ""
     executables: Tuple[str, ...] = ()
     bios_required: bool = False
+    flatpak_id: str = ""
     setup_required: bool = False
     setup_hint: str = ""
 
@@ -173,6 +175,7 @@ EMULATORS: Dict[str, EmulatorSpec] = {
         notes="Azahar 官方 AppImage（仅 x86_64）；需要 3DS system files",
         min_bytes=60 * 1024 * 1024,
         state_key="azahar",
+        flatpak_id="org.azahar_emu.Azahar",
         setup_required=True,
         setup_hint="3DS 需要 system files：请在 Azahar 首次启动时按提示配置（或把 sysdata 放入其数据目录）",
     ),
@@ -360,10 +363,102 @@ def flatpak_command(spec: EmulatorSpec) -> Optional[List[str]]:
     return ["flatpak", "run", "io.mgba.mGBA"] if result.returncode == 0 else None
 
 
+_FLATPAK_CACHE: Dict[str, Tuple[float, bool]] = {}
+
+
+def _is_steamos() -> bool:
+    try:
+        text = Path("/etc/os-release").read_text(encoding="utf-8", errors="replace").lower()
+    except Exception:
+        return False
+    return "id=steamos" in text or "steamos" in text
+
+
+def _flatpak_binary() -> str:
+    return shutil.which("flatpak") or ""
+
+
+def flatpak_installed(app_id: str, *, max_age: float = 30.0) -> bool:
+    app_id = str(app_id or "").strip()
+    binary = _flatpak_binary()
+    if not app_id or not binary:
+        return False
+    now = time.monotonic()
+    cached = _FLATPAK_CACHE.get(app_id)
+    if cached and now - cached[0] < max_age:
+        return cached[1]
+    try:
+        result = subprocess.run(
+            [binary, "info", app_id],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+        )
+        installed = result.returncode == 0
+    except Exception:
+        installed = False
+    _FLATPAK_CACHE[app_id] = (now, installed)
+    return installed
+
+
+async def _run_flatpak(args: Sequence[str], *, timeout: float = 600.0) -> Tuple[int, str]:
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        try:
+            output, _ = await asyncio.wait_for(process.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            return 124, "flatpak 操作超时"
+        return int(process.returncode or 0), (output or b"").decode("utf-8", "replace")
+    except Exception as exc:
+        return 1, str(exc)
+
+
+async def _ensure_flatpak(spec: EmulatorSpec, *, allow_download: bool) -> Optional[List[str]]:
+    """优先使用官方 Flatpak；SteamOS 上可自动安装，避免 AppImage glibc 兼容问题。"""
+    if not spec.flatpak_id:
+        return None
+    binary = _flatpak_binary()
+    if not binary:
+        return None
+    if flatpak_installed(spec.flatpak_id):
+        return [binary, "run", spec.flatpak_id]
+    if not allow_download:
+        return None
+
+    config.logger.info("Installing Flatpak %s for %s", spec.flatpak_id, spec.name)
+    await _run_flatpak(
+        [binary, "remote-add", "--user", "--if-not-exists", "flathub", "https://flathub.org/repo/flathub.flatpakrepo"],
+        timeout=120,
+    )
+    code, output = await _run_flatpak(
+        [binary, "install", "-y", "--user", "flathub", spec.flatpak_id],
+        timeout=1200,
+    )
+    if code != 0:
+        config.logger.warning("Flatpak user install failed for %s: %s", spec.flatpak_id, output[-500:])
+        code, output = await _run_flatpak(
+            [binary, "install", "-y", "flathub", spec.flatpak_id],
+            timeout=1200,
+        )
+    if flatpak_installed(spec.flatpak_id, max_age=0):
+        return [binary, "run", spec.flatpak_id]
+    if code != 0:
+        config.logger.warning("Flatpak install failed for %s: %s", spec.flatpak_id, output[-500:])
+    return None
+
+
 def resolve_command(spec: EmulatorSpec, plugin_dir: str = "") -> Optional[List[str]]:
     env_path = str(os.getenv(spec.env_var, "") or "").strip()
     if env_path and os.path.isfile(env_path):
         return [env_path]
+    if spec.flatpak_id and flatpak_installed(spec.flatpak_id):
+        return [_flatpak_binary(), "run", spec.flatpak_id]
     installed = installed_command(spec)
     if installed:
         return [installed]
@@ -473,6 +568,9 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
             "bios_dir": str(bios_dir(spec.platform)) if spec.bios_required else "",
             "setup_required": spec.setup_required,
             "setup_hint": spec.setup_hint,
+            "flatpak_id": spec.flatpak_id,
+            "flatpak_available": bool(_flatpak_binary()),
+            "flatpak_installed": flatpak_installed(spec.flatpak_id) if spec.flatpak_id else False,
         }
     arch = runtime_arch()
     asset = spec.assets.get(arch)
@@ -497,7 +595,14 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
         "bios_dir": str(bios_dir(spec.platform)) if spec.bios_required else "",
         "setup_required": spec.setup_required,
         "setup_hint": spec.setup_hint,
-        "message": f"首次安装会从官方 release 下载 {spec.name}（{asset}）",
+        "flatpak_id": spec.flatpak_id,
+        "flatpak_available": bool(_flatpak_binary()),
+        "flatpak_installed": flatpak_installed(spec.flatpak_id) if spec.flatpak_id else False,
+        "message": (
+            f"首次安装会通过官方 Flatpak 安装 {spec.name}（推荐，避开 AppImage 兼容问题）"
+            if spec.flatpak_id and _flatpak_binary()
+            else f"首次安装会从官方 release 下载 {spec.name}（{asset}）"
+        ),
     }
 
 
@@ -591,6 +696,17 @@ async def ensure_emulator(
     if spec is None:
         raise RuntimeError(f"暂不支持 {str(platform_name).upper()} 平台")
 
+    env_override = str(os.getenv(spec.env_var, "") or "").strip() if spec.env_var else ""
+    if (
+        spec.flatpak_id
+        and not (env_override and os.path.isfile(env_override))
+        and (flatpak_installed(spec.flatpak_id) or (_is_steamos() and allow_download))
+    ):
+        flatpak_command = await _ensure_flatpak(spec, allow_download=allow_download)
+        if flatpak_command:
+            config.logger.info("Using Flatpak %s for %s", spec.flatpak_id, spec.name)
+            return flatpak_command
+
     command = resolve_command(spec, plugin_dir)
     if command:
         first = command[0]
@@ -665,10 +781,15 @@ def create_launch_wrapper(
     if not used_rom:
         args.append(str(rom_path))
 
+    env_lines = ""
+    if platform_name == "3ds":
+        # SteamOS/Game Mode 下强制 XWayland，避开 Azahar Wayland 后端的兼容问题。
+        env_lines = "export QT_QPA_PLATFORM=xcb\nexport SDL_VIDEODRIVER=x11\n"
     script = (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        'exec ' + " ".join(shlex.quote(part) for part in [*argv, *args]) + "\n"
+        + env_lines
+        + 'exec ' + " ".join(shlex.quote(part) for part in [*argv, *args]) + "\n"
     )
     wrapper = Path(wrapper_path)
     wrapper.parent.mkdir(parents=True, exist_ok=True)

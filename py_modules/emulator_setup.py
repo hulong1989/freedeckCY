@@ -360,7 +360,12 @@ def _install_rpcs3_firmware(root: str, command: Sequence[str], files: Sequence[s
 
 
 def _deploy_3ds(files: Sequence[str]) -> List[str]:
-    targets = [_AZAHAR_DATA / "sysdata", Path.home() / ".local" / "share" / "citra" / "sysdata"]
+    targets = [
+        _AZAHAR_DATA / "sysdata",
+        Path.home() / ".local" / "share" / "citra" / "sysdata",
+        Path.home() / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar" / "sysdata",
+        Path.home() / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar-emu" / "sysdata",
+    ]
     copied = _copy_files(files, targets)
     source_tree = bios_dir("3ds") / "sysdata"
     if source_tree.is_dir():

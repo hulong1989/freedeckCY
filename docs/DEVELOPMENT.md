@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.14.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.14.1**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -21,8 +21,8 @@
 | `py_modules/seven_zip_manager.py` | 7z 解压 / 压缩（带进度回调）；`test_archive()` 跑 `7z t` 做解压前校验（7z 不可用时 best-effort 跳过） |
 | `py_modules/save_manifest.py` | **Ludusavi 存档清单（v0.8.0）**：加载本地 JSON、标题/SteamID 匹配、`<base>/<winAppData>/...` 占位符解析到 Proton 前缀、glob 展开（最多 200 路径）；运行时不联网 |
 | `py_modules/gamewatch.py` | **游戏进程检测（v0.8.0）**：后台每 8 s 扫 `/proc/*/cmdline`（无 `/proc` 回退 `pgrep -f`），状态切换产出 start/end 事件（自动云存档只在 end 触发） |
-| `py_modules/emulator_manager.py` | **通用模拟器注册表（v0.12.0，10 平台全部在线下载）**：`EmulatorSpec`/`EMULATORS` 描述 GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch；`available_platforms(arch)` 做架构白名单（3DS/PS2/PS3 仅 x86_64）；官方资产解析、首次安装按需下载、AppImage/zip 解包、`find_rom_file()`、`create_launch_wrapper()`、`emulator_status()`；旧 `prepare_bios()` 保留兼容 |
-| `py_modules/emulator_setup.py` | **安装后 BIOS/固件部署（v0.12.0）**：`setup_emulator(platform, command, seven_zip)` 把 `bios/<platform>/` 下文件/压缩包部署到模拟器目录并写 portable 配置（DuckStation/PCSX2 INI、mGBA/PPSSPP 全屏、RPCS3 `--installfw`）；只补缺失/只改单个键，不下载 |
+| `py_modules/emulator_manager.py` | **通用模拟器注册表（v0.14.1，10 平台全部在线下载）**：`EmulatorSpec`/`EMULATORS` 描述 GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch（3DS 带 `flatpak_id=org.azahar_emu.Azahar`）；`available_platforms(arch)` 做架构白名单；官方资产解析、首次安装按需下载、AppImage/zip 解包、SteamOS 上 3DS 优先 Flatpak（`_is_steamos`/`flatpak_installed`/`_ensure_flatpak`）、`find_rom_file()`、3DS wrapper 强制 XWayland、`emulator_status()`；旧 `prepare_bios()` 保留兼容 |
+| `py_modules/emulator_setup.py` | **安装后 BIOS/固件部署（v0.12.0；v0.14.1 3DS 加 Flatpak 路径）**：`setup_emulator(platform, command, seven_zip)` 把 `bios/<platform>/` 下文件/压缩包部署到模拟器目录并写 portable 配置；3DS sysdata 同时部署到 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`；只补缺失/只改单个键，不下载 |
 | `py_modules/submission.py` | **仓库游戏提交（v0.13.0）**：`normalize_platform()` 平台别名、`validate_submission()`/`validate_submission_files()` 校验、`build_catalog_row()` 生成目录行、`merge_submissions()` 合并（dry-run/`--apply`）；纯标准库，可被 CLI 直接 import |
 | `py_modules/baidu_client.py` | **百度公开分享 URL 解析（v0.14.0）**：`resolve_baidu_share(share_url, "")` 取分享页元数据（share_id/uk/sekey/files），**只传空 cookie，不读 BDUSS/Cookie**；给 OpenAPI 链路提供公开分享上下文 |
 | `py_modules/baidu_openapi_client.py` | **百度网盘官方 OpenAPI（v0.14.0）**：OAuth oob 授权（`build_baidu_oauth_authorize_url`/`exchange_baidu_oauth_code`/`refresh_baidu_oauth_token`）、公开分享转存、`fetch_baidu_openapi_download_url`、`delete_baidu_openapi_transfer_file`；纯 HTTPS API，无网页抓取/CDP |
@@ -43,7 +43,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（326 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度 OpenAPI（来源识别/token 刷新/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（330 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度 OpenAPI（来源识别/token 刷新/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -214,7 +214,7 @@ defaults/runtime/node/<arch>/bin/node
 | ps1 | DuckStation `latest` | `DuckStation-{x64,arm64}.AppImage` | AppImage，按需下载；**需要自备 BIOS** | `.cue/.m3u/.chd/.iso/.pbp/.bin` | `FREEDECKCY_DUCKSTATION_BIN` |
 | fc | Mesen2 2.1.1 | `Mesen_2.1.1_Linux_{x64,ARM64}.zip` | zip 内单文件 `Mesen`，按需下载 | `.nes/.fds/.unf/.unif` | `FREEDECKCY_MESEN_BIN` |
 | md | Mesen2 2.1.1 | 同上（**与 FC 共享缓存** `emulators/mesen/<arch>/`） | zip 内单文件 `Mesen`，按需下载 | `.md/.gen/.smd/.bin/.32x` | `FREEDECKCY_MESEN_BIN` |
-| 3ds | Azahar 2126.2 | `azahar.AppImage`，**仅 x86_64** | AppImage，按需下载；需要 3DS system files（setup） | `.3ds/.cia/.cci/.cxi/.app` | `FREEDECKCY_AZAHAR_BIN` |
+| 3ds | Azahar 2126.2 | **SteamOS 优先 Flathub `org.azahar_emu.Azahar`**；否则 `azahar.AppImage`（**仅 x86_64**） | 3DS system files（setup）；Flatpak 自动安装或 AppImage 回退 | `.3ds/.cia/.cci/.cxi/.app` | `FREEDECKCY_AZAHAR_BIN`（最高优先） |
 | ps2 | PCSX2 v2.8.2 | `pcsx2-v2.8.2-linux-appimage-x64-Qt.AppImage`，**仅 x86_64** | AppImage，按需下载；需要 PS2 BIOS | `.iso/.chd/.cue/.bin/.gz` | `FREEDECKCY_PCSX2_BIN` |
 | ps3 | RPCS3 build-8d6b42e | `rpcs3-v0.0.43-20606-8d6b42e7_linux64.AppImage`，**仅 x86_64** | AppImage，按需下载；需要 PS3 固件（setup） | `.iso/.pkg/.elf/.self` | `FREEDECKCY_RPCS3_BIN` |
 | switch | Eden v0.2.1 | `stable.eden-emu.dev/v0.2.1/` 的 x86_64 + aarch64 AppImage | AppImage，按需下载；需要 prod.keys + 固件（setup） | `.nsp/.xci` | `FREEDECKCY_EDEN_BIN` |
@@ -223,7 +223,7 @@ defaults/runtime/node/<arch>/bin/node
 
 **架构白名单**：`available_platforms(arch)` 按 `spec.assets` 是否含当前 arch 过滤；`TianyiService.list_catalog()` 把 `["pc", *available_platforms()]` 传给 `GameCatalog.list(allowed_platforms=...)`，因此 x86_64 显示 10 平台，aarch64 只显示 GBA/PSP/NDS/PS1/FC/MD/Switch（3DS/PS2/PS3 的条目和平台筛选条都不出现）。
 
-解析顺序（v0.10.0 起**没有内置包分支**）：`FREEDECKCY_<PLATFORM>_BIN` → 已下载/已解包的模拟器（`~/.local/share/freedeckCY/emulators/<state_key>/<arch>/`；GBA 兼容旧 `<arch>/squashfs-root`）→ 系统命令 → Flatpak（仅 mGBA）。都没有时 `emulator_status` 返回 `source=download`（10 平台都如此；无当前架构资产时返回 `available=false` + "已隐藏该平台"），安装时 `ensure_emulator` 从 GitHub release 下载到 `emulators/<state_key>/<arch>/`：AppImage 走 `--appimage-extract`（不依赖 FUSE，proot/DroidDeck 可用），zip 先解压找 `executables` 指定的可执行文件（Mesen2 的 `Mesen`），否则找 zip 内 AppImage。只有当前架构没有官方资产时才会在计划阶段拒绝。
+解析顺序（v0.10.0 起**没有内置包分支**）：`FREEDECKCY_<PLATFORM>_BIN` → 已下载/已解包的模拟器（`~/.local/share/freedeckCY/emulators/<state_key>/<arch>/`；GBA 兼容旧 `<arch>/squashfs-root`）→ 系统命令 → Flatpak（mGBA 的 `io.mgba.mGBA`；3DS 用 `org.azahar_emu.Azahar`，SteamOS 上自动安装）。都没有时 `emulator_status` 返回 `source=download`（10 平台都如此；无当前架构资产时返回 `available=false` + "已隐藏该平台"），安装时 `ensure_emulator` 从 GitHub release 下载到 `emulators/<state_key>/<arch>/`：AppImage 走 `--appimage-extract`（不依赖 FUSE，proot/DroidDeck 可用），zip 先解压找 `executables` 指定的可执行文件（Mesen2 的 `Mesen`），否则找 zip 内 AppImage。只有当前架构没有官方资产时才会在计划阶段拒绝。
 
 **离线预置**：把官方包提前放到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`（AppImage 需 `chmod +x`；zip 可留原样，安装时会解），或用 `FREEDECKCY_*_BIN` 指向本地可执行文件/AppImage（GBA `FREEDECKCY_MGBA_BIN`、PSP `FREEDECKCY_PPSSPP_BIN`、NDS `FREEDECKCY_MELONDS_BIN`、PS1 `FREEDECKCY_DUCKSTATION_BIN`、FC/MD `FREEDECKCY_MESEN_BIN`）。
 
@@ -332,7 +332,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **326 个用例**（`make test` 实测 `326 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **330 个用例**（`make test` 实测 `330 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -552,6 +552,25 @@ cp -n ~/.local/share/freedeckCY/bios/ps2/*.bin ~/.local/share/PCSX2/bios/ 2>/dev
 
 BIOS 缺失不阻断安装：安装消息/库页弹窗会提示"需要 PS1 BIOS：请把 scph*.bin 放到 …"；补上 BIOS 后重装或手工复制即可（可先 `bash launch-freedeckcy.sh` 验证 DuckStation 是否识别）。
 
+**3DS（Azahar）Flatpak 专用（v0.14.1）**：SteamOS 3.9.5 上 Azahar AppImage 有已知问题（上游 #127 打不开、#953 Game Mode 崩溃），优先官方 Flatpak：
+
+```bash
+# 手动装 Flatpak（插件在 SteamOS 上也会自动做，失败再试 system 安装）
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install -y --user flathub org.azahar_emu.Azahar
+flatpak run org.azahar_emu.Azahar
+
+# 确认插件用了 Flatpak：
+flatpak info org.azahar_emu.Azahar
+curl -s http://127.0.0.1:59271/api/tianyi/diagnostics | python3 -m json.tool
+# data.emulators.3ds.source == "flatpak"；另有 flatpak_id / flatpak_available / flatpak_installed
+```
+
+- 选路：`FREEDECKCY_AZAHAR_BIN` > 已装 Flatpak > SteamOS 自动装 Flatpak > AppImage 下载/解包；把 `FREEDECKCY_AZAHAR_BIN` 指向 AppImage 可强制回退；
+- 3DS wrapper 会写 `export QT_QPA_PLATFORM=xcb` + `export SDL_VIDEODRIVER=x11`（XWayland），避免 Game Mode/Wayland 崩溃；
+- system files 除 `~/.local/share/azahar|citra/sysdata` 外，还部署到 `~/.var/app/org.azahar_emu.Azahar/data/azahar/sysdata` 与 `.../azahar-emu/sysdata`（`bios/3ds/sysdata/` 整树复制）；
+- **已有游戏自动修复**：后台维护首次 tick 会扫已安装 3DS 记录并重写 `launch-freedeckcy.sh`（旧 AppImage 命令 → `flatpak run`），无需重装；日志关键字 `Repaired 3DS launcher for ...` / `Repair 3DS launcher failed`。
+
 **安装完成后检查**：
 
 ```bash
@@ -744,6 +763,9 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 | **模拟器计划报「分享中没有找到 ROM」** | 目录 CSV 的 `openpath` 文件名与分享内文件名不一致（或资源包已更新）：核对 CSV/分享文件名，大小写与扩展名要一致（gba `.gba`；psp `.iso/.cso/.pbp/.elf`；nds `.nds/.dsi/.srl`；ps1 `.cue/.m3u/.chd/.iso/.pbp/.bin`；fc `.nes/.fds/.unf/.unif`；md `.md/.gen/.smd/.bin/.32x`）；接口报错会附已扫描文件示例 |
 | **模拟器解包失败（AppImage / Mesen2 zip）** | AppImage 首次使用会执行 `--appimage-extract`；Mesen2 是 zip 内单文件 `Mesen`（解压后直接可执行，不走 AppImage）。失败时看日志与 `~/.local/share/freedeckCY/emulators/<state_key>/<arch>/` 权限/空间；可删掉该目录重试，或用对应 `FREEDECKCY_*_BIN` 指向已解包的 `squashfs-root/AppRun` / `Mesen`。下载不完整（小于各平台 `min_bytes`）会删文件并报「<模拟器> 下载不完整」 |
 | **模拟器快捷方式点了不启动** | 检查 `launch-freedeckcy.sh` 与 ROM 是否都在安装目录（`find_rom_file` 只认注册表扩展名）；`bash launch-freedeckcy.sh` 手工试跑；Steam 条目 Exe 必须是脚本路径、LaunchOptions 带 token（用于卸载定位），Proton 不应有映射。除 GBA 外还要确认首次下载/解包已完成；PS1 检查 BIOS（见下） |
+| **3DS 启动报找不到 Flatpak / 安装失败** | 先确认系统有 `flatpak`（SteamOS 自带）；手动跑 `flatpak remote-add --user --if-not-exists flathub ...` + `flatpak install -y --user flathub org.azahar_emu.Azahar`；还失败可重试/看安装消息，插件会回退 AppImage（或设 `FREEDECKCY_AZAHAR_BIN` 指向本地 AppImage） |
+| **3DS 在 Game Mode 崩溃 / 黑屏** | 确认用的是 Flatpak（诊断 `emulators.3ds.source=flatpak`）；wrapper 应包含 `QT_QPA_PLATFORM=xcb`/`SDL_VIDEODRIVER=x11`；旧快捷方式由后台自动重写，也可重装/重新注册触发 |
+| **3DS system files 不被识别** | 放 `~/.local/share/freedeckCY/bios/3ds/sysdata/`（整目录）；安装后会复制到 azahar/citra 与 Flatpak 的 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`；确认目标目录非空 |
 | **PS1 黑屏 / 提示没有 BIOS** | DuckStation 必须自备 BIOS：把 `scph*.bin` 放到 `~/.local/share/freedeckCY/bios/ps1/`，安装时会复制到 `~/.local/share/duckstation/bios/`；缺失**不阻断安装**但会警告、运行时可能黑屏。可用 `curl /api/tianyi/diagnostics` 看 `emulators.ps1.bios_present/bios_dir`，或手工 `cp -n ~/.local/share/freedeckCY/bios/ps1/*.bin ~/.local/share/duckstation/bios/` |
 | **DroidDeck / aarch64 看不到 3DS/PS2/PS3** | 预期行为：这三个平台官方包仅 x86_64，`available_platforms("aarch64")` 只返回 7 个平台，目录查询按白名单过滤，所以条目与平台筛选条都不显示；`emulator_status` 会返回"已隐藏该平台"。想在 ARM 上用只能等官方 arm64 包，不能靠环境变量绕过 |
 | **PS2 BIOS 放哪 / PCSX2 提示没有 BIOS** | 把 `*.bin`（如 `scph39001.bin`）放到 `~/.local/share/freedeckCY/bios/ps2/`；v0.12.0 安装时会部署到 `<AppDir>/bios`、`~/.local/share/PCSX2/bios`、`~/.config/PCSX2/bios` 三处，并写 `portable.ini`+`inis/PCSX2.ini`（`[Folders] Bios`/`[UI] Fullscreen`）。也可手工复制；诊断接口看 `emulators.ps2.bios_present/bios_dir` |
@@ -776,6 +798,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 - **仅早期版本**：`package.json` 版本 0.8.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
 - **DroidDeck 适配未真机验证**：ARM64 运行环境、FEX/ARM Proton、Android 存储映射都可能有差异；实测失败时优先参考 [DROIDDECK.md](DROIDDECK.md) 的排障与日志收集。
 - **目录数据需保持干净**：新增/合并目录后必须跑 `make normalize-catalog` 与 `make validate-catalog`（CI 对内置目录执行 `--strict`）；「模拟器」是清洗后的兜底分类，不是真实游戏分类。
+- **3DS（Azahar）SteamOS 兼容**（v0.14.1）：SteamOS 3.9.5 优先 Flathub Flatpak（AppImage 有上游 #127/#953 问题），需要系统有 flatpak 且能访问 Flathub；Flatpak 安装失败会回退 AppImage（可能仍打不开）；3DS 仅 x86_64（aarch64 目录隐藏）；system files 需用户自备并部署到 `~/.var/app/org.azahar_emu.Azahar/data/...`；已有快捷方式会自动重写，但真机验证仍待补。
 - **百度网盘只走官方 OpenAPI**（v0.14.0）：必须自建应用 + OAuth 授权（无公共应用）；分享文件需转存 `/FreedeckTmp` 才能取 dlink，会占用户网盘（安装后清理，失败则保留）；`errno=-6`/dlink 403 等官方错误进安装消息；**不接 BDUSS/Cookie/CDP**；公开分享元数据解析仍依赖分享页结构（空 cookie），页面改版可能影响解析。
 - **10 平台可安装，按架构裁剪，BIOS/固件自动部署**（v0.12.0）：x86_64 上 10 个平台（含 3DS/PS2/PS3/Switch）都可安装/启动；aarch64 上 3DS/PS2/PS3 无官方 arm64 包，目录按 `available_platforms()` 白名单隐藏（条目与筛选条都不出现），Switch 有 arm64 包可用。**插件包不集成任何模拟器，首次安装都需要联网下载**（包体积约 45MB）；PS1/PS2 需要 BIOS、3DS/PS3/Switch 需要 system files/固件/keys（v0.12.0 安装后自动从 `bios/<platform>/` 部署到模拟器目录并写 portable 配置，含压缩包；缺失不阻断安装但装完不能直接玩）；模拟器只识别注册表内扩展名，不含存档管理；下载/解包会额外占一份空间；ARM64/DroidDeck 上这些平台尚未真机验证。
 - **完整性校验是"大小 + 头部预检 + `7z t`（best-effort）"**：7z 不可用时自动跳过校验；没有哈希/签名校验；分卷识别只覆盖常见命名；云存档仍依赖 `node`。
@@ -817,6 +840,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 | 改 Proton 工具解析 / 设置 | `py_modules/steam_shortcuts.py` 的 `detect_proton_tool` / `add_or_update_tianyi_shortcut(proton_tool=)`；设置项 `proton_tool` 贯穿 `tianyi_store` / `tianyi_service.update_settings` / `main.set_tianyi_settings` / `tianyi_http.handle_settings_*` |
 | 改打包架构 / ARM64 产物 | `scripts/package.sh` 的 `PACKAGE_ARCH`；`Makefile` 的 `package-droiddeck` / `runtime ARCH=`（模拟器不在包内，与打包无关） |
 | 改模拟器支持 / 新增平台 | `py_modules/emulator_manager.py` 的 `EmulatorSpec` / `EMULATORS`（官方资产、launch_args、rom_extensions、env_var、state_key、executables、bios_required、setup_required/setup_hint）；`available_platforms(arch)` 决定架构白名单；`tianyi_service.list_catalog` 传 `allowed_platforms`；`_build_install_plan`/`_auto_register_emulator_to_steam` 的模拟器字段；BIOS 见 `bios_dir`/`bios_present`/`prepare_bios` |
+| 改 3DS Flatpak/修复 | `emulator_manager.py` 的 `_is_steamos`/`flatpak_installed`/`_ensure_flatpak`/`ensure_emulator`/`create_launch_wrapper`；`emulator_setup._deploy_3ds`；`tianyi_service._maybe_schedule_launcher_repair`/`_repair_emulator_launchers` |
 | 改百度 OpenAPI | `py_modules/baidu_openapi_client.py`（OAuth/refresh/转存/dlink/清理）、`py_modules/baidu_client.py`（公开分享元数据）、`tianyi_service` 的 `_share_provider`/`_build_install_plan`/`_fetch_baidu_direct_url`/`_cleanup_baidu_transfer_files`、QAM 百度区；不引入 BDUSS/Cookie |
 | 改仓库提交校验/合并 | `py_modules/submission.py`（`normalize_platform`/`validate_submission`/`build_catalog_row`/`merge_submissions`）、`submissions/schema.json`、`scripts/validate_submissions.py` / `merge_submissions.py`、`.github/workflows/ci.yml` 的提交校验步骤 |
 | 改 BIOS/固件部署 | `py_modules/emulator_setup.py`：`setup_emulator`、`_source_files`/`_extract_archives`（压缩包）、`_set_ini_value`（只修单键）、各平台 `_write_*`/`_deploy_*`；`tianyi_service._auto_register_emulator_to_steam` 调用并消费 `setup_messages` |
@@ -833,12 +857,13 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/baidu/openapi/clear
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 326 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 330 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
 - [ ] 改动打包/运行时时验证两种架构：`make package`（x86_64）与 `make package-droiddeck`（aarch64），确认产物后缀与包内 `defaults/runtime/<arch>/` 只有 aria2c/7zz/node（**不含任何模拟器**）；模拟器首次安装联网下载，PS1/PS2 BIOS、3DS/PS3/Switch 系统文件由用户自备；
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
+- [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
 - [ ] 改百度相关代码后跑 `python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`（mock HTTP，不联网）；确认未引入 Cookie/BDUSS 路径；
 - [ ] 改提交校验/合并后跑 `make validate-submissions`、`python scripts/merge_submissions.py --dry-run`，确认无 JSON 时 CI 也通过；`make validate-catalog` 确认合并后的 CSV 合法；
 - [ ] 改动模拟器注册表后验证 `available_platforms()`：x86_64 应有 10 个平台、aarch64 只有 7 个（3DS/PS2/PS3 无包），并确认 `/api/tianyi/catalog` 的 `platforms` 计数同步裁剪；

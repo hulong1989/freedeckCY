@@ -583,3 +583,50 @@ def test_setup_ps3_installs_firmware(tmp_path, monkeypatch):
     messages = emu_setup.setup_emulator("ps3", [str(root / "AppRun")])
     assert calls and "--installfw" in calls[0]
     assert any("固件" in message for message in messages)
+
+
+def test_azahar_uses_flatpak_spec():
+    spec = emu.get_spec("3ds")
+    assert spec is not None
+    assert spec.flatpak_id == "org.azahar_emu.Azahar"
+
+
+def test_flatpak_installed_and_resolve(monkeypatch):
+    monkeypatch.setattr(emu.shutil, "which", lambda name: "/usr/bin/flatpak" if name == "flatpak" else None)
+    monkeypatch.setattr(
+        emu.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0),
+    )
+    emu._FLATPAK_CACHE.clear()
+    spec = emu.get_spec("3ds")
+    assert emu.flatpak_installed(spec.flatpak_id) is True
+    command = emu.resolve_command(spec)
+    assert command == ["/usr/bin/flatpak", "run", "org.azahar_emu.Azahar"]
+
+
+def test_steamos_prefers_flatpak_on_install(tmp_path, monkeypatch):
+    monkeypatch.setattr(emu, "get_spec", lambda platform: emu.EMULATORS["3ds"])
+    monkeypatch.setattr(emu, "flatpak_installed", lambda app_id, **kwargs: False)
+    monkeypatch.setattr(emu, "_is_steamos", lambda: True)
+    monkeypatch.setattr(emu, "resolve_command", lambda spec, plugin_dir="": None)
+
+    async def _fake_flatpak(spec, *, allow_download):
+        return ["/usr/bin/flatpak", "run", "org.azahar_emu.Azahar"]
+
+    monkeypatch.setattr(emu, "_ensure_flatpak", _fake_flatpak)
+    command = asyncio.run(emu.ensure_emulator("3ds", str(tmp_path)))
+    assert command == ["/usr/bin/flatpak", "run", "org.azahar_emu.Azahar"]
+
+
+def test_3ds_wrapper_sets_xwayland_env(tmp_path):
+    wrapper = tmp_path / "3ds.sh"
+    emu.create_launch_wrapper(
+        command=["/usr/bin/flatpak", "run", "org.azahar_emu.Azahar"],
+        rom_path="/roms/game.3ds",
+        wrapper_path=str(wrapper),
+        platform_name="3ds",
+    )
+    text = wrapper.read_text(encoding="utf-8")
+    assert "QT_QPA_PLATFORM=xcb" in text
+    assert "game.3ds" in text
