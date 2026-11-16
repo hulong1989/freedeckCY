@@ -1,6 +1,6 @@
 # freedeckCY 架构说明
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.9.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.10.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -18,11 +18,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 这是阅读本仓库最容易踩的坑：**GitHub Releases 里的成品功能远多于仓库代码**。
 
-> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.9.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
+> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.10.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.8.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台） |
+| 本仓库 `main` | `package.json` 版本 `0.8.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成） |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -31,9 +31,10 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 - **仓库代码只是早期版本**：releases 里的百度网盘、模拟器、资源池等模块在 `main` 上完全不存在。不要在本仓库里寻找它们。
 - **仓库缺运行时二进制**：`aria2_manager.py` / `seven_zip_manager.py` / `tianyi_client.py` 会优先查找 `defaults/runtime/` 下的 `aria2c`、`7zz`、`node`，但仓库本身不提交这些文件（已在 `.gitignore` 中）。插件可以不带它们启动，但要完整跑通下载/安装/云存档，克隆后必须先执行 `make runtime` 补齐，否则会分别报"下载组件不可用 / 解压组件不可用 / 未找到 node 运行时"。release zip 约 50 MB 与源码约 1 MB 的差值，主要就是这些二进制。
 - **作者已停止维护**：NewFreedeck v0.1 的发布说明原文是"目前我没有精力与时间继续维护，抱歉，所以可以根据我整理的 skill 自行修改，最后可以给我推 pr"。
+- **v0.10.0 模拟器全部在线下载**：插件包**不再集成任何模拟器**（删除 `scripts/fetch_emulator.sh` 与 `make emulator-runtime`，包体积从约 68 MB 降到约 45 MB）；6 个平台（含 GBA）的官方包都在首次安装时从 GitHub release 下载到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`，离线环境可手动预置缓存或设 `FREEDECKCY_*_BIN`（见 5.10 / 5.7）。
 - **v0.9.0 模拟器扩到 6 平台**：注册表新增 **PS1（DuckStation，需自备 BIOS）/ FC（Mesen2）/ MD（Mesen2，与 FC 共享缓存）**；PS1 BIOS 放 `~/.local/share/freedeckCY/bios/ps1/`，安装时复制到 `~/.local/share/duckstation/bios/`，缺失只提示不阻断；FC/MD 的 Mesen2 是 zip 内单个可执行文件；PS2/PS3/3DS/Switch 因 x64-only 官方包或需固件/keys 暂未接入（见 5.10）。
 - **v0.8.0 自动云存档**：内置 **Ludusavi 存档清单**（53,549 款游戏，MIT）做标题/SteamID 匹配并把 `<winAppData>` 等模板解析到 Proton 前缀，与原有 Proton 扫描合并；`gamewatch` 每 8 秒用 `/proc/*/cmdline`（无 `/proc` 时 `pgrep -f`）检测游戏退出，**只对刚退出的游戏**自动触发云存档上传（设置 `cloud_save_auto_upload` 默认开启、30 秒防抖）；上传前用"相对路径+大小+mtime"指纹去重，未变化则 `reason=unchanged` 跳过（见 5.11）。
-- **v0.7.0 通用模拟器注册表**：`EmulatorSpec` 注册表接入 **GBA（mGBA 0.10.5）/ PSP（PPSSPP 1.20.4）/ NDS（melonDS 1.1）** 三个平台——GBA 随包内置，PSP/NDS 首次安装按需下载官方 AppImage（NDS 为 zip 内 AppImage），统一 `--appimage-extract` 解包（不依赖 FUSE），生成启动脚本后以原生 Linux 快捷方式注册（不写 Proton）；PS1 因 BIOS 依赖暂缓，其它平台仍只可浏览（见 5.10 / ROADMAP 9.8）。
+- **v0.7.0 通用模拟器注册表**：`EmulatorSpec` 注册表接入 **GBA（mGBA 0.10.5）/ PSP（PPSSPP 1.20.4）/ NDS（melonDS 1.1）** 三个平台——（当时 GBA 随包内置，**v0.10.0 起改为全部在线下载**）PSP/NDS 首次安装按需下载官方 AppImage（NDS 为 zip 内 AppImage），统一 `--appimage-extract` 解包（不依赖 FUSE），生成启动脚本后以原生 Linux 快捷方式注册（不写 Proton）；PS1 因 BIOS 依赖暂缓，其它平台仍只可浏览（见 5.10 / ROADMAP 9.8）。
 - **v0.6.1 / v0.6.2 远程 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 支持本地文件或 HTTP(S) JSON（NewFreedeck 兼容格式），远程缓存 6 小时、失败自动回退 CSV；默认仍读内置 CSV，详见 [UPSTREAM_SERVER.md](UPSTREAM_SERVER.md)。
 - **v0.5.0 第一梯队（浏览体验与运维）**：库页打开即浏览全部资源、平台/分类筛选 + 分页 + 排序，新增「已安装」页签（启动/打开目录/卸载），顶部工具条可**导出诊断 zip**（脱敏）与**检查 GitHub 更新**（1 h 缓存）；交互与快捷键见 5.8、诊断/更新见 5.9。
 - **v0.4.0 DroidDeck 适配**：ARM64 运行时选择、DroidDeck 检测、ARM Proton 工具自动解析、双 Steam 根（x64 客户端优先）、`PACKAGE_ARCH` 打包 arm64/universal 包；安装、构建与排障见 [DROIDDECK.md](DROIDDECK.md)。
@@ -65,7 +66,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 | 环境诊断 | 只读 bash 脚本（运行时/Steam/state/日志/端口/网络）；另有 HTTP 诊断 JSON/zip 导出与 GitHub 更新检查（v0.5.0） | `scripts/doctor.sh`（`make doctor`）、`tianyi_service.get_diagnostics()` |
 | 运行平台 | Steam Deck（x86_64）/ **DroidDeck（aarch64）**；运行时目录按 `platform.machine()` 选择 | `defaults/runtime/<arch>/`、`scripts/package.sh`、[DROIDDECK.md](DROIDDECK.md) |
 | 自动云存档（v0.8.0） | **Ludusavi 清单**（本地 JSON，53,549 游戏，MIT）+ **gamewatch** 进程检测；退出后只上传该游戏，指纹去重 | `py_modules/save_manifest.py`、`py_modules/gamewatch.py`、`defaults/ludusavi/` |
-| 模拟器运行时（v0.6.0 起，v0.7.0 注册表，v0.9.0 扩到 6 平台） | **GBA=mGBA 0.10.5（内置）/ PSP=PPSSPP 1.20.4 / NDS=melonDS 1.1 / PS1=DuckStation（需 BIOS）/ FC、MD=Mesen2 2.1.1**；除 GBA 外首次安装按需下载官方包，AppImage 统一 `--appimage-extract` 解包（不依赖 FUSE），Mesen2 为 zip 内可执行文件 | `py_modules/emulator_manager.py`（`EMULATORS` 注册表）、`defaults/runtime/mgba/<arch>/`、`~/.local/share/freedeckCY/emulators/` |
+| 模拟器运行时（v0.6.0 起，v0.7.0 注册表，v0.9.0 六平台，v0.10.0 全部在线下载） | **GBA=mGBA 0.10.5 / PSP=PPSSPP 1.20.4 / NDS=melonDS 1.1 / PS1=DuckStation（需 BIOS）/ FC、MD=Mesen2 2.1.1**；**插件包不集成模拟器**，首次安装按需从官方 release 下载并解包（AppImage 用 `--appimage-extract`，Mesen2 为 zip 内可执行文件），缓存到 `~/.local/share/freedeckCY/emulators/` | `py_modules/emulator_manager.py`（`EMULATORS` 注册表）、`~/.local/share/freedeckCY/emulators/<platform>/<arch>/` |
 
 运行时一共会拉起 **4 类进程**：Decky 的 Python 进程、`aria2c`、`7zz`、偶尔的 `node`。
 
@@ -135,14 +136,13 @@ repo/
 │   └── tianyi_cloud_upload.cjs     # 同上，CommonJS 版，只实现 upload
 ├── scripts/
 │   ├── fetch_runtime.sh        # 下载 aria2c / 7zz / node 到 defaults/runtime/
-│   ├── fetch_emulator.sh       # 下载 mGBA AppImage（x86_64/aarch64）到 defaults/runtime/mgba/<arch>/
 │   ├── fetch_ludusavi_manifest.py  # 从上游 YAML 转换 Ludusavi 清单到 defaults/ludusavi/manifest.json.gz（需 PyYAML，仅构建时）
 │   ├── package.sh              # 组装 Decky 插件 zip 到 dist-artifacts/（PACKAGE_ARCH=x86_64|aarch64|all）
 │   ├── doctor.sh               # 环境诊断（只读）：运行时/Steam/state/日志/端口/网络
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（295 个用例，不联网、不碰 Steam 目录）
+├── tests/                      # pytest 单测（295 个用例，不联网、不碰 Steam 目录；模拟器下载走 mock）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -303,8 +303,8 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 | `make package-droiddeck` | `...-arm64.zip` | 等价于 `PACKAGE_ARCH=aarch64 bash scripts/package.sh` |
 | `PACKAGE_ARCH=all make package` | `...-universal.zip` | 同时保留 x86_64 + aarch64 两份 runtime，体积更大 |
 
-- 单架构打包会删掉 `defaults/runtime/{aria2,7z,node,mgba}/*/<arch>` 下其它架构目录，避免包体积翻倍；打包前可先 `make runtime ARCH=aarch64`（或 `ARCH=all`）准备 arm64 的 aria2c / 7zz / node，GBA 还要 `make emulator-runtime ARCH=...`（或 `bash scripts/fetch_emulator.sh --arch all`）准备 mGBA AppImage；
-- 打包脚本会检查 `defaults/runtime/mgba/<arch>/mGBA.AppImage` 是否存在：缺失只警告（GBA 安装后无法启动），Steam Deck 包与 `-arm64.zip` 各自内置对应架构的 mGBA；**只有 GBA 的 mGBA 随包内置**，PSP/NDS/PS1/FC/MD 的官方包都不打进包，首次安装时按需从 GitHub release 下载（需要网络，失败会报错可重试；PS1 的 BIOS 由用户自备）；
+- 单架构打包会删掉 `defaults/runtime/{aria2,7z,node}/*/<arch>` 下其它架构目录，避免包体积翻倍；打包前先 `make runtime ARCH=aarch64`（或 `ARCH=all`）准备 arm64 的 aria2c / 7zz / node（**模拟器不参与打包**，`make emulator-runtime` 与 `scripts/fetch_emulator.sh` 已在 v0.10.0 删除）；
+- **插件包不包含任何模拟器**：6 个平台的官方包全部在首次安装时按需下载（需要网络，失败会报错可重试），因此包体积从约 68 MB 降到约 45 MB；离线环境可提前把官方包放到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`（AppImage 需可执行）或用 `FREEDECKCY_*_BIN` 指向本地版本；PS1 BIOS 仍由用户自备；
 - 产物命名后缀：`PACKAGE_ARCH=aarch64` → `-arm64`，`all` → `-universal`，`x86_64` 无后缀；
 - 部署到 DroidDeck：把 `-arm64.zip` 放进手机存储，用 Decky 的 **Import plugin zip** 安装（DroidDeck 按 `plugin.json` 的 name 覆盖安装）；首次使用与排障见 [DROIDDECK.md](DROIDDECK.md)。
 
@@ -367,49 +367,48 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **公共 helper**：[tianyi_service.py:353](../py_modules/tianyi_service.py) `_tail_text()`（读文件末尾 N 行）、[tianyi_service.py:368](../py_modules/tianyi_service.py) `_redact_text()`（脱敏）、[tianyi_service.py:377](../py_modules/tianyi_service.py) `_parse_version()`（从 `v0.5.0`/`0.5.0-pre` 提取数字元组比较）、[tianyi_service.py:383](../py_modules/tianyi_service.py) `_launch_external()`（优先 `xdg-open`，否则 `gio open`；拉起 `steam://rungameid/...` 或安装目录）。
 
-### 5.10 模拟器注册表与接入平台（v0.6.0 起 / v0.7.0 注册表 / v0.9.0 六平台）
+### 5.10 模拟器注册表与接入平台（v0.6.0 起 / v0.7.0 注册表 / v0.9.0 六平台 / v0.10.0 全部在线下载）
 
-**注册表**：[emulator_manager.py:29](../py_modules/emulator_manager.py) `EmulatorSpec` 描述一个平台（`platform / name / adapter / repo / download_base / assets{arch: 文件名} / archive(appimage|zip) / launch_args / rom_extensions / env_var / min_bytes / state_key / executables / bios_required`），[emulator_manager.py:51](../py_modules/emulator_manager.py) `EMULATORS` 是注册表本体；[emulator_manager.py:175](../py_modules/emulator_manager.py) `get_spec()` / [emulator_manager.py:184](../py_modules/emulator_manager.py) `supported_platforms()` 供服务层与诊断使用。当前接入 **6 个平台**：
+**注册表**：[emulator_manager.py:29](../py_modules/emulator_manager.py) `EmulatorSpec` 描述一个平台（`platform / name / adapter / repo / download_base / assets{arch: 文件名} / archive(appimage|zip) / launch_args / rom_extensions / env_var / min_bytes / state_key / executables / bios_required`），[emulator_manager.py:51](../py_modules/emulator_manager.py) `EMULATORS` 是注册表本体；[emulator_manager.py:175](../py_modules/emulator_manager.py) `get_spec()` / [emulator_manager.py:184](../py_modules/emulator_manager.py) `supported_platforms()` 供服务层与诊断使用。当前接入 **6 个平台，全部首次安装在线下载**：
 
 | 平台 | 模拟器 | 版本 / 仓库 | 官方资产（arch → 文件） | 启动参数 | ROM 扩展名 | 环境变量 |
 |---|---|---|---|---|---|---|
-| gba | mGBA | 0.10.5 / mgba-emu/mgba | appimage：x64 / arm64；**随包内置** | `-f {rom}` | `.gba` | `FREEDECKCY_MGBA_BIN` |
-| psp | PPSSPP | 1.20.4 / hrydgard/ppsspp | appimage：anylinux-x86_64 / aarch64；**按需下载** | `--fullscreen {rom}` | `.iso` `.cso` `.pbp` `.elf` | `FREEDECKCY_PPSSPP_BIN` |
-| nds | melonDS | 1.1 / melonDS-emu/melonDS | **zip 内 AppImage**：x86_64 / aarch64；**按需下载** | `{rom}` | `.nds` `.dsi` `.srl` | `FREEDECKCY_MELONDS_BIN` |
-| ps1 | DuckStation | `latest`（stenzek/duckstation） | appimage：`DuckStation-x64.AppImage` / `DuckStation-arm64.AppImage`；**按需下载** | `-batch -fullscreen {rom}` | `.cue` `.m3u` `.chd` `.iso` `.pbp` `.bin` | `FREEDECKCY_DUCKSTATION_BIN` |
-| fc | Mesen2 | 2.1.1（SourMesen/Mesen2） | **zip 内单文件 `Mesen`**：x86_64 / ARM64；**按需下载** | `/fullscreen {rom}` | `.nes` `.fds` `.unf` `.unif` | `FREEDECKCY_MESEN_BIN` |
+| gba | mGBA | 0.10.5 / mgba-emu/mgba | appimage：x64（约 25 MB）/ arm64（约 24.6 MB） | `-f {rom}` | `.gba` | `FREEDECKCY_MGBA_BIN` |
+| psp | PPSSPP | 1.20.4 / hrydgard/ppsspp | appimage：anylinux-x86_64 / aarch64 | `--fullscreen {rom}` | `.iso` `.cso` `.pbp` `.elf` | `FREEDECKCY_PPSSPP_BIN` |
+| nds | melonDS | 1.1 / melonDS-emu/melonDS | **zip 内 AppImage**：x86_64 / aarch64 | `{rom}` | `.nds` `.dsi` `.srl` | `FREEDECKCY_MELONDS_BIN` |
+| ps1 | DuckStation | `latest`（stenzek/duckstation） | appimage：`DuckStation-x64.AppImage` / `DuckStation-arm64.AppImage` | `-batch -fullscreen {rom}` | `.cue` `.m3u` `.chd` `.iso` `.pbp` `.bin` | `FREEDECKCY_DUCKSTATION_BIN` |
+| fc | Mesen2 | 2.1.1（SourMesen/Mesen2） | **zip 内单文件 `Mesen`**：x86_64 / ARM64 | `/fullscreen {rom}` | `.nes` `.fds` `.unf` `.unif` | `FREEDECKCY_MESEN_BIN` |
 | md | Mesen2 | 2.1.1（SourMesen/Mesen2） | 同上，**与 FC 共享缓存** | `/fullscreen {rom}` | `.md` `.gen` `.smd` `.bin` `.32x` | `FREEDECKCY_MESEN_BIN` |
 
-**解析顺序**（[emulator_manager.py:309](../py_modules/emulator_manager.py) `resolve_command()`）：
+**解析顺序**（[emulator_manager.py:285](../py_modules/emulator_manager.py) `resolve_command()`，**没有内置包分支**）：
 
 1. `FREEDECKCY_<PLATFORM>_BIN` 环境变量（spec.env_var，指向可执行文件/AppImage）；
-2. 已解包的模拟器（[emulator_manager.py:248](../py_modules/emulator_manager.py) `installed_command()`）：`~/.local/share/freedeckCY/emulators/<state_key>/<arch>/`（[emulator_manager.py:234](../py_modules/emulator_manager.py) `_find_spec_executable()` 按 `executables` 找 Mesen2 等非 AppImage 可执行文件；AppImage 解包目录里再找 `squashfs-root/`）；GBA 兼容旧路径 `emulators/<arch>/squashfs-root/`；
-3. 插件内置包（[emulator_manager.py:262](../py_modules/emulator_manager.py) `bundled_appimage()`；GBA 固定 `defaults/runtime/mgba/<arch>/mGBA.AppImage`，其它平台可放 `defaults/runtime/emulators/<platform>/<arch>/<资产名>`）；
-4. 系统命令（[emulator_manager.py:277](../py_modules/emulator_manager.py) `system_command()`：`mgba/mgba-qt`、`ppsspp/PPSSPP/ppsspp-sdl`、`melonds/melonDS`、`duckstation/DuckStation/duckstation-qt`、`Mesen/mesen`）；
-5. Flatpak（[emulator_manager.py:292](../py_modules/emulator_manager.py) `flatpak_command()`；**仅 mGBA** 的 `io.mgba.mGBA`）；
-6. 都没有时：[emulator_manager.py:371](../py_modules/emulator_manager.py) `emulator_status()` 返回 `available=True, source="download", requires_setup=True`（附 `asset/url/bios_*`）；安装时由 [emulator_manager.py:508](../py_modules/emulator_manager.py) `ensure_emulator()` 按需下载。只有该 arch 没有官方资产时才拒绝（`"<模拟器> 暂无 <arch> 官方包"`）。兼容旧接口：[emulator_manager.py:541](../py_modules/emulator_manager.py) `ensure_mgba()`。
+2. 已下载并解包的模拟器（[emulator_manager.py:239](../py_modules/emulator_manager.py) `installed_command()`）：`~/.local/share/freedeckCY/emulators/<state_key>/<arch>/`（[emulator_manager.py:225](../py_modules/emulator_manager.py) `_find_spec_executable()` 按 `executables` 找 Mesen2 等非 AppImage 可执行文件；AppImage 解包目录里再找 `squashfs-root/`）；GBA 兼容旧路径 `emulators/<arch>/squashfs-root/`；
+3. 系统命令（[emulator_manager.py:253](../py_modules/emulator_manager.py) `system_command()`：`mgba/mgba-qt`、`ppsspp/PPSSPP/ppsspp-sdl`、`melonds/melonDS`、`duckstation/DuckStation/duckstation-qt`、`Mesen/mesen`）；
+4. Flatpak（[emulator_manager.py:268](../py_modules/emulator_manager.py) `flatpak_command()`；**仅 mGBA** 的 `io.mgba.mGBA`）；
+5. 都没有时：[emulator_manager.py:344](../py_modules/emulator_manager.py) `emulator_status()` 返回 `available=True, source="download", requires_setup=True`（附 `asset/url/bios_*`；**不再有 `source=bundled`**）；安装时由 [emulator_manager.py:479](../py_modules/emulator_manager.py) `ensure_emulator()` 直接按需下载。只有该 arch 没有官方资产时才拒绝（`"<模拟器> 暂无 <arch> 官方包"`）。兼容旧接口：[emulator_manager.py:508](../py_modules/emulator_manager.py) `ensure_mgba()`。
 
 **按需下载与解包**（不依赖 FUSE）：
 
-- [emulator_manager.py:458](../py_modules/emulator_manager.py) `_download_asset()`：下载到 `~/.local/share/freedeckCY/emulators/<state_key>/<arch>/<资产名>`（HTTP 非 200 / 文件小于 `min_bytes` 会删文件并报错，可重试）；**FC/MD 共用 `state_key="mesen"`**，所以只下载/解包一份 Mesen2；
-- zip 资产：NDS 是 zip 内 AppImage，[emulator_manager.py:442](../py_modules/emulator_manager.py) `_extract_zip_emulator()` 解压后先找 `executables` 指定的可执行文件（Mesen2 的 `Mesen`），否则找 `.appimage`；AppImage 再走 [emulator_manager.py:428](../py_modules/emulator_manager.py) `_run_appimage_extract()` 解包到平台目录，[emulator_manager.py:488](../py_modules/emulator_manager.py) `_ensure_extracted()` 在解包失败时退回直接运行 AppImage。下载/解包失败会写进安装消息。
+- [emulator_manager.py:429](../py_modules/emulator_manager.py) `_download_asset()`：下载到 `~/.local/share/freedeckCY/emulators/<state_key>/<arch>/<资产名>`（HTTP 非 200 / 文件小于 `min_bytes` 会删文件并报错，可重试）；**FC/MD 共用 `state_key="mesen"`**，所以只下载/解包一份 Mesen2；
+- zip 资产：NDS 是 zip 内 AppImage，[emulator_manager.py:413](../py_modules/emulator_manager.py) `_extract_zip_emulator()` 解压后先找 `executables` 指定的可执行文件（Mesen2 的 `Mesen`），否则找 `.appimage`；AppImage 再走 [emulator_manager.py:399](../py_modules/emulator_manager.py) `_run_appimage_extract()` 解包到平台目录，[emulator_manager.py:459](../py_modules/emulator_manager.py) `_ensure_extracted()` 在解包失败时退回直接运行 AppImage。下载/解包失败会写进安装消息。
 
-**ROM 选择与启动参数**：[emulator_manager.py:546](../py_modules/emulator_manager.py) `find_rom_file()` 按平台扩展名过滤（GBA `.gba`；PSP `.iso/.cso/.pbp/.elf`；NDS `.nds/.dsi/.srl`；PS1 `.cue/.m3u/.chd/.iso/.pbp/.bin`，优先 `.cue`；FC `.nes/.fds/.unf/.unif`；MD `.md/.gen/.smd/.bin/.32x`），优先 `openpath` 同名，其次按扩展名优先级+路径长度选；[emulator_manager.py:573](../py_modules/emulator_manager.py) `create_launch_wrapper()` 按 spec.launch_args 生成 `<install_dir>/launch-freedeckcy.sh`（GBA `-f`、PSP `--fullscreen`、PS1 `-batch -fullscreen`、FC/MD `/fullscreen`、NDS 直接接 ROM）。
+**ROM 选择与启动参数**：[emulator_manager.py:513](../py_modules/emulator_manager.py) `find_rom_file()` 按平台扩展名过滤（GBA `.gba`；PSP `.iso/.cso/.pbp/.elf`；NDS `.nds/.dsi/.srl`；PS1 `.cue/.m3u/.chd/.iso/.pbp/.bin`，优先 `.cue`；FC `.nes/.fds/.unf/.unif`；MD `.md/.gen/.smd/.bin/.32x`），优先 `openpath` 同名，其次按扩展名优先级+路径长度选；[emulator_manager.py:540](../py_modules/emulator_manager.py) `create_launch_wrapper()` 按 spec.launch_args 生成 `<install_dir>/launch-freedeckcy.sh`（GBA `-f`、PSP `--fullscreen`、PS1 `-batch -fullscreen`、FC/MD `/fullscreen`、NDS 直接接 ROM）。
 
 **PS1 BIOS**：
 
-- 用户目录固定为 `~/.local/share/freedeckCY/bios/ps1/`（放 `scph*.bin` 等 `.bin/.rom`），[emulator_manager.py:325](../py_modules/emulator_manager.py) `bios_dir()` / [emulator_manager.py:329](../py_modules/emulator_manager.py) `bios_present()` 检测；
-- 安装时 [emulator_manager.py:339](../py_modules/emulator_manager.py) `prepare_bios()` 把用户 BIOS 复制到 DuckStation 默认目录 `~/.local/share/duckstation/bios/`（已存在同名文件不覆盖，复制失败写进安装消息）；
+- 用户目录固定为 `~/.local/share/freedeckCY/bios/ps1/`（放 `scph*.bin` 等 `.bin/.rom`），[emulator_manager.py:298](../py_modules/emulator_manager.py) `bios_dir()` / [emulator_manager.py:302](../py_modules/emulator_manager.py) `bios_present()` 检测；
+- 安装时 [emulator_manager.py:312](../py_modules/emulator_manager.py) `prepare_bios()` 把用户 BIOS 复制到 DuckStation 默认目录 `~/.local/share/duckstation/bios/`（已存在同名文件不覆盖，复制失败写进安装消息）；
 - `emulator_status()` 对 `bios_required` 平台额外返回 `bios_required / bios_present / bios_dir`，plan 的 `emulator_info` 原样带给前端；**BIOS 缺失不阻断安装**：安装完成消息带 `warning`，库页安装弹窗显示"需要 PS1 BIOS：请把 scph*.bin 放到 …"。
 
 **安装链路 / 平台准入 / UI / 诊断**：
 
-- 计划阶段不再要求模拟器已存在（`source=download` 也放行）；安装完成后按任务 `platform` 分流：`find_rom_file()` → `ensure_emulator(platform)`（按需下载/解包；PS1 还会 `prepare_bios()`）→ 生成 wrapper → Steam 快捷方式 **Exe=启动脚本、LaunchOptions 带 `freedeckcy:tianyi:<token>`、Proton=none**；已安装记录写 `platform/emulator/rom_path/launcher_path`。
+- 计划阶段不再要求模拟器已存在（`source=download` 也放行）；安装完成后按任务 `platform` 分流：`find_rom_file()` → `ensure_emulator(platform)`（**首次安装下载/解包**；PS1 还会 `prepare_bios()`）→ 生成 wrapper → Steam 快捷方式 **Exe=启动脚本、LaunchOptions 带 `freedeckcy:tianyi:<token>`、Proton=none**；已安装记录写 `platform/emulator/rom_path/launcher_path`。
 - 安装计划放行 `pc` 与注册表内平台（`gba/psp/nds/ps1/fc/md`）；库页同样允许这 6 个平台的卡片打开安装确认，弹窗显示 `emulator_info.name`（mGBA / PPSSPP / melonDS / DuckStation / Mesen2）。
 - **未接入平台及原因**：PS2（PCSX2 官方包仅 x64，且需要 BIOS）、PS3（RPCS3 官方包仅 x64，需要固件）、3DS（Azahar 官方包仅 x64，需要 system files）、Switch（需要 keys/固件，且无官方 arm64 包）。这些平台目录仍只可浏览、后端拒绝。
-- 诊断包 `emulators` 遍历 [emulator_manager.py:184](../py_modules/emulator_manager.py) `supported_platforms()`，逐平台输出 available/source/name/version/message 以及 BIOS 状态。
+- 诊断包 `emulators` 遍历 [emulator_manager.py:184](../py_modules/emulator_manager.py) `supported_platforms()`，逐平台输出 available/source/name/version/message 以及 BIOS 状态（`source` 不再出现 `bundled`）。
 
-**打包与网络**：只有 GBA 的 mGBA AppImage 随包内置（`make emulator-runtime`）；PSP/NDS/PS1/FC/MD 的官方包不打进包，首次安装时从 GitHub release 下载（需要网络；PS1 的 BIOS 不下载、由用户自备）。
+**打包与网络（v0.10.0）**：插件包**不包含任何模拟器**（`scripts/fetch_emulator.sh` 与 `make emulator-runtime` 已删除）；6 个平台（含 GBA）首次安装都要联网从 GitHub release 下载，包体积从约 68 MB 降到约 45 MB；离线环境可手动预置缓存到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`（AppImage 需可执行、zip 可解压）或用 `FREEDECKCY_*_BIN` 指向本地版本；PS1 BIOS 由用户自备。
 
 ### 5.11 自动云存档（Ludusavi + gamewatch，v0.8.0）
 
@@ -440,7 +439,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **设置与 UI**：设置项 `cloud_save_auto_upload` 默认 true，贯穿 `tianyi_store`（默认/加载/set_settings）、`main.set_tianyi_settings`、`tianyi_http.handle_settings_set` 与 QAM 设置页「云存档上传 → 游戏退出后自动上传」开关（`src/index.tsx` 的 `ToggleField`）。
 
-**边界**：只做"退出后自动上传"，**没有自动恢复/冲突策略**（恢复仍需手动在 QAM 操作、覆盖前备份）；模拟器（GBA/PSP/NDS）存档写在模拟器自身配置目录（如 `~/.local/share/PPSSPP`），目前不在 Ludusavi/Proton 扫描范围内；指纹只覆盖大小/mtime，不读文件内容；gamewatch 依赖进程命令行包含 install_path（Steam 直接启动脚本通常满足，自定义包装可能漏检）。
+**边界**：只做"退出后自动上传"，**没有自动恢复/冲突策略**（恢复仍需手动在 QAM 操作、覆盖前备份）；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档写在模拟器自身配置目录（如 `~/.local/share/PPSSPP`），目前不在 Ludusavi/Proton 扫描范围内；指纹只覆盖大小/mtime，不读文件内容；gamewatch 依赖进程命令行包含 install_path（Steam 直接启动脚本通常满足，自定义包装可能漏检）。
 
 ---
 
@@ -509,8 +508,8 @@ Steam 库里出现游戏（写完后备份 + 回读校验；需重启 Steam 生�
 | 任务/已装/登录/设置 | `~/.local/share/freedeckCY/tianyi/state.json` |
 | aria2 会话 | `~/.local/share/freedeckCY/tianyi/aria2/` |
 | 封面缓存 | `~/.local/share/freedeckCY/tianyi/cover_cache.json`（0600，正缓存 7 天 / 负缓存 30 分钟） |
-| 运行时二进制 | `defaults/runtime/{aria2,7z}/<arch>/`、`defaults/runtime/node/<arch>/bin/node`、`defaults/runtime/mgba/<arch>/mGBA.AppImage`（GBA 内置） |
-| 模拟器解包产物 | `~/.local/share/freedeckCY/emulators/<platform>/<arch>/squashfs-root/`（AppRun，不依赖 FUSE；GBA 兼容旧 `emulators/<arch>/`） |
+| 运行时二进制 | `defaults/runtime/{aria2,7z}/<arch>/`、`defaults/runtime/node/<arch>/bin/node`（模拟器不在包内） |
+| 模拟器解包产物 | `~/.local/share/freedeckCY/emulators/<platform>/<arch>/squashfs-root/`（AppRun，不依赖 FUSE；FC/MD 共用 `mesen/`；GBA 兼容旧 `emulators/<arch>/`） |
 | 按需下载的模拟器资产 | `~/.local/share/freedeckCY/emulators/<platform>/<arch>/<官方资产名>`（PSP/NDS 首次安装时下载） |
 | GBA 启动脚本 | `<install_dir>/launch-freedeckcy.sh`（`exec <mGBA> -f <rom>`） |
 | 日志 | `/tmp/freedeckcy.log` |
@@ -845,7 +844,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 33. ~~非 PC 资源只可浏览、无法安装~~（模拟器未集成）：**部分修复（v0.6.0~v0.9.0）**——**GBA/PSP/NDS/PS1/FC/MD 已可安装/启动**（mGBA / PPSSPP / melonDS / DuckStation / Mesen2，原生 Linux 快捷方式，见 5.10）；PS2/PS3/3DS/Switch 仍只可浏览（官方包仅 x64 或需 BIOS/固件/keys，前端提示 + 后端拒绝，ROADMAP 9.8 剩余部分）。（已知限制）
 34. ~~目录分类混入平台名（GBA/Switch…）、分类筛选里出现平台名、数据无自动体检~~：**v0.3.1 已修复**——`normalize_categories()` 加载时清洗 + 606 行数据已改写（「模拟器」606 条），`validate_catalog.py --strict` 进 CI（见 5.6）。
 35. **DroidDeck 适配未真机验证**：v0.4.0 按 DroidDeck 源码/ARM64 运行时结构适配（未在真机完整验证）；FEX/ARM Proton、Android 存储映射可能影响结果；**GBA/PSP/NDS 已可安装/启动**，其它模拟器平台仍只可浏览（见 [DROIDDECK.md](DROIDDECK.md) / ROADMAP 9.8）。（已知限制）
-36. **模拟器闭环的边界（v0.9.0）**：PS1 **必须用户自备 BIOS**（放 `~/.local/share/freedeckCY/bios/ps1/`，缺失不阻断安装但会警告/可能导致黑屏）；FC/MD 共用 Mesen2 缓存（`emulators/mesen/<arch>/`），zip 内是可执行文件而非 AppImage；PSP/NDS/PS1/FC/MD **首次安装需要联网**从 GitHub release 下载（失败写进安装消息，可重试）；只识别注册表内 ROM 扩展名，**不含 BIOS/存档管理**；下载/解包会多占一份磁盘空间；ARM64/DroidDeck 上这些平台尚未真机验证。（已知限制）
+36. **模拟器闭环的边界（v0.10.0）**：插件包**不集成任何模拟器**，**所有平台（含 GBA）首次安装都需要联网**从 GitHub release 下载（失败写进安装消息，可重试；离线可手动预置 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/` 或用 `FREEDECKCY_*_BIN`）；PS1 **必须用户自备 BIOS**（放 `~/.local/share/freedeckCY/bios/ps1/`，缺失不阻断安装但会警告/可能导致黑屏）；FC/MD 共用 Mesen2 缓存（`emulators/mesen/<arch>/`），zip 内是可执行文件而非 AppImage；只识别注册表内 ROM 扩展名，**不含 BIOS/存档管理**；下载/解包会多占一份磁盘空间；ARM64/DroidDeck 上这些平台尚未真机验证。（已知限制）
 37. **自动云存档的边界（v0.8.0）**：只对 gamewatch 检测到"退出"的游戏自动上传，且 gamewatch 依赖进程命令行包含 install_path（自定义 wrapper 可能漏检）；没有自动恢复/冲突策略；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档在模拟器配置目录，暂未纳入；上传前指纹只看相对路径+size+mtime（最多 5000 文件），不读内容；`cloud_save_auto_upload` 默认开启（可在 QAM 关闭）。（已知限制）
 38. **未接入的模拟器平台（v0.9.0）**：PS2（PCSX2 官方包仅 x64，需 BIOS）、PS3（RPCS3 仅 x64，需固件）、3DS（Azahar 仅 x64，需 system files）、Switch（需 keys/固件，且无官方 arm64 包）——这些平台目录仍只可浏览，后端拒绝安装；要接入需先解决 arm64 官方包缺失与固件/BIOS 的版权合规问题（见 ROADMAP 9.8）。（已知限制）
 
@@ -863,7 +862,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | 解压前收紧 | `archive_validator.py` 预检思路 | `_wait_payload_settled()`（等 `.aria2` 释放、大小稳定两次）+ `_precheck_archive_payload()`（空文件/HTML）；v0.1.1 起再补 `7z t` best-effort 校验（见 6.6） |
 | `7z t` 解压前校验 + 自动重下（v0.1.1 落地） | `archive_validator.test_archive` 思路 | `seven_zip.test_archive()`（7z 不可执行时跳过）+ `_schedule_archive_repair()`（见 6.6） |
 | compatdata 卸载清理（v0.1.1 落地） | `uninstall_installed_game(delete_compatdata=)` | `preview_uninstall()` + `find_compatdata_dirs()` + `_can_remove_compatdata_dir()`（见 6.8） |
-| 模拟器注册表 / GBA+PSP+NDS+PS1+FC+MD（v0.6.0 起，v0.7.0/v0.9.0 扩展） | `emulator_adapters.py`（Eden/DuckStation/PCSX2/PPSSPP/RPCS3/mGBA/Lime3DS/melonDS/Nestopia/BlastEm/MAME） | `emulator_manager.py` 的 `EmulatorSpec` 注册表：GBA=mGBA（内置）、PSP=PPSSPP、NDS=melonDS、PS1=DuckStation（需自备 BIOS，安装时复制到 DuckStation 目录）、FC/MD=Mesen2（共享缓存、zip 内可执行文件）；解包/ROM 查找/启动脚本/原生 Steam 快捷方式见 5.10；PS2/PS3/3DS/Switch 未做 |
+| 模拟器注册表 / GBA+PSP+NDS+PS1+FC+MD（v0.6.0 起，v0.7.0/v0.9.0 扩展，v0.10.0 全部在线下载） | `emulator_adapters.py`（Eden/DuckStation/PCSX2/PPSSPP/RPCS3/mGBA/Lime3DS/melonDS/Nestopia/BlastEm/MAME） | `emulator_manager.py` 的 `EmulatorSpec` 注册表：GBA=mGBA、PSP=PPSSPP、NDS=melonDS、PS1=DuckStation（需自备 BIOS，安装时复制到 DuckStation 目录）、FC/MD=Mesen2（共享缓存、zip 内可执行文件）；**插件包不集成模拟器，首次安装在线下载**；解包/ROM 查找/启动脚本/原生 Steam 快捷方式见 5.10；PS2/PS3/3DS/Switch 未做 |
 | 平台目录 + 封面索引（v0.2.0 起步，v0.3.0 完成数据与 UI） | 各平台 catalog + `generate_*_cover_urls.py` / `emulator_cover_pipeline.py` | 目录 CSV 4 个可选列 + 全量目录（7084 条 / 11 平台，来自 v0.6 数据经 `scripts/merge_v06_catalog.py` 合并）+ `cover_index.csv`（3470 行 / 合并后 6823 条有封面）+ 封面磁盘缓存 + **平台/分类双筛选 UI** + v0.3.1 分类清洗/数据体检（`normalize_categories` + `validate_catalog --strict` CI）；多平台数据已具备，模拟器安装仍未做（ROADMAP 9.8） |
 | aria2 运行时复用（meta + flock） | `aria2_manager.py` 的 `aria2.runtime.json` + flock | `aria2-runtime.json` + `aria2-runtime.lock`，插件重载附着存活实例（见 6.4） |
 | 直链原地换链 | `aria2.changeUri` | `Aria2Manager.replace_uri()`；直链过期保留 gid 与进度 |
@@ -913,10 +912,10 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | Ludusavi | 开源存档路径清单项目（mtkennerly/ludusavi-manifest，MIT）；本项目内置其转换后的 JSON 清单（53,549 款游戏），用于把 Windows 存档路径解析到 Proton 前缀 |
 | gamewatch | 后台游戏进程检测：每 8 s 扫 `/proc/*/cmdline`（无 /proc 用 `pgrep -f`），状态切换产出 start/end 事件；本项目只在 end 时触发自动云存档 |
 | 存档指纹 | 对存档文件集算 sha256（相对路径 + 大小 + mtime_ns，最多 5000 文件），持久化在 `state.json` 的 `cloud_save_fingerprints`，未变化则跳过上传（reason=unchanged） |
-| 模拟器注册表 / 闭环 | v0.9.0：`EmulatorSpec` 注册表接入 GBA（mGBA，内置）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation，需 BIOS）/ FC、MD（Mesen2，共享缓存）；下载 ROM → 生成启动脚本 → Steam 原生快捷方式（不经 Proton） |
+| 模拟器注册表 / 闭环 | v0.10.0：`EmulatorSpec` 注册表接入 GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation，需 BIOS）/ FC、MD（Mesen2，共享缓存）；**全部首次安装在线下载、插件包不集成**；下载 ROM → 生成启动脚本 → Steam 原生快捷方式（不经 Proton） |
 | EmulatorSpec | 平台注册表条目：官方资产（repo/版本/各 arch 文件名）、archive（appimage/zip）、launch_args、rom_extensions、env_var、min_bytes、state_key（缓存目录名，FC/MD 共用 mesen）、executables（zip 内可执行文件名）、bios_required |
 | PS1 BIOS | DuckStation 必需的系统 BIOS（如 `scph5501.bin`）；本项目不内置，用户放到 `~/.local/share/freedeckCY/bios/ps1/`，安装时复制到 `~/.local/share/duckstation/bios/`；缺失只提示不阻断安装 |
-| 按需下载 | PSP/NDS 首次安装时从 GitHub release 下载官方 AppImage 到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`；GBA 则随包内置 |
+| 按需下载 | **6 个平台（含 GBA）首次安装时**都从 GitHub release 下载官方包到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`（FC/MD 共用 `mesen/`）；插件包不集成模拟器，离线可手动预置缓存或用 `FREEDECKCY_*_BIN` |
 | ROM / wrapper | ROM = 安装目录里符合平台扩展名的文件（GBA `.gba`；PSP `.iso/.cso/.pbp/.elf`；NDS `.nds/.dsi/.srl`，优先 openpath 同名）；wrapper = `<install_dir>/launch-freedeckcy.sh`（按平台拼启动参数，Steam 快捷方式的 Exe） |
 | `proton_tool` / `PACKAGE_ARCH` | 设置项 `proton_tool`：`auto`/`none`/具体兼容工具名；打包变量 `PACKAGE_ARCH`：`x86_64`/`aarch64`/`all`，决定产物架构与后缀 |
 | cover_index.csv | 封面索引文件（仓库已内置 3470 行）：按 `game_id` 或标题补齐封面/appid/platform，不覆盖目录 CSV 已有值 |

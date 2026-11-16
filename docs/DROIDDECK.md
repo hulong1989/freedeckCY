@@ -1,6 +1,6 @@
 # 在 DroidDeck 上使用 freedeckCY
 
-[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD 也可在 DroidDeck 上使用；本文是安装与排障说明。
+[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载（插件包不集成模拟器）也可在 DroidDeck 上使用；本文是安装与排障说明。
 
 > 适配基于 DroidDeck 的源码与 ARM64 运行时结构，**尚未在真机上完整验证**。遇到问题请按文末“排障”收集日志。
 
@@ -19,9 +19,9 @@ freedeckCY 的处理方式：
 - 运行时（aria2c、7zz、node）按 `platform.machine()` 选择 `defaults/runtime/<arch>/`，ARM 设备用 `aarch64`。
 - 检测到 DroidDeck 标记（`~/.droiddeck-x64`、`~/.droiddeck-decky-enabled`、`<Steam>/package/droiddeck-installed`）时，Proton 映射自动改用 `droiddeck-proton-arm64`；若 `config.vdf` 里已出现 `droiddeck-proton-11-arm64` 则优先用它。
 - 若 DroidDeck 的 x64 Steam 客户端正在运行（`steam.pid` 存在），优先把快捷方式写到它的 `~/.droiddeck-x64/.local/share/Steam`，否则回退标准路径。
- - GBA 闭环（v0.6.0）使用内置 **mGBA arm64 AppImage**：首次安装 GBA 时用 `--appimage-extract` 解包到 `~/.local/share/freedeckCY/emulators/gba/aarch64/squashfs-root`（GBA 兼容旧 `emulators/aarch64/`；**不依赖 FUSE**，proot 环境可用）；Steam 快捷方式的 Exe 是生成的 `launch-freedeckcy.sh`，**不写 Proton 映射**（原生 Linux 启动）。
+- GBA 闭环（v0.6.0 起）使用 **mGBA arm64 AppImage**：v0.10.0 起**不再随包内置**，首次安装 GBA 时自动从官方 release 下载，再用 `--appimage-extract` 解包到 `~/.local/share/freedeckCY/emulators/gba/aarch64/squashfs-root`（GBA 兼容旧 `emulators/aarch64/`；**不依赖 FUSE**，proot 环境可用）；Steam 快捷方式的 Exe 是生成的 `launch-freedeckcy.sh`，**不写 Proton 映射**（原生 Linux 启动）。
 - 自动云存档（v0.8.0）：内置 Ludusavi 清单（53,549 游戏）按标题/SteamID 匹配，并把 Windows 存档路径解析到 **ARM Proton 前缀**（`compatdata/.../pfx` 内布局与 x86_64 一致）；`gamewatch` 每 8 秒扫 `/proc/*/cmdline`（proot 下通常可用；没有 `/proc` 时回退 `pgrep -f`，需要系统有 pgrep），检测到游戏退出后只上传该游戏。自动上传**默认开启**，可在 QAM「云存档上传」里关闭。
-- 模拟器注册表（v0.9.0）在 DroidDeck 上接入 **GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC、MD（Mesen2）**：只有 GBA 的 mGBA 随包内置；**其它平台首次安装时会从官方 GitHub release 下载 arm64 包**（NDS 是 zip 内 AppImage；Mesen2 是 zip 内单文件 `Mesen`），插件已按 `aarch64` 选资产，AppImage 解包到 `~/.local/share/freedeckCY/emulators/<state_key>/aarch64/squashfs-root`，不依赖 FUSE。
+- 模拟器注册表（v0.10.0）在 DroidDeck 上接入 **GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC、MD（Mesen2）**：**插件包不集成任何模拟器**，6 个平台首次安装都会从官方 GitHub release 下载 arm64 包（NDS 是 zip 内 AppImage；Mesen2 是 zip 内单文件 `Mesen`），插件已按 `aarch64` 选资产，AppImage 解包到 `~/.local/share/freedeckCY/emulators/<state_key>/aarch64/squashfs-root`，不依赖 FUSE；离线可手动预置缓存或用 `FREEDECKCY_*_BIN`。
 - **PS1 需要自备 BIOS**：把 `scph*.bin` 放到 `~/.local/share/freedeckCY/bios/ps1/`，安装时会复制到 `~/.local/share/duckstation/bios/`（Android 上的 HOME 同样是 proot 内路径）；BIOS 缺失不阻断安装，但会警告、可能黑屏。
 
 ## 2. 构建 ARM64 插件包
@@ -31,14 +31,13 @@ freedeckCY 的处理方式：
 ```bash
 cd freedeckCY
 make runtime ARCH=aarch64        # 下载 ARM64 版 aria2c / 7zz / node
-make emulator-runtime ARCH=aarch64  # 下载 ARM64 版 mGBA AppImage（GBA 闭环，约 24 MB）
 make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zip
 ```
 
 说明：
 
-- `make runtime ARCH=all` / `make emulator-runtime ARCH=all` 可以同时准备 x86_64 与 aarch64 两份运行时（`emulator-runtime` 只预置 GBA 的 mGBA AppImage；PSP/NDS/PS1/FC/MD 不内置，首次安装联网下载 arm64 官方包；PS1 BIOS 由用户自备）。
-- `PACKAGE_ARCH=aarch64` 打包时会自动裁剪 `defaults/runtime/{aria2,7z,node,mgba}` 里其它架构，避免包体积翻倍；打包脚本会检查 `mgba/aarch64/mGBA.AppImage`，缺失只警告（GBA 装完无法启动）；PSP/NDS/PS1/FC/MD 官方包不打进包，DroidDeck 上首次安装需要联网；PS1 BIOS 需自己放到 `~/.local/share/freedeckCY/bios/ps1/`。
+- `make runtime ARCH=all` 可以同时准备 x86_64 与 aarch64 两份运行时。**v0.10.0 起不再有 `make emulator-runtime`**：插件包不包含任何模拟器（GBA 也改为首次安装在线下载），包体积约 45MB（此前含 mGBA 时约 68MB）。
+- `PACKAGE_ARCH=aarch64` 打包时会自动裁剪 `defaults/runtime/{aria2,7z,node}` 里其它架构，避免包体积翻倍；**模拟器不参与打包**，DroidDeck 上 6 个平台首次安装都需要联网下载 arm64 官方包；PS1 BIOS 需自己放到 `~/.local/share/freedeckCY/bios/ps1/`。
 - 产物名带 `-arm64` 后缀；x86_64 的普通包仍用 `make package`。
 
 ## 3. 安装
@@ -54,7 +53,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 - 登录天翼云盘（QAM 面板）；
 - 在下载设置里把下载目录/安装目录改到空间充足的路径（例如 `/root/Games`）；
 - 打开游戏库页面（QAM 里“游戏列表”或本地 Web UI），搜索/筛选后安装；
-- 模拟器：GBA/PSP/NDS/PS1/FC/MD 筛选后直接安装，插件会自动生成启动脚本并注册 Steam 快捷方式（GBA 首次解包几秒；其它平台首次要先下载 arm64 官方包，耗时取决于网络；PS1 记得先放 BIOS）。
+- 模拟器：GBA/PSP/NDS/PS1/FC/MD 筛选后直接安装，插件会自动生成启动脚本并注册 Steam 快捷方式。**所有平台（含 GBA）首次安装都要联网下载 arm64 官方包**，耗时取决于网络；PS1 记得先放 BIOS。
 
 ## 4. 功能支持情况
 
@@ -68,7 +67,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | 任务重试、下载完整性校验、自动重下 | ✅ |
 | 云存档上传/恢复 | ✅ 需要 ARM64 node（`make runtime ARCH=aarch64` 自带） |
 | 自动云存档（Ludusavi + gamewatch，v0.8.0） | ✅ 内置清单随包；游戏退出后自动上传该游戏（30 s 防抖、指纹去重）。`/proc` 在 proot 下通常可用，无则回退 `pgrep -f`；默认开启可在 QAM 关闭；ARM64 未真机验证 |
-| GBA 模拟器（mGBA，v0.6.0） | ✅ 可安装/启动：内置 mGBA arm64 AppImage，首次 `--appimage-extract` 解包（不依赖 FUSE），Steam 快捷方式走原生（无 Proton 映射） |
+| GBA 模拟器（mGBA，v0.6.0 起，v0.10.0 在线下载） | ✅ 可安装/启动：首次安装从官方 release 下载 arm64 AppImage（约 24.6MB）→ `--appimage-extract` 解包（不依赖 FUSE），Steam 快捷方式走原生（无 Proton 映射） |
 | PSP 模拟器（PPSSPP，v0.7.0） | ✅ 可安装/启动：首次安装从 GitHub 下载 arm64 官方 AppImage（已按 aarch64 选资产），解包不依赖 FUSE |
 | NDS 模拟器（melonDS，v0.7.0） | ✅ 可安装/启动：首次安装下载官方 zip（内含 aarch64 AppImage）→ 解 zip → `--appimage-extract`，不依赖 FUSE |
 | PS1 模拟器（DuckStation，v0.9.0） | ✅ 可安装/启动：官方 arm64 AppImage 按需下载；**需自备 BIOS**（`~/.local/share/freedeckCY/bios/ps1/`，安装时复制到 `~/.local/share/duckstation/bios/`）；缺失不阻断但会警告/可能黑屏 |
@@ -84,7 +83,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | `FREEDECKCY_STEAM_ROOT` | 指定 Steam 根目录（DroidDeck 双客户端时手动锁定） |
 | `FREEDECKCY_PROTON_TOOL` | 覆盖 Proton 工具名；`none` 表示不写映射 |
 | `FREEDECKCY_ARIA2_BIN` / `FREEDECKCY_7Z_BIN` / `FREEDECKCY_NODE_BIN` | 覆盖运行时二进制路径 |
-| `FREEDECKCY_MGBA_BIN` | 覆盖 mGBA 可执行文件/AppImage 路径（默认用内置 arm64 AppImage；也可指向系统 mGBA 或已解包的 `squashfs-root/AppRun`） |
+| `FREEDECKCY_MGBA_BIN` | 覆盖 mGBA 可执行文件/AppImage 路径（默认用已下载的缓存；也可指向系统 mGBA 或手工预置的 AppImage） |
 | `FREEDECKCY_PPSSPP_BIN` | 覆盖 PPSSPP 路径（默认用已下载的 arm64 AppImage / 系统 PPSSPP） |
 | `FREEDECKCY_MELONDS_BIN` | 覆盖 melonDS 路径（默认用已下载的 arm64 AppImage / 系统 melonDS） |
 | `FREEDECKCY_DUCKSTATION_BIN` | 覆盖 DuckStation 路径（PS1；默认用已下载的 arm64 AppImage / 系统 DuckStation） |
@@ -118,18 +117,19 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
       defaults/runtime/mgba/aarch64/mGBA.AppImage
 ```
 
-缺哪个就重新 `make runtime ARCH=aarch64` / `make emulator-runtime ARCH=aarch64` 并重新打包；也可用环境变量指向系统里的 arm64 版本。
+缺哪个就重新 `make runtime ARCH=aarch64` 并重新打包；也可用环境变量指向系统里的 arm64 版本。（模拟器已不在包内，无需准备。）
 
-**GBA 装完启动不了 / 提示未找到 mGBA**
+**GBA 装完启动不了 / 提示未找到 mGBA / 下载失败**
 
-- 确认包内含 `defaults/runtime/mgba/aarch64/mGBA.AppImage`；缺了重新 `make emulator-runtime ARCH=aarch64` 再打包。
-- 首次启动会解包到 `~/.local/share/freedeckCY/emulators/gba/aarch64/squashfs-root`（GBA 兼容旧 `emulators/aarch64/`；不依赖 FUSE）；解包失败通常是存储空间/权限问题，可删掉该目录重试，或用 `FREEDECKCY_MGBA_BIN` 指向系统 mGBA / 已解包的 `AppRun`。
-- 用 `GET /api/tianyi/diagnostics` 看 `emulators.gba`（available/source/command）快速定位。
+- v0.10.0 起 GBA 也**首次安装自动下载**（包内不再含 mGBA）：检查网络/系统代理；失败后重装可再次触发下载。
+- 下载/解包位置 `~/.local/share/freedeckCY/emulators/gba/aarch64/`（GBA 兼容旧 `emulators/aarch64/`；不依赖 FUSE）；解包失败通常是存储空间/权限问题，可删掉该目录重试，或用 `FREEDECKCY_MGBA_BIN` 指向系统 mGBA / 手工预置的 AppImage。
+- 离线时可把 mGBA arm64 AppImage 放到 `~/.local/share/freedeckCY/emulators/gba/aarch64/` 并 `chmod +x`，或用 `FREEDECKCY_MGBA_BIN` 指向本地版本；PSP/NDS/PS1/FC/MD 同理（各自 `<state_key>/aarch64/`，FC/MD 共用 `mesen/`）。
+- 用 `GET /api/tianyi/diagnostics` 看 `emulators.gba` 的 available/source/command 快速定位。
 - GBA 快捷方式在 Steam 里的 Exe 是 `<安装目录>/launch-freedeckcy.sh`（`exec <mGBA> -f <rom>`）；可进安装目录手工 `bash launch-freedeckcy.sh` 验证。
 
 **PSP/NDS/PS1/FC/MD 装完启动不了 / 首次安装下载失败**
 
-- 这些平台的官方包 **不随包内置**：首次安装需要访问 GitHub release 下载 arm64 资产；无网络、代理不通或 GitHub 限流都会失败，失败后重装可再次触发下载。
+- 这些平台的官方包 **不随包内置**（v0.10.0 起 GBA 也一样）：首次安装需要访问 GitHub release 下载 arm64 资产；无网络、代理不通或 GitHub 限流都会失败，失败后重装可再次触发下载。
 - 下载/解包位置：`~/.local/share/freedeckCY/emulators/{psp,nds,duckstation,mesen}/aarch64/`；NDS/Mesen2 先解 zip（Mesen2 直接是可执行文件 `Mesen`），PSP/PS1 是 AppImage（`--appimage-extract`），均不依赖 FUSE。
 - 检查诊断接口 `emulators.{psp,nds,ps1,fc,md}` 的 `source`（`download` 表示尚未下载）与 `message`；也可用 `FREEDECKCY_PPSSPP_BIN` / `FREEDECKCY_MELONDS_BIN` / `FREEDECKCY_DUCKSTATION_BIN` / `FREEDECKCY_MESEN_BIN` 指向手工下载的 arm64 包。
 - 手工验证 wrapper：`bash "<安装目录>/launch-freedeckcy.sh"`（PSP `--fullscreen`、PS1 `-batch -fullscreen`、FC/MD `/fullscreen`、NDS 直接接 ROM）。
@@ -155,7 +155,7 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 ## 7. 已知限制
 
 - 未在真机验证：DroidDeck 的 FEX/ARM Proton、不同 Android 机型的存储映射都可能影响结果。
-- GBA/PSP/NDS/PS1/FC/MD 已可安装/启动（mGBA / PPSSPP / melonDS / DuckStation / Mesen2；v0.6.0~v0.9.0，均为 arm64 官方包，解包不依赖 FUSE）；PS2/PS3/3DS/Switch 仍只可浏览（见 [ROADMAP.md](ROADMAP.md) 9.8）。**PS1 需自备 BIOS**（放 `~/.local/share/freedeckCY/bios/ps1/`，安装时复制到 DuckStation 目录，缺失不阻断但可能黑屏）；**除 GBA 外首次安装需要联网**从 GitHub 下载官方包；各平台只识别各自 ROM 扩展名，不含 BIOS/存档管理；ARM64 上这些平台尚未真机验证。
+- GBA/PSP/NDS/PS1/FC/MD 已可安装/启动（mGBA / PPSSPP / melonDS / DuckStation / Mesen2；v0.6.0~v0.9.0，v0.10.0 起全部在线下载）；PS2/PS3/3DS/Switch 仍只可浏览（见 [ROADMAP.md](ROADMAP.md) 9.8）。**插件包不集成任何模拟器，6 个平台（含 GBA）首次安装都需要联网**从 GitHub 下载 arm64 官方包（包体积约 45MB），离线可手动预置缓存或用 `FREEDECKCY_*_BIN`；**PS1 需自备 BIOS**（放 `~/.local/share/freedeckCY/bios/ps1/`，安装时复制到 DuckStation 目录，缺失不阻断但可能黑屏）；各平台只识别各自 ROM 扩展名，不含 BIOS/存档管理；ARM64 上这些平台尚未真机验证。
 - **自动云存档边界（v0.8.0）**：只对 gamewatch 检测到"退出"的游戏自动上传，没有自动恢复/冲突策略；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档在模拟器配置目录，暂未纳入清单/Proton 扫描；指纹只看相对路径+大小+mtime（≤5000 文件）；`/proc` 不可用时依赖 `pgrep`；ARM64 上该链路尚未真机验证。
 - DroidDeck 升级/重装 Decky 可能清空插件，需重新导入 zip。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。

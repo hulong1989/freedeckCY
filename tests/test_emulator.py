@@ -97,17 +97,13 @@ def test_ensure_mgba_env_override(tmp_path, monkeypatch):
     assert asyncio.run(emu.ensure_mgba(str(tmp_path), allow_download=False)) == [str(binary)]
 
 
-def test_emulator_status_prefers_bundled(tmp_path, monkeypatch):
+def test_emulator_status_offers_download_when_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
     monkeypatch.delenv("FREEDECKCY_MGBA_BIN", raising=False)
-    arch = emu.runtime_arch()
-    appimage = tmp_path / "plugin" / "defaults" / "runtime" / "mgba" / arch / "mGBA.AppImage"
-    appimage.parent.mkdir(parents=True)
-    appimage.write_bytes(b"x" * 1024)
-
     status = emu.emulator_status("gba", str(tmp_path / "plugin"))
     assert status["available"] is True
-    assert status["source"] == "bundled"
+    assert status["source"] == "download"
+    assert "mGBA" in status["url"]
 
 
 def test_gba_plan_selects_target_rom(monkeypatch, tmp_path):

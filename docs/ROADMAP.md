@@ -1,12 +1,12 @@
 # freedeckCY 后续路线图（ROADMAP）
 
-> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配 + v0.5.0 第一梯队 + v0.6.0 GBA 闭环 + v0.7.0 模拟器注册表 + v0.8.0 自动云存档 + v0.9.0 模拟器六平台之后**（v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 平台字段/封面缓存/分类筛选；v0.3.0 全量目录与平台筛选 UI；v0.3.1 分类清洗 + 数据体检 CI；v0.4.0 Android/ARM64 的 DroidDeck 适配；v0.5.0 目录浏览/分页/排序/已安装页签/诊断导出/更新检查；v0.6.0 GBA 模拟器闭环；v0.6.1/v0.6.2 远程 JSON 目录；v0.7.0 通用模拟器注册表 + PSP/NDS；v0.8.0 Ludusavi + gamewatch 自动云存档；v0.9.0 模拟器扩到 PS1/FC/MD）值得继续做、以及明确不建议做的方向。当前版本 **v0.9.0**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
+> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配 + v0.5.0 第一梯队 + v0.6.0 GBA 闭环 + v0.7.0 模拟器注册表 + v0.8.0 自动云存档 + v0.9.0 模拟器六平台 + v0.10.0 模拟器全部在线下载之后**（v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 平台字段/封面缓存/分类筛选；v0.3.0 全量目录与平台筛选 UI；v0.3.1 分类清洗 + 数据体检 CI；v0.4.0 Android/ARM64 的 DroidDeck 适配；v0.5.0 目录浏览/分页/排序/已安装页签/诊断导出/更新检查；v0.6.0 GBA 模拟器闭环；v0.6.1/v0.6.2 远程 JSON 目录；v0.7.0 通用模拟器注册表 + PSP/NDS；v0.8.0 Ludusavi + gamewatch 自动云存档；v0.9.0 模拟器扩到 PS1/FC/MD；v0.10.0 模拟器全部在线下载、插件包不集成）值得继续做、以及明确不建议做的方向。当前版本 **v0.10.0**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
 >
 > 背景：上游作者已停止维护，`main` 只是早期版本，Releases 里的百度网盘 / 模拟器 / 资源池代码**不在本仓库**（见 [ARCHITECTURE.md](ARCHITECTURE.md) §2）。
 >
 > ⚠️ 合规提示：本项目分发的资源链接来自互联网，属于盗版资源分发，违反云盘服务条款并涉及版权风险。本路线图只讨论**工程改进**，不建议部署使用，更不建议扩大资源分发能力。
 >
-> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0/v0.3.0 —— 目录平台字段 + `cover_index.csv` + 封面磁盘缓存 + **全量目录（7084 条 / 11 平台）+ 平台/分类双筛选 UI**（§9.6）；v0.3.1 —— 分类清洗（606 行，「模拟器」606 条）+ `validate_catalog --strict` 进 CI；v0.4.0 —— **DroidDeck（Android/ARM64）适配**：ARM64 运行时/ARM Proton 解析/双 Steam 根/`PACKAGE_ARCH` 打包（见 [DROIDDECK.md](DROIDDECK.md)，尚未真机验证）；v0.5.0 —— **第一梯队**：目录浏览/分页/排序、已安装页签（启动/打开目录/卸载）、诊断 JSON+zip 导出（脱敏）、GitHub 更新检查（1 h 缓存）；v0.6.0 —— **GBA 模拟器闭环**：内置 mGBA AppImage、分享分页找 ROM、启动脚本 + 原生 Steam 快捷方式（不写 Proton）；v0.6.1/v0.6.2 —— **远程 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 读本地/HTTP JSON（远程缓存 6 h、失败回退 CSV，默认关闭）；v0.7.0 —— **通用模拟器注册表**：`EmulatorSpec` 接入 GBA/PSP/NDS，GBA 内置、PSP/NDS 首次安装按需下载官方 AppImage，启动脚本按平台参数生成；v0.8.0 —— **自动云存档**：内置 Ludusavi 清单（53,549 游戏）+ gamewatch 进程检测，游戏退出后只上传该游戏（30 s 防抖、指纹去重 reason=unchanged、设置 `cloud_save_auto_upload` 默认开）；v0.9.0 —— **模拟器扩到 6 平台**：PS1（DuckStation，需自备 BIOS，安装时复制到 DuckStation 目录）、FC/MD（Mesen2，共享缓存、zip 内可执行文件）。
+> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0/v0.3.0 —— 目录平台字段 + `cover_index.csv` + 封面磁盘缓存 + **全量目录（7084 条 / 11 平台）+ 平台/分类双筛选 UI**（§9.6）；v0.3.1 —— 分类清洗（606 行，「模拟器」606 条）+ `validate_catalog --strict` 进 CI；v0.4.0 —— **DroidDeck（Android/ARM64）适配**：ARM64 运行时/ARM Proton 解析/双 Steam 根/`PACKAGE_ARCH` 打包（见 [DROIDDECK.md](DROIDDECK.md)，尚未真机验证）；v0.5.0 —— **第一梯队**：目录浏览/分页/排序、已安装页签（启动/打开目录/卸载）、诊断 JSON+zip 导出（脱敏）、GitHub 更新检查（1 h 缓存）；v0.6.0 —— **GBA 模拟器闭环**：内置 mGBA AppImage、分享分页找 ROM、启动脚本 + 原生 Steam 快捷方式（不写 Proton）；v0.6.1/v0.6.2 —— **远程 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 读本地/HTTP JSON（远程缓存 6 h、失败回退 CSV，默认关闭）；v0.7.0 —— **通用模拟器注册表**：`EmulatorSpec` 接入 GBA/PSP/NDS，GBA 内置、PSP/NDS 首次安装按需下载官方 AppImage，启动脚本按平台参数生成；v0.8.0 —— **自动云存档**：内置 Ludusavi 清单（53,549 游戏）+ gamewatch 进程检测，游戏退出后只上传该游戏（30 s 防抖、指纹去重 reason=unchanged、设置 `cloud_save_auto_upload` 默认开）；v0.9.0 —— **模拟器扩到 6 平台**：PS1（DuckStation，需自备 BIOS，安装时复制到 DuckStation 目录）、FC/MD（Mesen2，共享缓存、zip 内可执行文件）；v0.10.0 —— **模拟器全部在线下载**：删除 `fetch_emulator.sh`/`make emulator-runtime` 与包内 mGBA，6 个平台（含 GBA）首次安装都从官方 release 下载，包体积约 68MB→45MB，离线可手动预置缓存。
 
 ---
 
@@ -180,7 +180,7 @@
 
 ---
 
-## 9. v0.6 对齐候选（9.2 / 9.4 已落地；9.6 已在 v0.3.0 完成；9.8 的 GBA/PSP/NDS/PS1/FC/MD 已在 v0.6.0~v0.9.0 完成；其余未做）
+## 9. v0.6 对齐候选（9.2 / 9.4 已落地；9.6 已在 v0.3.0 完成；9.8 的 6 平台模拟器已在 v0.6.0~v0.10.0 完成；其余未做）
 
 作者 v0.6 发行版（本地只读参考 `0.6/freedeck-plugin`，不随本仓库分发）在下载管线、模拟器与资源池上完整得多。三轮补全只采纳了下载/Steam 写入相关的少数能力（见 [ARCHITECTURE.md](ARCHITECTURE.md) §13）；**v0.1.1 落地 9.2（compatdata 清理）与 9.4（`7z t` best-effort 校验）；v0.2.0 起步 9.6；v0.3.0 完成 9.6（全量目录 7084 条 / 11 平台 + cover_index 3470 行 + 平台/分类双筛选 UI）；v0.3.1 做数据质量（分类清洗 + validate_catalog --strict CI）**，其余按 **性价比 + 工作量** 从高到低排列，供后续认领。
 
@@ -193,7 +193,7 @@
 | 9.5 | SQLite 任务库 | P2 | 大 | `archive_task_db.py` | 任务持久化/查询与崩溃恢复更可靠 |
 | 9.6 | ~~平台目录 + 封面索引~~ ✅ | ~~P2~~ | ~~大~~ | `gba_catalog.py` 等 + `generate_*_cover_urls.py` | **v0.3.0 完成**（7084 条/11 平台 + cover_index + 双筛选），**v0.3.1 数据清洗/体检**；封面生成流水线仍未做 |
 | 9.7 | 资源池只读 | P2 | 中 | 腾讯文档 smartsheet 读取 | 扩充资源，但不引入投稿/点赞 |
-| 9.8 | ~~单平台模拟器闭环~~ ✅（GBA/PSP/NDS/PS1/FC/MD） | ~~P2~~ | ~~大~~ | `emulator_adapters.py` | **v0.6.0 GBA、v0.7.0 PSP/NDS、v0.9.0 PS1（DuckStation，需 BIOS）/FC/MD（Mesen2，共享缓存）**；PS2/PS3/3DS/Switch 仍只可浏览（官方包仅 x64 或需 BIOS/固件/keys） |
+| 9.8 | ~~单平台模拟器闭环~~ ✅（6 平台，全部在线下载） | ~~P2~~ | ~~大~~ | `emulator_adapters.py` | **v0.6.0 GBA、v0.7.0 PSP/NDS、v0.9.0 PS1（DuckStation，需 BIOS）/FC/MD（Mesen2，共享缓存）、v0.10.0 全部改为在线下载（包内不集成模拟器）**；PS2/PS3/3DS/Switch 仍只可浏览（官方包仅 x64 或需 BIOS/固件/keys） |
 | 9.9 | 百度 OpenAPI | P3 | 大 | `baidu_openapi_client.py` | 新增一个"干净"的网盘来源 |
 
 ### 9.1 Range 续传探测（P1，工作量：小）
@@ -282,7 +282,7 @@
 - **数据质量（v0.3.1）**：`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底），数据 606 行改写、「模拟器」606 条；`scripts/validate_catalog.py --strict` 进 CI，重复 `game_id`/非法链接/空标题/分类混平台名会让 CI 红；
 - 测试：`make test` 295 用例（含 `tests/test_catalog_platform.py` / `tests/test_droiddeck.py` / `tests/test_emulator.py` / `tests/test_cloud_auto.py` 与分类清洗/默认目录洁净度用例）。
 
-**仍未做**：封面索引的**生成流水线**（`generate_*_cover_urls.py` 类脚本；当前 index 直接来自 v0.6）、无网络时纯离线封面库、其它平台模拟器安装（GBA/PSP/NDS 已落地，见 9.8）。
+**仍未做**：封面索引的**生成流水线**（`generate_*_cover_urls.py` 类脚本；当前 index 直接来自 v0.6）、无网络时纯离线封面库、其它平台模拟器安装（6 平台已落地，见 9.8）。
 
 ### 9.7 资源池只读（P2，工作量：中，**合规风险高**）
 
@@ -301,20 +301,21 @@
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/game_catalog.py`、`defaults/`、`tests/`、`docs/`。
 
-### 9.8 ~~单平台模拟器闭环~~（✅ GBA/PSP/NDS/PS1/FC/MD 已完成；PS2/PS3/3DS/Switch 待做）
+### 9.8 ~~单平台模拟器闭环~~（✅ 6 平台已完成，全部在线下载；PS2/PS3/3DS/Switch 待做）
 
 **落地实现（v0.6.0 起 / v0.7.0 注册表 / v0.9.0 六平台）**：
 
 - `py_modules/emulator_manager.py` 的 `EmulatorSpec` 注册表当前接入 **6 个平台**：
-  - GBA = mGBA 0.10.5（AppImage x64/arm64，**随包内置**，`-f <rom>`，`.gba`）；
+  - GBA = mGBA 0.10.5（AppImage x64/arm64，**首次安装在线下载**，x64 约 25MB / arm64 约 24.6MB，`-f <rom>`，`.gba`）；
   - PSP = PPSSPP 1.20.4（anylinux AppImage，按需下载，`--fullscreen <rom>`）；
   - NDS = melonDS 1.1（zip 内 AppImage，按需下载，`<rom>`）；
   - PS1 = DuckStation（`latest`，`DuckStation-{x64,arm64}.AppImage`，按需下载，`-batch -fullscreen <rom>`，`.cue/.m3u/.chd/.iso/.pbp/.bin`，**必须用户自备 BIOS**）；
   - FC/MD = Mesen2 2.1.1（zip 内单文件 `Mesen`，x64/ARM64，按需下载，`/fullscreen <rom>`，**共用 `emulators/mesen/<arch>/` 缓存**）；
-- 解析顺序：`FREEDECKCY_<PLATFORM>_BIN` → 已解包/已下载（`emulators/<state_key>/<arch>/`）→ 内置包（仅 GBA）→ 系统命令 → Flatpak（仅 mGBA）；`emulator_status` 可返回 `source=download`，安装时 `ensure_emulator` 下载并按 AppImage/zip 分别解包（不依赖 FUSE，proot/DroidDeck 可用）；
+- 解析顺序（**无内置包分支**）：`FREEDECKCY_<PLATFORM>_BIN` → 已下载/已解包（`emulators/<state_key>/<arch>/`）→ 系统命令 → Flatpak（仅 mGBA）；`emulator_status` 对 6 平台都可返回 `source=download`，安装时 `ensure_emulator` 下载并按 AppImage/zip 分别解包（不依赖 FUSE，proot/DroidDeck 可用）；
 - PS1 BIOS：用户放 `~/.local/share/freedeckCY/bios/ps1/`，安装时 `prepare_bios` 复制到 `~/.local/share/duckstation/bios/`；status/plan 返回 `bios_required/bios_present/bios_dir`，**缺失不阻断安装**但会在安装消息与库页弹窗警告；
 - 安装完成后 `find_rom_file(platform)` → wrapper（按平台参数）→ Steam 快捷方式 Exe=脚本、LaunchOptions 带 token、**Proton=none**；已安装记录写 `platform/emulator/rom_path/launcher_path`；
 - 诊断包 `emulators` 遍历全部已接入平台（含 BIOS 状态）；
+- **v0.10.0 打包变化**：`scripts/fetch_emulator.sh` 与 `make emulator-runtime` 删除、`defaults/runtime/mgba/` 不再打包，插件包不集成模拟器（约 68MB→45MB）；离线环境可手动把官方包放到缓存目录，或用 `FREEDECKCY_*_BIN` 指向本地版本；
 - 测试 `tests/test_emulator.py`；`make test` 295 用例。
 
 **仍未做 / 阻塞原因**：
@@ -376,7 +377,7 @@
 
 | 事项 | 说明 | 验收要点 |
 |---|---|---|
-| 自动云存档（Ludusavi + gamewatch）✅ | **v0.8.0 已落地**：内置 Ludusavi 清单（53,549 游戏，MIT）做标题/SteamID 匹配并解析到 Proton 前缀，与原有 Proton 扫描合并；gamewatch 每 8 s 检测游戏退出，只上传**刚退出的那个 game_id**（30 s 防抖）；指纹（相对路径+size+mtime，≤5000 文件）持久化去重，未变化 `reason=unchanged`；设置 `cloud_save_auto_upload` 默认开、QAM 可关。**仍未做**：自动恢复/冲突策略、模拟器（GBA/PSP/NDS）存档纳入、跨设备同步/版本保留策略 | 已完成；后续按"仍未做"继续 |
+| 自动云存档（Ludusavi + gamewatch）✅ | **v0.8.0 已落地**：内置 Ludusavi 清单（53,549 游戏，MIT）做标题/SteamID 匹配并解析到 Proton 前缀，与原有 Proton 扫描合并；gamewatch 每 8 s 检测游戏退出，只上传**刚退出的那个 game_id**（30 s 防抖）；指纹（相对路径+size+mtime，≤5000 文件）持久化去重，未变化 `reason=unchanged`；设置 `cloud_save_auto_upload` 默认开、QAM 可关。**仍未做**：自动恢复/冲突策略、模拟器（GBA/PSP/NDS/PS1/FC/MD）存档纳入、跨设备同步/版本保留策略 | 已完成；后续按"仍未做"继续 |
 | 第一梯队：目录浏览 / 分页 / 排序 / 已安装管理 / 诊断导出 / 更新检查 ✅ | **v0.5.0 已落地**：库页打开即浏览全部资源（空查询不再隐藏）、平台/分类筛选 + 分页（L1/R1、PageUp/PageDown）+ 排序（默认/名称/大小↓/大小↑）、已安装页签（鼠标点击启动 / 打开目录 / 卸载 confirm）、自定义双按钮 confirm、`GET /catalog?sort=`、`/installed*`、`/diagnostics`+`/diagnostics/export`（zip，cookie/token/HOME 脱敏）、`/update-check`（GitHub release，1 h 缓存） | 已完成；体验小项（已安装页签键盘/手柄启动接线）继续迭代 |
 | DroidDeck 适配 ✅ | **v0.4.0 已落地**：ARM64 运行时选择（`make runtime ARCH=aarch64`）、`is_droiddeck()` 检测、ARM Proton 自动解析（`droiddeck-proton-arm64`/`11-arm64`）、双 Steam 根（x64 客户端优先）、`PACKAGE_ARCH` 打包（`-arm64`/`-universal`）。**尚未真机验证**；GBA/PSP/NDS 已可安装（v0.6.0/v0.7.0，arm64 官方 AppImage），其它模拟器平台仍只可浏览（§9.8） | 真机验证通过后回归本项；详见 [DROIDDECK.md](DROIDDECK.md) |
 | 目录数据体检 / 分类清洗 ✅ | **v0.3.1 已完成**：`normalize_categories` + `normalize_catalog_categories.py` 清洗 606 行，`validate_catalog.py --strict` 进 CI（封面覆盖 96.3%，总大小约 39 TB） | 已完成，后续仅在数据变更时复用 `make normalize-catalog` / `make validate-catalog` |

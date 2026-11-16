@@ -2,6 +2,15 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.10.0
+
+### 变更
+
+- **模拟器全部改为在线下载**：移除内置 mGBA AppImage、`make emulator-runtime` 与 `defaults/runtime/mgba/` 的打包集成；GBA/PSP/NDS/PS1/FC/MD 六个平台都在首次安装时从官方 release 下载，缓存到 `~/.local/share/freedeckCY/emulators/<platform>/<arch>/`。
+- 插件包不再包含任何模拟器二进制，体积由约 68MB 降到约 45MB；模拟器下载一次后离线可用。
+- `emulator_status` 不再返回 `source=bundled`；无本地版本时显示 `source=download`。
+- 保留 `FREEDECKCY_*_BIN` 覆盖与手动预置缓存（离线环境可自行放入对应目录）。
+
 ## v0.9.0
 
 ### 新增

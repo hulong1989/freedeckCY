@@ -209,7 +209,6 @@ else
     runtime_has_binary aria2c || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 aria2c：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
     runtime_has_binary 7zz || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 7zz：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
     runtime_has_binary node || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 node：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
-    runtime_has_binary mGBA.AppImage || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 mGBA.AppImage：GBA 安装后无法启动，建议先 bash scripts/fetch_emulator.sh --arch ${PACKAGE_ARCH}"
     [[ -f "$REPO_ROOT/defaults/ludusavi/manifest.json.gz" ]] || warn "缺少 defaults/ludusavi/manifest.json.gz：自动云存档只会退回 Proton 目录扫描（make ludusavi-manifest）"
 fi
 
@@ -264,7 +263,7 @@ done
 
 # 单架构打包：删掉 defaults/runtime 下其它架构，避免包体积翻倍
 if [[ "$PACKAGE_ARCH" != "all" && -d "$STAGE/defaults/runtime" ]]; then
-    for _component in aria2 7z node mgba; do
+    for _component in aria2 7z node; do
         _dir="$STAGE/defaults/runtime/$_component"
         [[ -d "$_dir" ]] || continue
         find "$_dir" -mindepth 1 -maxdepth 1 -type d ! -name "$PACKAGE_ARCH" -exec rm -rf {} + 2>/dev/null || true

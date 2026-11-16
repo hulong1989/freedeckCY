@@ -63,7 +63,7 @@ EMULATORS: Dict[str, EmulatorSpec] = {
         launch_args=("-f", "{rom}"),
         rom_extensions=(".gba",),
         env_var="FREEDECKCY_MGBA_BIN",
-        notes="mGBA 官方 AppImage；默认随包内置",
+        notes="mGBA 官方 AppImage；首次安装按需下载",
         min_bytes=20 * 1024 * 1024,
     ),
     "psp": EmulatorSpec(
@@ -160,7 +160,7 @@ EMULATORS: Dict[str, EmulatorSpec] = {
 }
 
 SUPPORTED_PLATFORMS: Tuple[str, ...] = tuple(EMULATORS.keys())
-_APPIMAGE_NAME = "mGBA.AppImage"
+
 
 
 def runtime_arch() -> str:
@@ -187,15 +187,6 @@ def supported_platforms() -> Tuple[str, ...]:
 
 def emulator_state_dir() -> Path:
     return Path(config.DECKY_SEND_DIR) / "emulators"
-
-
-def _plugin_dir(plugin_dir: str = "") -> Path:
-    value = str(plugin_dir or "").strip()
-    if not value:
-        value = str(os.getenv("DECKY_PLUGIN_DIR", "") or "").strip()
-    if not value:
-        value = str(Path(__file__).resolve().parent.parent)
-    return Path(value)
 
 
 def _state_root(spec: EmulatorSpec, arch: str = "") -> Path:
@@ -259,21 +250,6 @@ def installed_command(spec: EmulatorSpec, arch: str = "") -> Optional[str]:
     return None
 
 
-def bundled_appimage(spec: EmulatorSpec, plugin_dir: str = "", arch: str = "") -> Optional[str]:
-    target_arch = arch or runtime_arch()
-    asset = spec.assets.get(target_arch, "")
-    candidates = []
-    if spec.platform == "gba":
-        candidates.append(_plugin_dir(plugin_dir) / "defaults" / "runtime" / "mgba" / target_arch / _APPIMAGE_NAME)
-    candidates.append(
-        _plugin_dir(plugin_dir) / "defaults" / "runtime" / "emulators" / spec.platform / target_arch / asset
-    )
-    for path in candidates:
-        if asset and path.is_file():
-            return str(path)
-    return None
-
-
 def system_command(spec: EmulatorSpec) -> Optional[str]:
     names = {
         "mgba": ("mgba", "mgba-qt"),
@@ -313,9 +289,6 @@ def resolve_command(spec: EmulatorSpec, plugin_dir: str = "") -> Optional[List[s
     installed = installed_command(spec)
     if installed:
         return [installed]
-    bundled = bundled_appimage(spec, plugin_dir)
-    if bundled:
-        return [bundled]
     system = system_command(spec)
     if system:
         return [system]
@@ -383,8 +356,6 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
             source = "env"
         elif installed_command(spec):
             source = "installed"
-        elif bundled_appimage(spec, plugin_dir):
-            source = "bundled"
         elif system_command(spec):
             source = "system"
         else:
@@ -521,10 +492,6 @@ async def ensure_emulator(
         if first.lower().endswith((".appimage", ".appimage")):
             return _ensure_extracted(spec, first)
         return command
-
-    appimage = bundled_appimage(spec, plugin_dir)
-    if appimage:
-        return _ensure_extracted(spec, appimage)
 
     if not allow_download:
         raise RuntimeError(emulator_status(spec.platform, plugin_dir).get("message", f"{spec.name} 不可用"))
