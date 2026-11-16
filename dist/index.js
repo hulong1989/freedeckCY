@@ -98,6 +98,8 @@ const listTianyiInstalledGames = callable("list_tianyi_installed_games");
 const launchTianyiInstalledGame = callable("launch_tianyi_installed_game");
 const openTianyiInstalledFolder = callable("open_tianyi_installed_folder");
 const scanTianyiInstalledGames = callable("scan_tianyi_installed_games");
+const runTianyiDiagnostics = callable("run_tianyi_diagnostics");
+const exportTianyiDiagnosticsFile = callable("export_tianyi_diagnostics_file");
 const uninstallTianyiInstalled = callable("uninstall_tianyi_installed_game");
 const getTianyiLoginUrl = callable("get_tianyi_login_url");
 const setTianyiSettings = callable("set_tianyi_settings");
@@ -1278,6 +1280,10 @@ function SettingsPage() {
     const [saving, setSaving] = SP_REACT.useState(false);
     const [clearingLogin, setClearingLogin] = SP_REACT.useState(false);
     const [scanningInstalled, setScanningInstalled] = SP_REACT.useState(false);
+    const [diagnosticsReport, setDiagnosticsReport] = SP_REACT.useState(null);
+    const [diagnosticsBusy, setDiagnosticsBusy] = SP_REACT.useState(false);
+    const [diagnosticsExportBusy, setDiagnosticsExportBusy] = SP_REACT.useState(false);
+    const [diagnosticsExportMessage, setDiagnosticsExportMessage] = SP_REACT.useState("");
     const [activeTab, setActiveTab] = SP_REACT.useState("paths");
     const [settings, setSettings] = SP_REACT.useState(EMPTY_SETTINGS);
     const [storageOptions, setStorageOptions] = SP_REACT.useState([]);
@@ -1698,6 +1704,49 @@ function SettingsPage() {
             setBaiduQrBusy(false);
         }
     }, [baiduQrBusy]);
+    const onRunDiagnostics = SP_REACT.useCallback(async () => {
+        if (diagnosticsBusy)
+            return;
+        setDiagnosticsBusy(true);
+        try {
+            const result = await runTianyiDiagnostics();
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "自检失败");
+            }
+            setDiagnosticsReport(result.data);
+            const summary = result.data.summary || {};
+            toaster.toast({
+                title: "freedeckCY 自检",
+                body: `OK ${summary.ok || 0} / 警告 ${summary.warn || 0} / 失败 ${summary.fail || 0}`,
+            });
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setDiagnosticsBusy(false);
+        }
+    }, [diagnosticsBusy]);
+    const onExportDiagnostics = SP_REACT.useCallback(async () => {
+        if (diagnosticsExportBusy)
+            return;
+        setDiagnosticsExportBusy(true);
+        try {
+            const result = await exportTianyiDiagnosticsFile();
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "导出诊断包失败");
+            }
+            const message = result.data.message || `已导出：${result.data.path || ""}`;
+            setDiagnosticsExportMessage(message);
+            toaster.toast({ title: "freedeckCY 诊断包", body: message });
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setDiagnosticsExportBusy(false);
+        }
+    }, [diagnosticsExportBusy]);
     const onScanInstalledSettings = SP_REACT.useCallback(async () => {
         if (scanningInstalled)
             return;
@@ -2051,6 +2100,20 @@ function SettingsPage() {
                                                 setSelectedRestoreEntryIds(restoreEntries.map((item) => String(item.entry_id || "")).filter(Boolean));
                                             }, disabled: restoreBusy, children: "\u5168\u9009" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => setSelectedRestoreEntryIds([]), disabled: restoreBusy, children: "\u6E05\u7A7A" })] }) })), targetCandidates.length > 1 && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u6062\u590D\u76EE\u6807\u76EE\u5F55", description: "\u68C0\u6D4B\u5230\u591A\u4E2A\u5019\u9009\u76EE\u5F55\uFF0C\u8BF7\u660E\u786E\u9009\u62E9", rgOptions: targetCandidates.map((path) => ({ data: path, label: path })), selectedOption: selectedRestoreTargetDir, disabled: restoreBusy, onChange: (option) => setSelectedRestoreTargetDir(String(option?.data || "")) }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveRestore, disabled: !login.logged_in || restoreBusy || !selectedRestoreGame || !selectedRestoreVersion || !selectedRestoreEntryIds.length, children: planningRestore ? "规划中..." : applyingRestore ? "恢复中..." : "下载并恢复云存档" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: cloudSaveRestoreSummaryText }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, opacity: 0.88 }, children: `${cloudSaveRestoreState.message || "未开始"} | ${clampProgress(cloudSaveRestoreState.progress).toFixed(1)}%` }) })] })] })),
         },
+        {
+            id: "diagnostics",
+            title: "诊断",
+            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u81EA\u68C0", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u68C0\u67E5\u63D2\u4EF6\u7248\u672C\u3001\u72B6\u6001/\u4E0B\u8F7D/\u5B89\u88C5\u76EE\u5F55\u3001aria2/7zz/node\u3001Steam \u5FEB\u6377\u65B9\u5F0F\u3001SD \u5361\u3001\u7F51\u7EDC\u4E0E\u767E\u5EA6\u626B\u7801\u63A5\u53E3\u3002" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onRunDiagnostics(), disabled: diagnosticsBusy, children: diagnosticsBusy ? "自检中..." : "运行自检" }) }), diagnosticsReport ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6 }, children: `v${diagnosticsReport.version} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}` }) }), (diagnosticsReport.checks || []).map((check) => {
+                                        const color = check.status === "ok"
+                                            ? "#9fe6a8"
+                                            : check.status === "warn"
+                                                ? "#ffd479"
+                                                : check.status === "fail"
+                                                    ? "#ff9a8a"
+                                                    : "#b9c0cc";
+                                        return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontWeight: 600 }, children: check.label }), SP_JSX.jsx("span", { style: { color, fontSize: "12px" }, children: check.status.toUpperCase() })] }), SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.86, wordBreak: "break-word" }, children: check.detail }), check.fix && check.status !== "ok" ? (SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.7 }, children: `建议：${check.fix}` })) : null] }) }, check.id));
+                                    })] })) : null] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u8BCA\u65AD\u5305", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u5BFC\u51FA diagnostics.json\u3001self-check.json\u3001\u6700\u65B0 300 \u884C\u65E5\u5FD7\uFF1Bcookie/token \u5DF2\u8131\u654F\uFF0C\u5199\u5230\u4E0B\u8F7D\u76EE\u5F55\u3002" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onExportDiagnostics(), disabled: diagnosticsExportBusy, children: diagnosticsExportBusy ? "打包中..." : "导出诊断包" }) }), diagnosticsExportMessage ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.82, wordBreak: "break-all" }, children: diagnosticsExportMessage }) })) : null] })] })),
+        },
     ], [
         clearingLogin,
         login.logged_in,
@@ -2093,6 +2156,12 @@ function SettingsPage() {
         cloudSaveRestoreSummaryText,
         cloudSaveRestoreState.message,
         cloudSaveRestoreState.progress,
+        diagnosticsReport,
+        diagnosticsBusy,
+        diagnosticsExportBusy,
+        diagnosticsExportMessage,
+        onRunDiagnostics,
+        onExportDiagnostics,
     ]);
     const focusSettingsTabRow = SP_REACT.useCallback((tabId) => {
         const classMap = getGamepadTabClassMap();

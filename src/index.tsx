@@ -155,6 +155,22 @@ interface StorageOptionsState {
   options?: StorageOption[];
 }
 
+interface DiagnosticCheck {
+  id: string;
+  label: string;
+  status: string;
+  detail: string;
+  fix?: string;
+}
+
+interface DiagnosticsReport {
+  generated_at: number;
+  version: string;
+  arch: string;
+  summary: { ok?: number; warn?: number; fail?: number; skip?: number };
+  checks: DiagnosticCheck[];
+}
+
 interface CatalogItem {
   game_id: string;
   title: string;
@@ -414,6 +430,8 @@ const listTianyiInstalledGames = callable<[], ApiResponse<InstalledList>>("list_
 const launchTianyiInstalledGame = callable<[string], ApiResponse<Record<string, unknown>>>("launch_tianyi_installed_game");
 const openTianyiInstalledFolder = callable<[string], ApiResponse<Record<string, unknown>>>("open_tianyi_installed_folder");
 const scanTianyiInstalledGames = callable<[], ApiResponse<Record<string, unknown>>>("scan_tianyi_installed_games");
+const runTianyiDiagnostics = callable<[], ApiResponse<DiagnosticsReport>>("run_tianyi_diagnostics");
+const exportTianyiDiagnosticsFile = callable<[], ApiResponse<{ path?: string; filename?: string; size?: number; message?: string }>>("export_tianyi_diagnostics_file");
 const uninstallTianyiInstalled = callable<[Record<string, unknown>], ApiResponse<Record<string, unknown>>>("uninstall_tianyi_installed_game");
 const getTianyiLoginUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_login_url");
 const setTianyiSettings = callable<[SettingsPayload], ApiResponse<SettingsState>>("set_tianyi_settings");
@@ -1712,6 +1730,10 @@ function SettingsPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [clearingLogin, setClearingLogin] = useState<boolean>(false);
   const [scanningInstalled, setScanningInstalled] = useState<boolean>(false);
+  const [diagnosticsReport, setDiagnosticsReport] = useState<DiagnosticsReport | null>(null);
+  const [diagnosticsBusy, setDiagnosticsBusy] = useState<boolean>(false);
+  const [diagnosticsExportBusy, setDiagnosticsExportBusy] = useState<boolean>(false);
+  const [diagnosticsExportMessage, setDiagnosticsExportMessage] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("paths");
   const [settings, setSettings] = useState<SettingsState>(EMPTY_SETTINGS);
   const [storageOptions, setStorageOptions] = useState<StorageOption[]>([]);
@@ -2128,6 +2150,45 @@ function SettingsPage() {
       setBaiduQrBusy(false);
     }
   }, [baiduQrBusy]);
+
+  const onRunDiagnostics = useCallback(async () => {
+    if (diagnosticsBusy) return;
+    setDiagnosticsBusy(true);
+    try {
+      const result = await runTianyiDiagnostics();
+      if (result.status !== "success" || !result.data) {
+        throw new Error(result.message || "自检失败");
+      }
+      setDiagnosticsReport(result.data);
+      const summary = result.data.summary || {};
+      toaster.toast({
+        title: "freedeckCY 自检",
+        body: `OK ${summary.ok || 0} / 警告 ${summary.warn || 0} / 失败 ${summary.fail || 0}`,
+      });
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setDiagnosticsBusy(false);
+    }
+  }, [diagnosticsBusy]);
+
+  const onExportDiagnostics = useCallback(async () => {
+    if (diagnosticsExportBusy) return;
+    setDiagnosticsExportBusy(true);
+    try {
+      const result = await exportTianyiDiagnosticsFile();
+      if (result.status !== "success" || !result.data) {
+        throw new Error(result.message || "导出诊断包失败");
+      }
+      const message = result.data.message || `已导出：${result.data.path || ""}`;
+      setDiagnosticsExportMessage(message);
+      toaster.toast({ title: "freedeckCY 诊断包", body: message });
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setDiagnosticsExportBusy(false);
+    }
+  }, [diagnosticsExportBusy]);
 
   const onScanInstalledSettings = useCallback(async () => {
     if (scanningInstalled) return;
@@ -2857,6 +2918,77 @@ function SettingsPage() {
           </>
         ),
       },
+      {
+        id: "diagnostics",
+        title: "诊断",
+        content: (
+          <>
+            <PanelSection title="插件自检">
+              <PanelSectionRow>
+                <div style={{ fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }}>
+                  检查插件版本、状态/下载/安装目录、aria2/7zz/node、Steam 快捷方式、SD 卡、网络与百度扫码接口。
+                </div>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <ButtonItem layout="below" onClick={() => void onRunDiagnostics()} disabled={diagnosticsBusy}>
+                  {diagnosticsBusy ? "自检中..." : "运行自检"}
+                </ButtonItem>
+              </PanelSectionRow>
+              {diagnosticsReport ? (
+                <>
+                  <PanelSectionRow>
+                    <div style={{ fontSize: "12px", lineHeight: 1.6 }}>
+                      {`v${diagnosticsReport.version} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}`}
+                    </div>
+                  </PanelSectionRow>
+                  {(diagnosticsReport.checks || []).map((check) => {
+                    const color =
+                      check.status === "ok"
+                        ? "#9fe6a8"
+                        : check.status === "warn"
+                          ? "#ffd479"
+                          : check.status === "fail"
+                            ? "#ff9a8a"
+                            : "#b9c0cc";
+                    return (
+                      <PanelSectionRow key={check.id}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "100%" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
+                            <span style={{ fontWeight: 600 }}>{check.label}</span>
+                            <span style={{ color, fontSize: "12px" }}>{check.status.toUpperCase()}</span>
+                          </div>
+                          <div style={{ fontSize: "12px", opacity: 0.86, wordBreak: "break-word" }}>{check.detail}</div>
+                          {check.fix && check.status !== "ok" ? (
+                            <div style={{ fontSize: "11px", opacity: 0.7 }}>{`建议：${check.fix}`}</div>
+                          ) : null}
+                        </div>
+                      </PanelSectionRow>
+                    );
+                  })}
+                </>
+              ) : null}
+            </PanelSection>
+
+            <PanelSection title="诊断包">
+              <PanelSectionRow>
+                <div style={{ fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }}>
+                  导出 diagnostics.json、self-check.json、最新 300 行日志；cookie/token 已脱敏，写到下载目录。
+                </div>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <ButtonItem layout="below" onClick={() => void onExportDiagnostics()} disabled={diagnosticsExportBusy}>
+                  {diagnosticsExportBusy ? "打包中..." : "导出诊断包"}
+                </ButtonItem>
+              </PanelSectionRow>
+              {diagnosticsExportMessage ? (
+                <PanelSectionRow>
+                  <div style={{ fontSize: "11px", opacity: 0.82, wordBreak: "break-all" }}>{diagnosticsExportMessage}</div>
+                </PanelSectionRow>
+              ) : null}
+            </PanelSection>
+          </>
+        ),
+      },
     ],
     [
       clearingLogin,
@@ -2900,6 +3032,12 @@ function SettingsPage() {
       cloudSaveRestoreSummaryText,
       cloudSaveRestoreState.message,
       cloudSaveRestoreState.progress,
+      diagnosticsReport,
+      diagnosticsBusy,
+      diagnosticsExportBusy,
+      diagnosticsExportMessage,
+      onRunDiagnostics,
+      onExportDiagnostics,
     ],
   );
 

@@ -406,6 +406,16 @@ _REDACT_PATTERN = re.compile(
 )
 
 
+def _write_private_file(path: str, data: bytes) -> None:
+    """写 0600 文件（诊断包可能含路径/错误信息）。"""
+    with open(path, "wb") as fh:
+        fh.write(data)
+    try:
+        os.chmod(path, 0o600)
+    except Exception:
+        pass
+
+
 def _redact_text(text: str) -> str:
     """脱敏：替换 HOME 路径与 cookie/token 类键值。"""
     value = str(text or "")
@@ -7214,9 +7224,223 @@ class TianyiService:
             "log_tail": log_tail,
         }
 
+    async def _runtime_version_check(self, path: str, args: Sequence[str]) -> Tuple[bool, str]:
+        """运行运行时 --version，返回 (ok, 摘要)。"""
+        if not path or not os.path.isfile(path):
+            return False, "文件不存在"
+        if not os.access(path, os.X_OK):
+            return False, "没有执行权限"
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                path,
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                return False, "执行超时"
+            text = (stdout or b"").decode("utf-8", "replace").strip().splitlines()
+            return proc.returncode == 0, (text[0][:160] if text else f"exit={proc.returncode}")
+        except Exception as exc:
+            return False, f"{type(exc).__name__}: {exc}"[:200]
+
+    async def run_diagnostics(self, include_network: bool = True) -> Dict[str, Any]:
+        """运行可用性自检，供 QAM/诊断包定位问题（不输出 cookie/token）。"""
+        checks: List[Dict[str, str]] = []
+
+        def add(check_id: str, label: str, status: str, detail: str, fix: str = "") -> None:
+            checks.append(
+                {
+                    "id": check_id,
+                    "label": label,
+                    "status": status,
+                    "detail": _redact_text(detail)[:500],
+                    "fix": fix[:300],
+                }
+            )
+
+        root = ""
+        try:
+            root = str(getattr(decky, "DECKY_PLUGIN_DIR", "") or "")
+        except Exception:
+            root = ""
+        if not root:
+            root = str(os.getenv("DECKY_PLUGIN_DIR", "") or "")
+        arch = _runtime_arch_name()
+
+        # 插件版本/目录
+        version = self._plugin_version()
+        add("plugin", "插件版本", "ok" if version else "warn", f"v{version or '未知'}；{root or '未获取插件目录'}", "确认已通过 Decky 安装并重启插件")
+
+        # 状态目录可写
+        state_dir = os.path.dirname(os.path.abspath(self.store.state_file))
+        try:
+            os.makedirs(state_dir, exist_ok=True)
+            probe = os.path.join(state_dir, ".diag-write-test")
+            with open(probe, "w", encoding="utf-8") as fh:
+                fh.write("ok")
+            os.remove(probe)
+            mode = oct(os.stat(self.store.state_file).st_mode & 0o777) if os.path.isfile(self.store.state_file) else "未创建"
+            add("state_dir", "状态目录", "ok", f"{_redact_text(state_dir)} 可写；state={mode}", "检查 ~/.local/share/freedeckCY 权限")
+        except Exception as exc:
+            add("state_dir", "状态目录", "fail", f"{_redact_text(state_dir)} 不可写：{exc}", "修复目录权限或磁盘空间")
+
+        # 下载/安装目录
+        for key, label in (("download_dir", "下载目录"), ("install_dir", "安装目录")):
+            value = str(getattr(self.store.settings, key, "") or "").strip()
+            if not value:
+                add(key, label, "warn", "未设置", "在设置 → 路径里选择目录")
+                continue
+            path = os.path.realpath(os.path.expanduser(value))
+            try:
+                os.makedirs(path, exist_ok=True)
+                usage = shutil.disk_usage(path)
+                free_gb = usage.free / (1024 ** 3)
+                status = "ok"
+                detail = f"{_redact_text(path)}；剩余 {free_gb:.1f} GB"
+                fix = ""
+                if not os.access(path, os.W_OK):
+                    status, detail, fix = "fail", f"{_redact_text(path)} 不可写", "重新选择目录/修复权限"
+                elif free_gb < 2:
+                    status, detail, fix = "warn", f"{_redact_text(path)} 剩余仅 {free_gb:.2f} GB", "清理空间或换 SD 卡"
+                add(key, label, status, detail, fix)
+            except Exception as exc:
+                add(key, label, "fail", f"{_redact_text(path)} 不可用：{exc}", "重新选择目录")
+
+        # 运行时
+        for component, rel, args in (
+            ("aria2", "aria2c", ("--version",)),
+            ("7z", "7zz", ("i",)),
+            ("node", os.path.join("bin", "node"), ("--version",)),
+        ):
+            path = os.path.join(root, "defaults", "runtime", component, arch, rel)
+            ok, detail = await self._runtime_version_check(path, list(args))
+            add(
+                f"runtime_{component}",
+                f"运行时 {component}",
+                "ok" if ok else "fail",
+                f"{detail}；{_redact_text(path)}",
+                "重新安装插件包，或执行 make runtime 后重打包",
+            )
+
+        # 目录
+        try:
+            total = len(self.catalog.entries)
+            add(
+                "catalog",
+                "游戏目录",
+                "ok" if total > 0 else "fail",
+                f"{total} 条，平台 {len(self.catalog.platform_counts())} 个，封面 {self.catalog.cover_index_total} 个",
+                "检查 defaults/tianyi_catalog 是否存在",
+            )
+        except Exception as exc:
+            add("catalog", "游戏目录", "fail", f"读取失败：{exc}", "重新安装插件包")
+
+        # Steam
+        try:
+            steam_root = await asyncio.to_thread(_find_steam_root)
+            if not steam_root:
+                add("steam", "Steam 目录", "fail", "未找到 Steam 安装目录", "确认 Steam 已安装/路径可访问")
+            else:
+                shortcut_info = await asyncio.to_thread(list_all_shortcuts_sync)
+                rows = shortcut_info.get("rows") if isinstance(shortcut_info, dict) else []
+                count = len(rows or [])
+                if shortcut_info.get("ok"):
+                    add("steam", "Steam 快捷方式", "ok", f"{_redact_text(steam_root)}；{count} 个快捷方式", "")
+                else:
+                    add(
+                        "steam",
+                        "Steam 快捷方式",
+                        "warn",
+                        f"{_redact_text(steam_root)}；{shortcut_info.get('message', '读取失败')}",
+                        "确认 Steam 已登录且 userdata 可读",
+                    )
+        except Exception as exc:
+            add("steam", "Steam 快捷方式", "warn", f"检查失败：{exc}", "查看日志 shortcuts 相关错误")
+
+        # 存储挂载
+        try:
+            storage = await asyncio.to_thread(detect_storage_options, home=os.path.expanduser("~"))
+            external = storage.get("external") or []
+            labels = "，".join(str(item.get("label", "")) for item in external[:5]) or "无"
+            add("storage", "SD/外置存储", "ok", f"检测到 {len(external)} 个：{labels}", "如未挂载，先在 SteamOS 挂载 SD 卡")
+        except Exception as exc:
+            add("storage", "SD/外置存储", "warn", f"检测失败：{exc}", "")
+
+        # 网络 / 百度二维码
+        if include_network:
+            try:
+                timeout = aiohttp.ClientTimeout(total=8, connect=5)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get("https://cloud.189.cn/") as response:
+                        add(
+                            "network_tianyi",
+                            "天翼云网络",
+                            "ok" if int(response.status) < 500 else "warn",
+                            f"HTTP {int(response.status)}",
+                            "检查网络/DNS/代理",
+                        )
+            except Exception as exc:
+                add("network_tianyi", "天翼云网络", "warn", f"{type(exc).__name__}: {exc}", "检查网络/DNS/代理")
+
+            try:
+                qr = await asyncio.wait_for(request_qr(), timeout=12)
+                add("baidu_qr", "百度扫码接口", "ok", f"getqrcode 正常（sign 长度 {len(qr.get('sign', ''))}）", "")
+            except Exception as exc:
+                add(
+                    "baidu_qr",
+                    "百度扫码接口",
+                    "fail",
+                    f"{type(exc).__name__}: {exc}",
+                    "检查 passport.baidu.com 连通性/证书；v0.19.2+ 已内置 TLS 回退",
+                )
+        else:
+            add("baidu_qr", "百度扫码接口", "skip", "未执行网络检查", "")
+
+        # 任务/已安装
+        failed_tasks = sum(1 for task in self.store.tasks if str(getattr(task, "status", "")).lower() in {"failed", "error"})
+        add(
+            "tasks",
+            "任务与已安装",
+            "warn" if failed_tasks else "ok",
+            f"{len(self.store.tasks)} 个任务（失败 {failed_tasks}），{len(self.store.installed_games)} 个已安装",
+            "查看主页失败任务/日志" if failed_tasks else "",
+        )
+
+        # 日志
+        try:
+            log_tail = await asyncio.to_thread(_tail_text, "/tmp/freedeckcy.log", 300)
+            error_lines = [line for line in log_tail.splitlines() if re.search(r"ERROR|Exception|失败", line)]
+            add(
+                "log",
+                "日志",
+                "warn" if error_lines else "ok",
+                f"最近错误行 {len(error_lines)} 条；/tmp/freedeckcy.log",
+                "导出诊断包查看 log-tail.txt" if error_lines else "",
+            )
+        except Exception as exc:
+            add("log", "日志", "warn", f"读取失败：{exc}", "")
+
+        summary = {"ok": 0, "warn": 0, "fail": 0, "skip": 0}
+        for check in checks:
+            status = str(check.get("status", "") or "warn")
+            summary[status] = summary.get(status, 0) + 1
+        return {
+            "generated_at": int(time.time()),
+            "version": version,
+            "arch": arch,
+            "summary": summary,
+            "checks": checks,
+        }
+
     async def export_diagnostics(self) -> bytes:
         """导出诊断 zip（diagnostics.json + log-tail.txt + README）。"""
         diagnostics = await self.get_diagnostics()
+        self_check = await self.run_diagnostics(include_network=True)
         log_tail = str(diagnostics.pop("log_tail", "") or "")
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -7224,15 +7448,37 @@ class TianyiService:
                 "diagnostics.json",
                 json.dumps(diagnostics, ensure_ascii=False, indent=2),
             )
+            archive.writestr("self-check.json", json.dumps(self_check, ensure_ascii=False, indent=2))
             archive.writestr("log-tail.txt", log_tail)
             archive.writestr(
                 "README.txt",
                 "freedeckCY 诊断包\n\n"
                 "diagnostics.json：版本/路径/运行时/任务/已安装统计（cookie 与 token 已脱敏，HOME 替换为 ~）\n"
+                "self-check.json：自检结果（插件/目录/运行时/Steam/存储/网络/百度扫码/任务/日志）\n"
                 "log-tail.txt：/tmp/freedeckcy.log 末尾 300 行（同样脱敏）\n\n"
                 "提交 issue 时请附上本 zip；如需进一步排查，可在 Deck 桌面终端运行 make doctor。\n",
             )
         return buffer.getvalue()
+
+    async def export_diagnostics_to_downloads(self) -> Dict[str, Any]:
+        """把诊断包写到下载目录，供 QAM 一键导出。"""
+        data = await self.export_diagnostics()
+        target_dir = str(self.store.settings.download_dir or "").strip()
+        if not target_dir:
+            target_dir = str(getattr(self.plugin, "downloads_dir", "") or "").strip()
+        if not target_dir:
+            target_dir = os.path.expanduser("~/Downloads")
+        target_dir = os.path.realpath(os.path.expanduser(target_dir))
+        await asyncio.to_thread(os.makedirs, target_dir, exist_ok=True)
+        filename = f"freedeckcy-diagnostics-{time.strftime('%Y%m%d-%H%M%S')}.zip"
+        path = os.path.join(target_dir, filename)
+        await asyncio.to_thread(_write_private_file, path, data)
+        return {
+            "path": _redact_text(path),
+            "filename": filename,
+            "size": len(data),
+            "message": f"诊断包已导出：{_redact_text(path)}",
+        }
 
     async def check_update(self) -> Dict[str, Any]:
         """检查 GitHub 最新 release（1 小时缓存）。"""

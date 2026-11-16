@@ -371,6 +371,14 @@ async def handle_diagnostics(request: web.Request, plugin: Any) -> web.Response:
         return _json_error_from_exception(exc, 500)
 
 
+async def handle_diagnostics_run(request: web.Request, plugin: Any) -> web.Response:
+    try:
+        data = await _service(plugin).run_diagnostics(include_network=True)
+        return _json_ok({"data": data})
+    except Exception as exc:
+        return _json_error_from_exception(exc)
+
+
 async def handle_diagnostics_export(request: web.Request, plugin: Any) -> web.Response:
     """诊断包（zip 下载）。"""
     try:
@@ -734,6 +742,7 @@ def setup_routes(app: web.Application, plugin: Any) -> None:
     app.router.add_get("/api/tianyi/storage/options", lambda request: handle_storage_options(request, plugin))
     app.router.add_get("/api/tianyi/diagnostics", lambda request: handle_diagnostics(request, plugin))
     app.router.add_get("/api/tianyi/diagnostics/export", lambda request: handle_diagnostics_export(request, plugin))
+    app.router.add_post("/api/tianyi/diagnostics/run", lambda request: handle_diagnostics_run(request, plugin))
     app.router.add_get("/api/tianyi/update-check", lambda request: handle_update_check(request, plugin))
     app.router.add_get("/api/tianyi/settings", lambda request: handle_settings_get(request, plugin))
     app.router.add_post("/api/tianyi/settings", lambda request: handle_settings_set(request, plugin))

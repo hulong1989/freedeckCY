@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.21.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.22.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -47,7 +47,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（352 个用例；原生库为前端构建验证）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（353 个用例；原生库为前端构建验证）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -336,7 +336,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **352 个用例**（`make test` 实测 `352 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **353 个用例**（`make test` 实测 `353 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -891,6 +891,34 @@ scan_tianyi_installed_games()
 
 **Web 库保留**：`defaults/tianyi_library_ui/` 仍可用 `http://127.0.0.1:59271/` 打开（桌面/调试/回退）；原生库通过 callable 直连 Python，不依赖本地 HTTP 与 CORS。
 
+### 6.15 诊断自检（v0.22.0）
+
+**QAM 设置 → 诊断**：「运行自检」调 callable `run_tianyi_diagnostics`；「导出诊断包」调 `export_tianyi_diagnostics_file`（写到下载目录并 toast 路径）。
+
+**命令/API**：
+
+```bash
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m json.tool
+# 返回 version/arch/summary{ok,warn,fail,skip}/checks[{id,label,status,detail,fix}]
+```
+
+**检查项**：plugin（版本/目录）、state_dir（可写/权限）、download_dir/install_dir（存在/可写/剩余空间，<2GB warn）、runtime_aria2/7z/node（存在+可执行+`--version`/`i`，5s）、catalog（条数/平台/封面）、steam（root + `list_all_shortcuts_sync` 数量）、storage（SD/外置挂载）、network_tianyi（GET cloud.189.cn）、baidu_qr（`request_qr()` 12s，只输出 sign 长度）、tasks（失败/已安装）、log（末尾 300 行 ERROR/Exception/失败 数）。
+
+**导出包**（`export_diagnostics_to_downloads`）：`diagnostics.json` + `self-check.json` + `log-tail.txt` + `README.txt`，写到 `settings.download_dir`（空则插件 downloads 目录，再退 `~/Downloads`），文件名 `freedeckcy-diagnostics-YYYYmmdd-HHMMSS.zip`，权限 0600。
+
+**常见失败项**：
+
+| 检查 | 处理 |
+|---|---|
+| runtime_* fail | 包内 `defaults/runtime/<component>/<arch>/` 缺失/不可执行；重装插件包或 `make runtime` 后重打包 |
+| steam warn/fail | Steam 未登录/`userdata` 不可读；确认 `FREEDECKCY_STEAM_ROOT` 指向正在运行的客户端 |
+| state_dir fail | `~/.local/share/freedeckCY` 权限/磁盘；修复后重跑 |
+| download/install warn | 剩余 <2GB 或不可写；清理空间/换 SD 卡/重新选目录 |
+| baidu_qr fail | 网络/DNS/证书；v0.19.2+ 有 TLS 回退；看 detail 里的异常类型 |
+| network_tianyi warn | 网络/代理/DNS；不影响本地功能，但安装需联网 |
+
+**测试**：`python -m pytest tests/test_diagnostics.py -q`（`include_network=False` 的结构用例）；自检不自动修复。
+
 ---
 
 ## 7. 常见故障排查---
@@ -941,6 +969,7 @@ scan_tianyi_installed_games()
 | **提交校验报链接不是 cloud.189.cn** | `share_url` 必须是 `https://cloud.189.cn/...`；支持 `/t/<shareCode>` 与 `/web/share?code=<shareCode>`，其它域名/短链先展开成天翼云盘原始分享链接 |
 | **openpath 缺失/包含 ..** | `openpath` 是分享根目录下游戏文件或压缩包的相对路径（如 `Stardew Valley/Stardew Valley.7z`），不能以 `/` 开头、不能含 `..`；安装器靠它分页定位文件 |
 | **提交报重复 shareCode** | 同一分享链接已在目录 CSV 或本批其它 JSON 里；用 `python scripts/validate_submissions.py --json` 看具体 shareCode，换链接或删除重复文件 |
+| **诊断自检某几项失败** | 设置 → 诊断「运行自检」看 status/detail/fix；runtime_* 检查包内 `defaults/runtime/<component>/<arch>/`，steam 检查登录/`FREEDECKCY_STEAM_ROOT`，network/baidu_qr 检查连通性；自检不自动修复 |
 | **导出诊断没反应/下载失败** | 诊断 zip 由浏览器直接 `GET /api/tianyi/diagnostics/export` 下载；若浏览器拦截下载，用 `curl -s -OJ http://127.0.0.1:59271/api/tianyi/diagnostics/export` 手工保存；接口本身失败时看 `/tmp/freedeckcy.log` 的 traceback |
 | **检查更新失败** | `update-check` 依赖 `api.github.com`：无网络、代理不通或 GitHub API 未认证限流（60 次/小时/IP）都会返回 `ok:false` + message；等一会儿或手工打开 Release 页；成功结果会缓存 1 小时，不必连续点 |
 | **GBA 计划报「未找到 mGBA」** | v0.10.0 起 GBA 也首次安装**自动下载**；失败先看网络/代理，或 `FREEDECKCY_MGBA_BIN=/path/to/mgba` 指向系统/手工预置的 mGBA，或安装 Flatpak `io.mgba.mGBA`；诊断接口 `emulators.gba` 会显示 available/source/message |
@@ -977,6 +1006,8 @@ scan_tianyi_installed_games()
 ---
 
 ## 8. 已知限制
+
+- **诊断自检（v0.22.0）**：一次性快照，网络项受连通性影响；不自动修复，只给 detail/fix；`baidu_qr` 只输出 sign 长度（不含 sign/cookie）；导出包写 0600 zip 到下载目录并含 300 行日志（已脱敏），提交前建议自行过目；不支持在线查看日志/上传诊断包。
 
 - **Decky 原生游戏库（v0.20.0）**：库页只有列表/分页/安装与已安装动作，任务进度仍在 QAM 主页任务区；无封面卡片视图，固定 20 条/页；**v0.21.0 起扫描入口在设置（不在库页）**，仍只认 `settings.install_dir` 一层；卸载固定 `delete_files=true`（不弹 compatdata 回收）；网页库保留为备用，两套 UI 可能短暂不同步。
 - **扫描补 Steam 快捷方式（v0.21.0）**：PC 需能找到 .exe（排除常见安装器/运行库），模拟器需已安装（不自动下载），否则记 `shortcut_error`；只写 `shortcuts.vdf`，Steam 需重启/切用户/重开库页才可见；不覆盖已有同名同 exe 快捷方式。
@@ -1028,6 +1059,7 @@ scan_tianyi_installed_games()
 | 改 Ludusavi 清单/匹配 | `scripts/fetch_ludusavi_manifest.py`（重新生成）、`py_modules/save_manifest.py`（`match_manifest` / `resolve_manifest_paths` / `_placeholder_bases`） |
 | 改 gamewatch / 自动上传 | `py_modules/gamewatch.py`（`GameWatcher.poll` / `is_game_running`）、`tianyi_service._poll_game_watch` / `_maybe_auto_cloud_upload` / `_cloud_save_fingerprint`、设置项 `cloud_save_auto_upload` |
 | 改原生游戏库 | `src/index.tsx` 的 `LIBRARY_ROUTE`/`LibraryPage`/`routerHook.addRoute`；callable 见 `main.py` 的 `list/prepare/start_tianyi_*` 与 `tianyi_service` 对应方法；网页库备用 |
+| 改诊断自检 | `tianyi_service.run_diagnostics()` / `export_diagnostics_to_downloads()`；`main.py` 的 `run_tianyi_diagnostics`/`export_tianyi_diagnostics_file`；QAM 设置「诊断」页 |
 | 改存储位置选择 | `py_modules/storage_options.py`（`detect_storage_options`/挂载前缀/过滤）、`tianyi_service.get_storage_options`、`GET /api/tianyi/storage/options`、QAM 路径页按钮 |
 | 改卸载 / Proton 前缀回收 | `py_modules/tianyi_service.py` 的 `preview_uninstall` / `uninstall_installed_game` / `_can_remove_compatdata_dir` + `py_modules/steam_shortcuts.py` 的 `find_compatdata_dirs` |
 | 改任务重试语义 | `py_modules/tianyi_service.py` 的 `retry_task` + `src/index.tsx`（任务行「重试」按钮） |
@@ -1056,7 +1088,7 @@ scan_tianyi_installed_games()
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 352 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 353 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
@@ -1064,6 +1096,7 @@ scan_tianyi_installed_games()
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
 - [ ] 改模拟器存档发现/恢复后跑 `pytest tests/test_emulator_saves.py -q`：单游戏不退化成整目录、共享目录去重、PARAM.SFO/3DS 拆分、恢复目标白名单、开关关闭；PS1 多碟跑 `tests/test_emulator.py` 的 m3u 用例；
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
+- [ ] 改诊断后跑 `pytest tests/test_diagnostics.py -q`，确认 checks 结构/summary；导出包含 `self-check.json` 且权限 0600；
 - [ ] 改原生库后跑 `pnpm build`、重载插件；确认 `/freedeckcy/library` 路由、搜索/筛选/分页、安装确认与已安装动作；`make test` 仍 351；
 - [ ] 改存储检测后跑 `pytest tests/test_storage_options.py -q`，确认系统挂载过滤、外置目录/容量字段；QAM 路径页按钮能切换且刷新；
 - [ ] 改扫描已安装后跑 `pytest tests/test_install_pipeline.py -q`（扫描回填/自动补快捷方式用例），确认只扫一层、path/game_id 去重、同名同 exe 不重复、PC exe 查找与模拟器 wrapper；Steam 重启后再核对 `shortcuts.vdf`；

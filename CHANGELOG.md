@@ -2,6 +2,24 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.22.0
+
+### 新增
+
+- **诊断自检**：QAM 设置新增「诊断」页。
+  - 「运行自检」检查：插件版本、状态目录权限、下载/安装目录与剩余空间、
+    aria2/7zz/node 可执行、Steam 快捷方式读取、SD/外置挂载、天翼云网络、
+    百度扫码 `getqrcode`、任务/已安装、最近日志错误；
+  - 每条返回 `ok/warn/fail/skip` + 具体原因 + 修复建议；
+  - 「导出诊断包」写到下载目录，包含 `diagnostics.json`、`self-check.json`、
+    `log-tail.txt`（最多 300 行），cookie/token 脱敏。
+- HTTP `POST /api/tianyi/diagnostics/run`；main callable
+  `run_tianyi_diagnostics` / `export_tianyi_diagnostics_file`。
+
+### 变更
+
+- 测试 352 → 353（诊断自检结构）。
+
 ## v0.21.0
 
 ### 变更

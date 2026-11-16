@@ -330,6 +330,22 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def run_tianyi_diagnostics(self) -> dict:
+        """运行插件自检（网络/运行时/Steam/百度扫码等）。"""
+        try:
+            data = await self._get_tianyi_service().run_diagnostics(include_network=True)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def export_tianyi_diagnostics_file(self) -> dict:
+        """把诊断包写到下载目录。"""
+        try:
+            data = await self._get_tianyi_service().export_diagnostics_to_downloads()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def list_tianyi_catalog(self, payload=None, query: str = "", page: int = 1, page_size: int = 20, platform: str = "", category: str = "", sort: str = "") -> dict:
         """原生 QAM 游戏库：分页查询目录。"""
         try:
