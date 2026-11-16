@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.24.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.25.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -47,7 +47,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（353 个用例；原生库为前端构建验证）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（354 个用例；原生库为前端构建验证）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -336,7 +336,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **353 个用例**（`make test` 实测 `353 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **354 个用例**（`make test` 实测 `354 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -866,7 +866,7 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 
 **入口（v0.23.0）**：QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)`**，失败才 `Navigation.Navigate("/freedeckcy/library")`；`routerHook.addRoute` 仍注册全屏入口，卸载移除。旧的网页库（`defaults/tianyi_library_ui/`）保留为备用（桌面浏览器/回退），两者共用同一后端。
 
-**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。⚠️ 当前源码 `PLUGIN_UI_BUILD` 仍为 `0.23.0`（见 `src/index.tsx` 顶部常量），发布 v0.24.0 前应同步为 `0.24.0` 并重新构建，否则标识会显示旧版本。
+**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。⚠️ 当前源码 `PLUGIN_UI_BUILD` 为 `0.24.0`（见 `src/index.tsx` 顶部常量），而 `package.json` 已是 `0.25.0`；发布 v0.25.0 前应同步常量并重新构建，否则标识会显示旧版本。
 
 **返回/关闭测试（v0.24.0）**：
 
@@ -896,6 +896,7 @@ scan_tianyi_installed_games()
 
 | 现象 | 处理 |
 |---|---|
+| **Steam 原有游戏详情页出现插件时长块** | v0.25.0 起前端只在 `managed===true` 渲染、未匹配直接 `return null`；确认前端 dist/插件已重载、Steam 库页重开；后端未匹配会返回 `managed=false` 且不查 HLTB；同名游戏可能因标题匹配被误认，需 AppID 优先/手动核对 `installed_games` |
 | **游戏库无法返回/困在库页** | v0.24.0 起顶部 sticky 栏和标题栏都有「返回」；modal 用 `onClose`→`modal.Close()`，route 用 `Navigation.NavigateBack()`；「Steam 库」走 `Router.NavigateToLibraryTab()`；B/Esc 在 Steam 覆盖层不一定生效，优先点显式按钮；route 返回依赖导航栈 |
 | QAM 点「游戏库」仍打开网页/没页面 | v0.23.0 起优先 `showModal(<LibraryPage />)`、失败才走路由；先确认主页有 `QAM 原生 UI v0.23.0`、库页有 `原生 UI · v0.23.0`（没有即 dist 未更新/未重载）；再看 Decky 日志里 modal/route 报错 |
 | 列表空/搜索无结果 | 目录 CSV 是否加载；`list_tianyi_catalog` 的 query/platform/category/sort/page_size 参数；空查询应返回全部 |
@@ -934,6 +935,22 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 | network_tianyi warn | 网络/代理/DNS；不影响本地功能，但安装需联网 |
 
 **测试**：`python -m pytest tests/test_diagnostics.py -q`（`include_network=False` 的结构用例）；自检不自动修复。
+
+### 6.16 库页时长块隔离（v0.25.0）
+
+**目标**：Steam 原有游戏详情页不再出现 freedeckCY 的「已玩时长 / 主线 / 总时长」块；只有插件安装/补录的游戏才显示。
+
+**验证方法**：
+
+1. **Steam 原有游戏**：打开一个非 freedeckCY 安装的 Steam 游戏详情页 → 不应出现时长块（也不应短暂出现"加载中"）；
+2. **插件安装游戏**：打开通过安装/扫描补录的游戏详情页 → 应出现「我的游玩 / 主线 / 总时长」块；
+3. **接口层**：`get_library_game_time_stats(app_id=<原版游戏>, title=...)` 应返回 `managed=false`、`reason="not_managed"`、全 0，且日志里没有 HLTB 查询；`app_id=<插件游戏>` 返回 `managed=true`。
+
+**匹配顺序**：先 `_resolve_installed_record_by_app_id()` 按 AppID 精确匹配 → 未命中才按标题归一化（`_normalize_cover_text`，双向包含）；AppID 优先用于避免同名 Steam 游戏误判。
+
+**测试**：`python -m pytest tests/test_diagnostics.py -q`（`test_library_time_stats_unmanaged_games_get_no_hltb`：未托管 → `managed=false` 且不查 HLTB）。
+
+**排障**：原版游戏仍出现块 → 确认前端 `dist` 是 v0.25.0+、Steam 库页是否缓存旧 patch（重启 Steam/重载插件）；插件游戏不出现块 → 检查该游戏是否在 `installed_games`、AppID/标题是否匹配；HLTB 查询失败只影响块内数值。
 
 ---
 
@@ -1023,6 +1040,8 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 
 ## 8. 已知限制
 
+- **库页时长块（v0.25.0）**：只有 `managed=true`（AppID 或标题匹配到 `installed_games`）才插入块；未匹配的 Steam 原有游戏直接 `return null` 且不查 HLTB；AppID 优先降低同名误判但非绝对；HLTB 失败只影响块内数据；仍依赖 Steam 库页内部结构，Steam 更新可能使 patch 失效。
+
 - **诊断自检（v0.22.0）**：一次性快照，网络项受连通性影响；不自动修复，只给 detail/fix；`baidu_qr` 只输出 sign 长度（不含 sign/cookie）；导出包写 0600 zip 到下载目录并含 300 行日志（已脱敏），提交前建议自行过目；不支持在线查看日志/上传诊断包。
 
 - **Decky 原生游戏库（v0.20.0）**：库页只有列表/分页/安装与已安装动作，任务进度仍在 QAM 主页任务区；无封面卡片视图，固定 20 条/页；**v0.21.0 起扫描入口在设置（不在库页）**，仍只认 `settings.install_dir` 一层；卸载固定 `delete_files=true`（不弹 compatdata 回收）；网页库保留为备用，两套 UI 可能短暂不同步。
@@ -1075,6 +1094,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 | 改 Ludusavi 清单/匹配 | `scripts/fetch_ludusavi_manifest.py`（重新生成）、`py_modules/save_manifest.py`（`match_manifest` / `resolve_manifest_paths` / `_placeholder_bases`） |
 | 改 gamewatch / 自动上传 | `py_modules/gamewatch.py`（`GameWatcher.poll` / `is_game_running`）、`tianyi_service._poll_game_watch` / `_maybe_auto_cloud_upload` / `_cloud_save_fingerprint`、设置项 `cloud_save_auto_upload` |
 | 改原生游戏库 | `src/index.tsx` 的 `LIBRARY_ROUTE`/`LibraryPage`/`routerHook.addRoute`；callable 见 `main.py` 的 `list/prepare/start_tianyi_*` 与 `tianyi_service` 对应方法；网页库备用 |
+| 改库页时长块 | `src/index.tsx` 的 `LibraryTimeBlock`（`managed` 门禁）/`installLibraryPlaytimePatch`；`tianyi_service.get_library_game_time_stats()`（AppID→标题匹配、未匹配不查 HLTB） |
 | 改诊断自检 | `tianyi_service.run_diagnostics()` / `export_diagnostics_to_downloads()`；`main.py` 的 `run_tianyi_diagnostics`/`export_tianyi_diagnostics_file`；QAM 设置「诊断」页 |
 | 改存储位置选择 | `py_modules/storage_options.py`（`detect_storage_options`/挂载前缀/过滤）、`tianyi_service.get_storage_options`、`GET /api/tianyi/storage/options`、QAM 路径页按钮 |
 | 改卸载 / Proton 前缀回收 | `py_modules/tianyi_service.py` 的 `preview_uninstall` / `uninstall_installed_game` / `_can_remove_compatdata_dir` + `py_modules/steam_shortcuts.py` 的 `find_compatdata_dirs` |
@@ -1104,7 +1124,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 353 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 354 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
@@ -1112,6 +1132,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
 - [ ] 改模拟器存档发现/恢复后跑 `pytest tests/test_emulator_saves.py -q`：单游戏不退化成整目录、共享目录去重、PARAM.SFO/3DS 拆分、恢复目标白名单、开关关闭；PS1 多碟跑 `tests/test_emulator.py` 的 m3u 用例；
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
+- [ ] 改库页时长逻辑后验证：原版 Steam 游戏详情页无块、插件游戏有块；`get_library_game_time_stats` 对未托管返回 `managed=false` 且不查 HLTB；`pytest tests/test_diagnostics.py -q`；
 - [ ] 改原生库返回逻辑后验证三种路径：modal「返回」、modal「Steam 库」、route「返回」；滚动后 sticky 栏仍可点；必要时用 `Navigation.NavigateBack` 回退验证；
 - [ ] 改原生库入口/百度 QR 后跑 `pnpm build`、重载插件：确认 `QAM 原生 UI v0.23.0`/`原生 UI · v0.23.0`、点游戏库走 modal；QR 超时日志包含 `Baidu QR ...`；
 - [ ] 改诊断后跑 `pytest tests/test_diagnostics.py -q`，确认 checks 结构/summary；导出包含 `self-check.json` 且权限 0600；

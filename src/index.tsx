@@ -30,7 +30,7 @@ import { FaCloudDownloadAlt } from "react-icons/fa";
 type ApiStatus = "success" | "error";
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.24.0";
+const PLUGIN_UI_BUILD = "0.25.0";
 
 interface ApiResponse<T> {
   status: ApiStatus;
@@ -1502,11 +1502,12 @@ function LibraryTimeBlock({ appId, title }: { appId: number; title: string }) {
     };
   }, [appIdText, cacheKey, titleText]);
 
-  const isLoading = !data;
-  const myPlaytime = isLoading ? "加载中" : formatPlaytimeText(data.my_playtime_seconds || 0, data.my_playtime_text);
-  const mainStory = isLoading ? "加载中" : normalizeHoursText(data.main_story_hours, data.main_story_time_text);
-  const totalTime = isLoading ? "加载中" : normalizeHoursText(data.total_hours, data.total_time_text);
-  const activeSuffix = !isLoading && data?.my_playtime_active ? "（进行中）" : "";
+  // 只给 freedeckCY 安装记录对应的游戏显示时长；Steam 原有游戏不插入任何时长/日期块。
+  if (!data || data.managed !== true) return null;
+  const myPlaytime = formatPlaytimeText(data.my_playtime_seconds || 0, data.my_playtime_text);
+  const mainStory = normalizeHoursText(data.main_story_hours, data.main_story_time_text);
+  const totalTime = normalizeHoursText(data.total_hours, data.total_time_text);
+  const activeSuffix = data.my_playtime_active ? "（进行中）" : "";
 
   return (
     <div

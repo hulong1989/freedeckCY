@@ -1,6 +1,6 @@
 # freedeckCY 架构说明
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.24.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.25.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -18,11 +18,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 这是阅读本仓库最容易踩的坑：**GitHub Releases 里的成品功能远多于仓库代码**。
 
-> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.24.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
+> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.25.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.24.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭 |
+| 本仓库 `main` | `package.json` 版本 `0.25.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块 |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -31,6 +31,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 - **仓库代码只是早期版本**：releases 里的百度网盘、模拟器、资源池等模块在 `main` 上完全不存在。不要在本仓库里寻找它们。
 - **仓库缺运行时二进制**：`aria2_manager.py` / `seven_zip_manager.py` / `tianyi_client.py` 会优先查找 `defaults/runtime/` 下的 `aria2c`、`7zz`、`node`，但仓库本身不提交这些文件（已在 `.gitignore` 中）。插件可以不带它们启动，但要完整跑通下载/安装/云存档，克隆后必须先执行 `make runtime` 补齐，否则会分别报"下载组件不可用 / 解压组件不可用 / 未找到 node 运行时"。release zip 约 50 MB 与源码约 1 MB 的差值，主要就是这些二进制。
 - **作者已停止维护**：NewFreedeck v0.1 的发布说明原文是"目前我没有精力与时间继续维护，抱歉，所以可以根据我整理的 skill 自行修改，最后可以给我推 pr"。
+- **v0.25.0 库详情时长块按 managed 隔离**：`LibraryTimeBlock` 只在 `data.managed === true` 时渲染，未匹配/未加载直接 `return null`（不再对 Steam 原有游戏插入"已玩/主线/总时长"，也不先显示"加载中"）；后端 `get_library_game_time_stats()` **先按 AppID** `_resolve_installed_record_by_app_id`、再按标题匹配，未匹配返回 `managed=false` + 全 0 且**不调用 `resolve_hltb_stats`**；只影响插件安装的游戏（见 7.3）。
 - **v0.24.0 原生库返回/关闭修复**：`LibraryPage` 新增 `onClose?`——modal 模式 `showModal(<LibraryPage onClose={() => modal.Close()} />)`，route 模式无 `onClose` 时 `handleClose` 用 `Navigation.NavigateBack()`；顶部新增 **sticky 固定栏**（返回/Steam 库/刷新，滚动仍可见），标题栏也保留「返回」；「Steam 库」关闭 modal/返回后 `Router.NavigateToLibraryTab()` 回 Steam 库（失败再 `NavigateBack`）（见 5.16）。
 - **v0.23.0 原生库兜底 + 百度扫码超时/反馈**：QAM「游戏库」改为 **`showModal(<LibraryPage />)` 优先**、失败才 `Navigation.Navigate(LIBRARY_ROUTE)`（全屏路由保留）；主页显示 `QAM 原生 UI v0.23.0`、库页标题下显示 `原生 UI · v0.23.0` 便于确认前端是否更新；百度扫码点击立即 toast，前端 `withTimeout`（start 20s/poll 15s）、后端 `wait_for(request_qr, 12)`/图片 10s，超时给出明确文案并记 `Baidu QR ...` 日志（见 5.13 / 5.16）。
 - **v0.22.0 诊断自检 + 一键诊断包**：QAM 设置新增「诊断」页（运行自检/导出诊断包）；`run_diagnostics()` 检查插件/目录/runtime/目录数据/Steam/存储/天翼网络/百度扫码/任务/日志，每项 `ok|warn|fail|skip` + detail/fix；`export_diagnostics()` 的 zip 新增 `self-check.json`，`export_diagnostics_to_downloads()` 写到下载目录（0600，`freedeckcy-diagnostics-<时间>.zip`）；百度 QR 自检只返回 sign 长度，不输出 sign/cookie（见 5.17）。
@@ -111,7 +112,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 repo/
 ├── main.py                     # 插件入口：Plugin 类，24 个可调用 RPC，大部分薄转发给 TianyiService / server_manager
 ├── plugin.json                 # Decky 元信息（api_version=1, flags=[]，publish 描述已更新）
-├── package.json                # 版本 0.24.0；build=rollup；前端依赖
+├── package.json                # 版本 0.25.0；build=rollup；前端依赖
 ├── decky.pyi                   # Decky Python API 类型存根
 ├── Makefile                    # runtime / package / test / doctor / validate-catalog / validate-submissions / clean / help 目标（见 DEVELOPMENT.md）
 ├── requirements-dev.txt        # 开发与 CI 依赖（pytest 等，运行期依赖由 Decky 自带）
@@ -168,7 +169,7 @@ repo/
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（353 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
+├── tests/                      # pytest 单测（354 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -231,7 +232,7 @@ Steam Deck (Game Mode)
 | 交互特点 | 900 ms / 6 s / 30 s 三档轮询 | 手柄/键盘双焦点模型（160 ms 轮询、方向键导航、A/B/X/Y/L1/R1 快捷键，为掌机设计；详见 5.8） |
 | 怎么打开 | 插件自带 | 调 RPC 拿 URL → `SteamClient.Browser.OpenUrl`（Steam 内置浏览器），不是 iframe/webview |
 
-QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `PanelSection` 组成，代码在 [src/index.tsx:3136](../src/index.tsx) `Content()` 到文件末尾；设置页是 `Tabs` 四页（路径 / 安装 / 下载 / 账号），在 [src/index.tsx:1729](../src/index.tsx) `SettingsPage()`。
+QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `PanelSection` 组成，代码在 [src/index.tsx:3137](../src/index.tsx) `Content()` 到文件末尾；设置页是 `Tabs` 四页（路径 / 安装 / 下载 / 账号），在 [src/index.tsx:1730](../src/index.tsx) `SettingsPage()`。
 
 ### 5.4 前端调用面
 
@@ -272,10 +273,10 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 - 列名兼容：横版 `cover_url` / `landscape_cover_url` / `cover`；竖版 `cover_portrait_url` / `square_cover_url` / `portrait_url` / `portrait`；appid `steam_appid` / `app_id` / `appid`；
 - 合并规则（[game_catalog.py:491](../py_modules/game_catalog.py) `_merge_cover_index()`）：先按 `game_id` 精确匹配，其次按标题（去空白、小写）匹配；**只补空值，不覆盖目录 CSV 已有值**；`platform` 也可被索引补齐；合并后 **6823 / 7084 条资源自带封面（96.3%）**；`summary()` 汇总 `cover_index_total` / `with_cover` / `platforms`。
 
-**封面解析优先级**（[tianyi_service.py:2301](../py_modules/tianyi_service.py) `resolve_catalog_cover()`）：
+**封面解析优先级**（[tianyi_service.py:2279](../py_modules/tianyi_service.py) `resolve_catalog_cover()`）：
 
-1. **目录/封面索引静态封面**（[tianyi_service.py:2273](../py_modules/tianyi_service.py) `_catalog_entry_cover()`）：CSV/索引自带 `cover_url`/`cover_portrait_url` 直接用；只有 `steam_appid` 时合成 Steam CDN 图（横版 `.../apps/<appid>/header.jpg`、竖版 `.../apps/<appid>/library_600x900.jpg`），`source="catalog"`；
-2. **内存 + 磁盘缓存**（[tianyi_service.py:2221](../py_modules/tianyi_service.py) `_load_cover_cache()` / [tianyi_service.py:2250](../py_modules/tianyi_service.py) `_save_cover_cache()`）：`~/.local/share/freedeckCY/tianyi/cover_cache.json`（目录 0700、文件 0600、临时文件 + `os.replace` 原子写；启动时只加载未过期项）；正结果 TTL **7 天**（`CATALOG_COVER_CACHE_TTL_SECONDS`），负结果 TTL **30 分钟**（`CATALOG_COVER_NEGATIVE_TTL_SECONDS`）；
+1. **目录/封面索引静态封面**（[tianyi_service.py:2251](../py_modules/tianyi_service.py) `_catalog_entry_cover()`）：CSV/索引自带 `cover_url`/`cover_portrait_url` 直接用；只有 `steam_appid` 时合成 Steam CDN 图（横版 `.../apps/<appid>/header.jpg`、竖版 `.../apps/<appid>/library_600x900.jpg`），`source="catalog"`；
+2. **内存 + 磁盘缓存**（[tianyi_service.py:2199](../py_modules/tianyi_service.py) `_load_cover_cache()` / [tianyi_service.py:2228](../py_modules/tianyi_service.py) `_save_cover_cache()`）：`~/.local/share/freedeckCY/tianyi/cover_cache.json`（目录 0700、文件 0600、临时文件 + `os.replace` 原子写；启动时只加载未过期项）；正结果 TTL **7 天**（`CATALOG_COVER_CACHE_TTL_SECONDS`），负结果 TTL **30 分钟**（`CATALOG_COVER_NEGATIVE_TTL_SECONDS`）；
 3. **Steam 商店搜索**（`store.steampowered.com/api/storesearch`，中文/中国区，最多 8 个候选）；
 4. **ProtonDB 兼容性等级**（拿到 appid 后附加查询，仅作 `protondb_tier` 展示字段）。
 
@@ -365,9 +366,9 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **已安装页签接口**：
 
-- 列表 `GET /api/tianyi/installed`：handler [tianyi_http.py:304](../py_modules/tianyi_http.py) `handle_installed_games()` → 服务 [tianyi_service.py:6732](../py_modules/tianyi_service.py) `list_installed_games()`；返回 `{total, items[]}`，按 `updated_at` 倒序，补 `exists`（目录还在不在）、`platform`/`cover_url`/`cover_portrait_url`/`steam_appid`。
-- 启动 `POST /api/tianyi/installed/launch`：handler [tianyi_http.py:313](../py_modules/tianyi_http.py) `handle_installed_launch()` → [tianyi_service.py:6757](../py_modules/tianyi_service.py) `launch_installed_game()`；用 `_launch_external("steam://rungameid/<appid>")` 拉起 Steam，AppID 缺失时报"请从 Steam 库手动启动"。
-- 打开目录 `POST /api/tianyi/installed/open-folder`：handler [tianyi_http.py:323](../py_modules/tianyi_http.py) `handle_installed_open_folder()` → [tianyi_service.py:7113](../py_modules/tianyi_service.py) `open_installed_folder()`；先校验目录存在再 `_launch_external(install_path)`。
+- 列表 `GET /api/tianyi/installed`：handler [tianyi_http.py:304](../py_modules/tianyi_http.py) `handle_installed_games()` → 服务 [tianyi_service.py:6710](../py_modules/tianyi_service.py) `list_installed_games()`；返回 `{total, items[]}`，按 `updated_at` 倒序，补 `exists`（目录还在不在）、`platform`/`cover_url`/`cover_portrait_url`/`steam_appid`。
+- 启动 `POST /api/tianyi/installed/launch`：handler [tianyi_http.py:313](../py_modules/tianyi_http.py) `handle_installed_launch()` → [tianyi_service.py:6735](../py_modules/tianyi_service.py) `launch_installed_game()`；用 `_launch_external("steam://rungameid/<appid>")` 拉起 Steam，AppID 缺失时报"请从 Steam 库手动启动"。
+- 打开目录 `POST /api/tianyi/installed/open-folder`：handler [tianyi_http.py:323](../py_modules/tianyi_http.py) `handle_installed_open_folder()` → [tianyi_service.py:7091](../py_modules/tianyi_service.py) `open_installed_folder()`；先校验目录存在再 `_launch_external(install_path)`。
 - 卸载 `POST /api/tianyi/installed/uninstall`：handler [tianyi_http.py:350](../py_modules/tianyi_http.py) `handle_installed_uninstall()`（`delete_files` 默认 true、`delete_compatdata` 默认 false）→ 复用 `uninstall_installed_game()`。
 
 卡片显示封面、安装大小、游玩时长（缺失显示 `-`）；点击卡片启动，卡片内按钮分别打开目录/卸载；卸载走自定义 confirm，完成后刷新已安装列表 + 游戏库列表。
@@ -376,12 +377,12 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 ### 5.9 诊断与更新（v0.5.0）
 
-**`GET /api/tianyi/diagnostics`**（JSON，本地只读；handler [tianyi_http.py:365](../py_modules/tianyi_http.py) `handle_diagnostics()` → [tianyi_service.py:7141](../py_modules/tianyi_service.py) `get_diagnostics()`）：`version / python / system / arch / paths(plugin_dir, state_file, log_file, steam_root) / runtime(aria2c,7zz,node 的存在性+大小) / steam(root_exists, proton_tool, droiddeck) / catalog(total, platforms, cover_index_total, with_cover) / tasks(counts,total) / installed(total,bytes,missing_paths) / settings / recent_errors / log_tail`。
+**`GET /api/tianyi/diagnostics`**（JSON，本地只读；handler [tianyi_http.py:365](../py_modules/tianyi_http.py) `handle_diagnostics()` → [tianyi_service.py:7119](../py_modules/tianyi_service.py) `get_diagnostics()`）：`version / python / system / arch / paths(plugin_dir, state_file, log_file, steam_root) / runtime(aria2c,7zz,node 的存在性+大小) / steam(root_exists, proton_tool, droiddeck) / catalog(total, platforms, cover_index_total, with_cover) / tasks(counts,total) / installed(total,bytes,missing_paths) / settings / recent_errors / log_tail`。
 
 - 脱敏：`_redact_text()` 把 HOME 替换成 `~`，并对 `cookie / authorization / token / sessionkey / accesstoken / uid / pwd` 的键值统一替换为 `<redacted>`；
 - 日志：`_tail_text(/tmp/freedeckcy.log, 300)` 取末尾 300 行，再筛出含 `ERROR/Exception/失败` 的最近 20 行到 `recent_errors`。
 
-**`GET /api/tianyi/diagnostics/export`**（handler [tianyi_http.py:382](../py_modules/tianyi_http.py) `handle_diagnostics_export()` → [tianyi_service.py:7445](../py_modules/tianyi_service.py) `export_diagnostics()`）：内存生成 zip（`Content-Disposition: attachment; filename="freedeckcy-diagnostics.zip"`），内含：
+**`GET /api/tianyi/diagnostics/export`**（handler [tianyi_http.py:382](../py_modules/tianyi_http.py) `handle_diagnostics_export()` → [tianyi_service.py:7423](../py_modules/tianyi_service.py) `export_diagnostics()`）：内存生成 zip（`Content-Disposition: attachment; filename="freedeckcy-diagnostics.zip"`），内含：
 
 | 文件 | 内容 |
 |---|---|
@@ -389,7 +390,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 | `log-tail.txt` | 日志末尾 300 行（同样脱敏） |
 | `README.txt` | 诊断包说明 + 提交 issue 指引 |
 
-**`GET /api/tianyi/update-check`**（handler [tianyi_http.py:395](../py_modules/tianyi_http.py) `handle_update_check()` → [tianyi_service.py:7488](../py_modules/tianyi_service.py) `check_update()`）：请求 `https://api.github.com/repos/hulong1989/freedeckCY/releases/latest`（10 s 超时，未认证 GitHub API 有速率限制）；结果 `{ok, current, latest, has_update, url, name, published_at}`，`has_update = _parse_version(latest) > _parse_version(current)`；成功结果在内存缓存 **1 小时**（`_update_cache`），失败返回 `ok: false` + `message`（网络错误/HTTP 状态）。
+**`GET /api/tianyi/update-check`**（handler [tianyi_http.py:395](../py_modules/tianyi_http.py) `handle_update_check()` → [tianyi_service.py:7466](../py_modules/tianyi_service.py) `check_update()`）：请求 `https://api.github.com/repos/hulong1989/freedeckCY/releases/latest`（10 s 超时，未认证 GitHub API 有速率限制）；结果 `{ok, current, latest, has_update, url, name, published_at}`，`has_update = _parse_version(latest) > _parse_version(current)`；成功结果在内存缓存 **1 小时**（`_update_cache`），失败返回 `ok: false` + `message`（网络错误/HTTP 状态）。
 
 **公共 helper**：[tianyi_service.py:394](../py_modules/tianyi_service.py) `_tail_text()`（读文件末尾 N 行）、[tianyi_service.py:419](../py_modules/tianyi_service.py) `_redact_text()`（脱敏）、[tianyi_service.py:428](../py_modules/tianyi_service.py) `_parse_version()`（从 `v0.5.0`/`0.5.0-pre` 提取数字元组比较）、[tianyi_service.py:434](../py_modules/tianyi_service.py) `_launch_external()`（优先 `xdg-open`，否则 `gio open`；拉起 `steam://rungameid/...` 或安装目录）。
 
@@ -469,7 +470,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 - **状态/提示**：`emulator_status()` 返回 `flatpak_id/flatpak_available/flatpak_installed`；有 flatpak 时下载提示改为"通过官方 Flatpak 安装 Azahar"；
 - **XWayland**：3DS wrapper 固定 `QT_QPA_PLATFORM=xcb`、`SDL_VIDEODRIVER=x11`（Game Mode/Wayland 崩溃规避）；
 - **system files**：除 `~/.local/share/azahar|citra/sysdata`，还部署到 Flatpak 的 `~/.var/app/org.azahar_emu.Azahar/data/azahar/sysdata` 与 `.../azahar-emu/sysdata`；
-- **已有游戏自动修复**：后台维护在首次 tick 调 [tianyi_service.py:4938](../py_modules/tianyi_service.py) `_maybe_schedule_launcher_repair()`，对已安装的 3DS 记录创建 repair task，[tianyi_service.py:4957](../py_modules/tianyi_service.py) `_repair_emulator_launchers()` 重新 `ensure_emulator("3ds")` 并重写 `launch-freedeckcy.sh`（AppImage 命令 → Flatpak 命令），保存 state/刷新已安装缓存；插件 shutdown 会取消该任务；用户无需重装游戏。
+- **已有游戏自动修复**：后台维护在首次 tick 调 [tianyi_service.py:4916](../py_modules/tianyi_service.py) `_maybe_schedule_launcher_repair()`，对已安装的 3DS 记录创建 repair task，[tianyi_service.py:4935](../py_modules/tianyi_service.py) `_repair_emulator_launchers()` 重新 `ensure_emulator("3ds")` 并重写 `launch-freedeckcy.sh`（AppImage 命令 → Flatpak 命令），保存 state/刷新已安装缓存；插件 shutdown 会取消该任务；用户无需重装游戏。
 
 ### 5.11 自动云存档（Ludusavi + gamewatch，v0.8.0；v0.15.0 模拟器存档）
 
@@ -492,11 +493,11 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **与原有 Proton 扫描合并**：`_collect_cloud_save_candidates()` 先按快捷方式解析出 `compat_user_dir` 与 appid，再用清单匹配/解析；命中时 `source_paths = manifest 路径 + Proton 扫描路径`（去重），`source_strategy` 取 `ludusavi`（清单命中且 Proton 未命中）/`ludusavi+proton`（两者都有）/`proton_prefix`（仅 Proton 扫描）/`install_fallback`（无前缀时按安装目录白名单兜底）；诊断里 `ludusavi = {matched, path_count}`。
 
-**gamewatch 进程检测**（`py_modules/gamewatch.py`）：后台维护每 8 s 调用 `_poll_game_watch()`（`maintenance_tick` 内，[tianyi_service.py:4990](../py_modules/tianyi_service.py) `_poll_game_watch()`）。[gamewatch.py:74](../py_modules/gamewatch.py) `is_game_running()` 优先扫描 `/proc/*/cmdline`（[gamewatch.py:51](../py_modules/gamewatch.py) `_is_running_proc()`，判断 install_path 是否出现在命令行），没有 `/proc` 时回退 [gamewatch.py:58](../py_modules/gamewatch.py) `_is_running_pgrep()`（`pgrep -f`）；[gamewatch.py:81](../py_modules/gamewatch.py) `GameWatcher.poll()` 维护每个 game_id 的运行状态：首次 poll 只建立基线，之后只在状态切换时产出 `start`/`end` 事件，已移除的游戏清空状态（[gamewatch.py:88](../py_modules/gamewatch.py) `poll()`）。服务层**只消费 `end` 事件**（start 事件不触发上传）。
+**gamewatch 进程检测**（`py_modules/gamewatch.py`）：后台维护每 8 s 调用 `_poll_game_watch()`（`maintenance_tick` 内，[tianyi_service.py:4968](../py_modules/tianyi_service.py) `_poll_game_watch()`）。[gamewatch.py:74](../py_modules/gamewatch.py) `is_game_running()` 优先扫描 `/proc/*/cmdline`（[gamewatch.py:51](../py_modules/gamewatch.py) `_is_running_proc()`，判断 install_path 是否出现在命令行），没有 `/proc` 时回退 [gamewatch.py:58](../py_modules/gamewatch.py) `_is_running_pgrep()`（`pgrep -f`）；[gamewatch.py:81](../py_modules/gamewatch.py) `GameWatcher.poll()` 维护每个 game_id 的运行状态：首次 poll 只建立基线，之后只在状态切换时产出 `start`/`end` 事件，已移除的游戏清空状态（[gamewatch.py:88](../py_modules/gamewatch.py) `poll()`）。服务层**只消费 `end` 事件**（start 事件不触发上传）。
 
-**只上传刚退出的游戏**（[tianyi_service.py:5004](../py_modules/tianyi_service.py) `_maybe_auto_cloud_upload()`）：`end` 事件 → 检查设置 `cloud_save_auto_upload`（默认 **true**）、登录态、当前无云存档上传/自动上传任务、距上次自动上传 ≥ **30 s** 防抖 → 调 [tianyi_service.py:3093](../py_modules/tianyi_service.py) `start_cloud_save_upload(game_ids=[该 game_id])`；上传任务构建候选后按 `game_ids` 过滤（诊断 `filtered_game_ids`），因此不会顺带打包其它游戏。
+**只上传刚退出的游戏**（[tianyi_service.py:4982](../py_modules/tianyi_service.py) `_maybe_auto_cloud_upload()`）：`end` 事件 → 检查设置 `cloud_save_auto_upload`（默认 **true**）、登录态、当前无云存档上传/自动上传任务、距上次自动上传 ≥ **30 s** 防抖 → 调 [tianyi_service.py:3071](../py_modules/tianyi_service.py) `start_cloud_save_upload(game_ids=[该 game_id])`；上传任务构建候选后按 `game_ids` 过滤（诊断 `filtered_game_ids`），因此不会顺带打包其它游戏。
 
-**指纹去重**：[tianyi_service.py:5039](../py_modules/tianyi_service.py) `_cloud_save_fingerprint()` 对每个游戏的 `source_paths` 递归取文件（最多 **5000** 个），指纹 = `sha256(相对路径|size|mtime_ns …)`；指纹按 `game_key` 持久化到 `state.json` 的 `cloud_save_fingerprints`。上传前计算并与上次比较，相同则**跳过打包/上传**（结果 `status=skipped`、`reason=unchanged`）；上传成功后写回新指纹。
+**指纹去重**：[tianyi_service.py:5017](../py_modules/tianyi_service.py) `_cloud_save_fingerprint()` 对每个游戏的 `source_paths` 递归取文件（最多 **5000** 个），指纹 = `sha256(相对路径|size|mtime_ns …)`；指纹按 `game_key` 持久化到 `state.json` 的 `cloud_save_fingerprints`。上传前计算并与上次比较，相同则**跳过打包/上传**（结果 `status=skipped`、`reason=unchanged`）；上传成功后写回新指纹。
 
 **设置与 UI**：设置项 `cloud_save_auto_upload`（默认 true）与 `cloud_save_include_emulators`（默认 true）贯穿 `tianyi_store`（默认/加载/set_settings）、`main.set_tianyi_settings`、`tianyi_http.handle_settings_set` 与 QAM 设置页「云存档上传」的两个开关（`src/index.tsx` 的 `ToggleField`）。
 
@@ -519,7 +520,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **模拟器存档恢复（v0.16.0）**：
 
-- `plan_cloud_save_restore()` 遇到 manifest `source_strategy="emulator_saves"` 不再拒绝，转 [tianyi_service.py:3350](../py_modules/tianyi_service.py) `_plan_emulator_save_restore()`：按已安装记录找平台根、构建 `copy_pairs`/`plan_items`，统计冲突（`conflict_count`/`conflict_samples`）并设置 `requires_confirmation`；
+- `plan_cloud_save_restore()` 遇到 manifest `source_strategy="emulator_saves"` 不再拒绝，转 [tianyi_service.py:3328](../py_modules/tianyi_service.py) `_plan_emulator_save_restore()`：按已安装记录找平台根、构建 `copy_pairs`/`plan_items`，统计冲突（`conflict_count`/`conflict_samples`）并设置 `requires_confirmation`；
 - **恢复根白名单**：[emulator_saves.py:326](../py_modules/emulator_saves.py) `restore_roots(record)` 返回平台标准目录 + portable 根；[emulator_saves.py:344](../py_modules/emulator_saves.py) `build_restore_targets(record, entries)` 只允许把文件写到这些根内——同机时若 `source_path` 的父目录仍在某个根内，恢复到**原父目录**；跨设备/路径不存在时落到**第一个根**；**不会把 manifest 里的任意 HOME 路径当目标**；
 - **冲突与备份**：目标已存在时计入冲突并要求确认（QAM confirm）；apply 复用现有恢复流程，覆盖前自动生成 `*.freedeckcy-bak-<时间戳>` 备份；
 - 边界：3DS 跨设备恢复可能退化到根目录（title 目录结构不一致时）；PS1/PS2/Switch 仍是整卡/整目录覆盖，不能只挑单个游戏。
@@ -584,7 +585,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
   2. 否则若 `store.baidu_openapi.configured` → `provider="baidu_openapi"`（可选回退）；
   3. 都没有 → 报"请先扫码登录百度网盘（设置 → 百度网盘扫码登录）"；
 - Cookie 链路：[baidu_client.py:477](../py_modules/baidu_client.py) `resolve_baidu_share(share_url, cookie)` 解析分享/文件列表，`fetch_baidu_download_url(cookie, ctx, file_id)` 取直链；任务 aria2 `cookie=<百度 Cookie>`、`referer=https://pan.baidu.com/disk/home`、`user_agent=pan.baidu.com`；任务 `provider="baidu"`，重试/补下 `_readd_task_download()` 按 provider 重新取直链（Cookie 过期会失败，需重新扫码）；
-- **OpenAPI 回退**（自建应用）：[baidu_openapi_client.py:1540](../py_modules/baidu_openapi_client.py) `resolve_baidu_openapi_share_url()` + [baidu_openapi_client.py:1987](../py_modules/baidu_openapi_client.py) `fetch_baidu_openapi_download_url()`，OAuth 流程 [baidu_openapi_client.py:359](../py_modules/baidu_openapi_client.py) `build_baidu_oauth_authorize_url()` / [baidu_openapi_client.py:387](../py_modules/baidu_openapi_client.py) `exchange_baidu_oauth_code()` / [baidu_openapi_client.py:418](../py_modules/baidu_openapi_client.py) `refresh_baidu_oauth_token()`；任务 `provider="baidu_openapi"`，aria2 空 cookie + 同 Referer/UA；安装后 [tianyi_service.py:7657](../py_modules/tianyi_service.py) `_cleanup_baidu_transfer_files()` 调 [baidu_openapi_client.py:1285](../py_modules/baidu_openapi_client.py) `delete_baidu_openapi_transfer_file()` 清理 `/FreedeckTmp` 转存（Cookie 链路无转存）；
+- **OpenAPI 回退**（自建应用）：[baidu_openapi_client.py:1540](../py_modules/baidu_openapi_client.py) `resolve_baidu_openapi_share_url()` + [baidu_openapi_client.py:1987](../py_modules/baidu_openapi_client.py) `fetch_baidu_openapi_download_url()`，OAuth 流程 [baidu_openapi_client.py:359](../py_modules/baidu_openapi_client.py) `build_baidu_oauth_authorize_url()` / [baidu_openapi_client.py:387](../py_modules/baidu_openapi_client.py) `exchange_baidu_oauth_code()` / [baidu_openapi_client.py:418](../py_modules/baidu_openapi_client.py) `refresh_baidu_oauth_token()`；任务 `provider="baidu_openapi"`，aria2 空 cookie + 同 Referer/UA；安装后 [tianyi_service.py:7635](../py_modules/tianyi_service.py) `_cleanup_baidu_transfer_files()` 调 [baidu_openapi_client.py:1285](../py_modules/baidu_openapi_client.py) `delete_baidu_openapi_transfer_file()` 清理 `/FreedeckTmp` 转存（Cookie 链路无转存）；
 - QAM：新增「百度网盘（扫码登录）」区（二维码/等待/已扫码/取消/退出）；原「百度网盘 OpenAPI」改为「（可选，需开发者资质）」保留；面板状态 `baidu_login`；HTTP `/api/tianyi/baidu/qr/{start,poll,cancel}` 与 `/api/tianyi/baidu/clear`，`main.py` 4 个同名 callable。
 
 **错误诊断（v0.18.0 起，v0.19.1 增强 TLS/urllib 回退）**：
@@ -609,17 +610,17 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 ### 5.14 扫描已安装游戏（v0.18.0；v0.21.0 入口迁移 + 自动补 Steam 快捷方式）
 
-**问题**：旧版本/手动安装/重装插件后 `state.json` 丢失时，目录里已有游戏但「已安装」页签为空。**v0.21.0 起入口在 QAM 设置 → 安装 → 「扫描已安装游戏」**（原生库已安装页不再有扫描按钮）；[tianyi_service.py:6860](../py_modules/tianyi_service.py) `scan_installed_games()` 把安装目录里的游戏补回已安装列表，并自动补齐 Steam 快捷方式。
+**问题**：旧版本/手动安装/重装插件后 `state.json` 丢失时，目录里已有游戏但「已安装」页签为空。**v0.21.0 起入口在 QAM 设置 → 安装 → 「扫描已安装游戏」**（原生库已安装页不再有扫描按钮）；[tianyi_service.py:6838](../py_modules/tianyi_service.py) `scan_installed_games()` 把安装目录里的游戏补回已安装列表，并自动补齐 Steam 快捷方式。
 
 **扫描逻辑**：
 
 - 范围：`settings.install_dir` 下**一层子目录**（`os.listdir`，最多 500 项）；跳过隐藏目录与 `compatdata/steamapps/downloads/lost+found/.freedeckcy/.cache` 等；
-- 匹配：把子目录名归一化（[tianyi_service.py:6802](../py_modules/tianyi_service.py) `_normalize_scan_title()`：小写、去分隔符/特殊字符）后与目录条目标题（按 `[/|｜]` 拆段）做**前缀/等值**匹配，取最长匹配；目录条目按 `game_id` 去重；
+- 匹配：把子目录名归一化（[tianyi_service.py:6780](../py_modules/tianyi_service.py) `_normalize_scan_title()`：小写、去分隔符/特殊字符）后与目录条目标题（按 `[/|｜]` 拆段）做**前缀/等值**匹配，取最长匹配；目录条目按 `game_id` 去重；
 - 已存在：安装 path 已记录 → `already_recorded`；game_id 已记录 → `game_id_recorded`（计入 skipped，不重复添加）；
 - 回填：匹配到 Steam 快捷方式（按 app_name 归一化/同 exe realpath）则写 `steam_app_id`；模拟器平台用 `find_rom_file(install_path, entry.openpath, platform)` 找 ROM；新记录写 `TianyiInstalledGame` 并保存；
 - **自动补 Steam 快捷方式（v0.21.0）**：
   - `steam_shortcuts.list_all_shortcuts_sync()` 读 `shortcuts.vdf` 全部条目，按 AppName 归一化 + `Exe` realpath 建索引；同名或同 exe 已有 appid 时只回填、不重复添加；
-  - 没有快捷方式时：PC 先 [tianyi_service.py:6812](../py_modules/tianyi_service.py) `_find_scanned_executable()` 找 exe（优先 `entry.openpath` 指向的 .exe，否则递归找 .exe，排除 `unins/setup/redist/vcredist/crashreport/dxsetup`，按标题/目录名/大小排序），找到后 `add_or_update_tianyi_shortcut()`（带 `freedeckcy:tianyi:<token>`、Proton 设置、封面）；找不到记 `shortcut_error="exe_not_found"`；
+  - 没有快捷方式时：PC 先 [tianyi_service.py:6790](../py_modules/tianyi_service.py) `_find_scanned_executable()` 找 exe（优先 `entry.openpath` 指向的 .exe，否则递归找 .exe，排除 `unins/setup/redist/vcredist/crashreport/dxsetup`，按标题/目录名/大小排序），找到后 `add_or_update_tianyi_shortcut()`（带 `freedeckcy:tianyi:<token>`、Proton 设置、封面）；找不到记 `shortcut_error="exe_not_found"`；
   - 模拟器：`ensure_emulator(platform, allow_download=False)`（**不自动下载**）+ `create_launch_wrapper()` 生成 `launch-freedeckcy.sh`，再注册原生快捷方式（Proton=none）；ROM 找不到 → `rom_not_found`；模拟器未就绪 → `emulator_not_ready: ...`；
   - **第二遍**：对已存在但 `steam_app_id=0` 的 PC 记录，按同样规则补建快捷方式，结果写入 `steam_recovered`；返回汇总 `steam_added`（新记录里补建成功数）、`steam_recovered_count`、`shortcut_error`；
   - **Steam 需要重启/切换用户/重新打开库页**才能看到新快捷方式（插件只写 `shortcuts.vdf`，不重启 Steam）。
@@ -641,7 +642,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
   - `label`（`SD 卡 / 外置：<目录名>`）、`mount`、`free_bytes/total_bytes`、`free_text/total_text`；
   - `download_dir=<mount>/freedeckCY/downloads`、`install_dir=<mount>/freedeckCY/installed`；
 - 内置选项：`~/Downloads/freedeckCY` / `~/Games/freedeckCY`（home 容量）；返回 `{internal, external, options}`；
-- 服务层 [tianyi_service.py:6805](../py_modules/tianyi_service.py) `get_storage_options()` 追加当前 `settings.download_dir/install_dir`。
+- 服务层 [tianyi_service.py:6783](../py_modules/tianyi_service.py) `get_storage_options()` 追加当前 `settings.download_dir/install_dir`。
 
 **API / UI**：`GET /api/tianyi/storage/options`（`tianyi_http.handle_storage_options`、`main.get_tianyi_storage_options`）；QAM「路径」页在下载/安装目录下按外置挂载渲染「下载到 <label>（剩余 X）」「安装到 <label>（剩余 X）」按钮，点击 `savePatch` 切换目录并刷新；没有外置挂载时显示"未检测到可写 SD 卡/外置存储"；原「选择下载目录/安装目录」保留。
 
@@ -653,7 +654,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **路由与入口（v0.23.0：modal 优先、route 兜底）**：
 
-- [src/index.tsx:32](../src/index.tsx) `LIBRARY_ROUTE = "/freedeckcy/library"`；[src/index.tsx:3702](../src/index.tsx) `LibraryPage()` 是页面组件；[src/index.tsx:4131](../src/index.tsx) `routerHook.addRoute(LIBRARY_ROUTE, LibraryPage)` 在插件挂载时注册，`onDismount()` 里 `removeRoute`；
+- [src/index.tsx:32](../src/index.tsx) `LIBRARY_ROUTE = "/freedeckcy/library"`；[src/index.tsx:3703](../src/index.tsx) `LibraryPage()` 是页面组件；[src/index.tsx:4132](../src/index.tsx) `routerHook.addRoute(LIBRARY_ROUTE, LibraryPage)` 在插件挂载时注册，`onDismount()` 里 `removeRoute`；
 - QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)` 原生弹层**，失败才 `Navigation.Navigate(LIBRARY_ROUTE)`（全屏路由保留）；不再调用后端打开网页；网页库入口仍保留作备用；
 - **版本标识**：主页显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`，库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`，用于确认前端是否已更新；**前端未重载/旧 dist 仍会打开网页或看不到该标识**。
 
@@ -678,8 +679,8 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **QAM 入口**：设置页新增「诊断」Tab（`src/index.tsx`，`onRunDiagnostics`/`onExportDiagnostics`）：
 
-- 「运行自检」调 callable `run_tianyi_diagnostics`（`main.py`）→ [tianyi_service.py:7256](../py_modules/tianyi_service.py) `run_diagnostics(include_network=True)`；返回 `{generated_at, version, arch, summary{ok,warn,fail,skip}, checks[{id,label,status,detail,fix}]}`；QAM 按状态着色（ok/warn/fail/skip）并展示 `建议：fix`；
-- 「导出诊断包」调 `export_tianyi_diagnostics_file` → [tianyi_service.py:7468](../py_modules/tianyi_service.py) `export_diagnostics_to_downloads()`：写 `settings.download_dir`（空则 `plugin.downloads_dir`、再退 `~/Downloads`）的 `freedeckcy-diagnostics-YYYYmmdd-HHMMSS.zip`（**0600**），返回 `path/filename/size/message`，QAM toast 显示路径；
+- 「运行自检」调 callable `run_tianyi_diagnostics`（`main.py`）→ [tianyi_service.py:7234](../py_modules/tianyi_service.py) `run_diagnostics(include_network=True)`；返回 `{generated_at, version, arch, summary{ok,warn,fail,skip}, checks[{id,label,status,detail,fix}]}`；QAM 按状态着色（ok/warn/fail/skip）并展示 `建议：fix`；
+- 「导出诊断包」调 `export_tianyi_diagnostics_file` → [tianyi_service.py:7446](../py_modules/tianyi_service.py) `export_diagnostics_to_downloads()`：写 `settings.download_dir`（空则 `plugin.downloads_dir`、再退 `~/Downloads`）的 `freedeckcy-diagnostics-YYYYmmdd-HHMMSS.zip`（**0600**），返回 `path/filename/size/message`，QAM toast 显示路径；
 - HTTP 仍保留 `POST /api/tianyi/diagnostics/run`（`tianyi_http.handle_diagnostics_run`），供网页/脚本使用。
 
 **检查项**（每项都带 `status`/`detail`/`fix`）：
@@ -778,29 +779,29 @@ Steam 库里出现游戏（写完后备份 + 回读校验；需重启 Steam 生�
 | 环节 | 代码位置 |
 |---|---|
 | HTTP 入口 prepare / start | [tianyi_http.py:608](../py_modules/tianyi_http.py) `handle_prepare_install` / [tianyi_http.py:629](../py_modules/tianyi_http.py) `handle_start_install` |
-| 安装计划 + 空间探针 | [tianyi_service.py:5749](../py_modules/tianyi_service.py) `_build_install_plan()` |
-| 创建下载任务 | [tianyi_service.py:6012](../py_modules/tianyi_service.py) `_create_tasks_from_plan()` |
-| 任务状态同步 | [tianyi_service.py:6362](../py_modules/tianyi_service.py) `refresh_tasks()` |
-| 安装调度 / 目录级互斥 | [tianyi_service.py:6473](../py_modules/tianyi_service.py) `_schedule_post_process_task()` / [tianyi_service.py:7549](../py_modules/tianyi_service.py) `_post_process_completed_task()` / [tianyi_service.py:7528](../py_modules/tianyi_service.py) `_install_lock_for()` |
-| 解压 / 合并 staging | [tianyi_service.py:8292](../py_modules/tianyi_service.py) `_extract_archive_to_dir()` / [tianyi_service.py:8338](../py_modules/tianyi_service.py) `_merge_extracted_content()` |
+| 安装计划 + 空间探针 | [tianyi_service.py:1612](../py_modules/tianyi_service.py) `_build_install_plan()` |
+| 创建下载任务 | [tianyi_service.py:1344](../py_modules/tianyi_service.py) `_create_tasks_from_plan()` |
+| 任务状态同步 | [tianyi_service.py:5727](../py_modules/tianyi_service.py) `refresh_tasks()` |
+| 安装调度 / 目录级互斥 | [tianyi_service.py:5990](../py_modules/tianyi_service.py) `_schedule_post_process_task()` / [tianyi_service.py:6340](../py_modules/tianyi_service.py) `_post_process_completed_task()` / [tianyi_service.py:6451](../py_modules/tianyi_service.py) `_install_lock_for()` |
+| 解压 / 合并 staging | [tianyi_service.py:7527](../py_modules/tianyi_service.py) `_extract_archive_to_dir()` / [tianyi_service.py:7506](../py_modules/tianyi_service.py) `_merge_extracted_content()` |
 | 写 Steam 快捷方式 / Proton / 封面 | [steam_shortcuts.py:432](../py_modules/steam_shortcuts.py) `_upsert_shortcut_sync()`、[steam_shortcuts.py:563](../py_modules/steam_shortcuts.py) `_set_proton_mapping_sync()`、[steam_shortcuts.py:813](../py_modules/steam_shortcuts.py) `_apply_grid_assets()` |
 | 非 Steam appid | [steam_shortcuts.py:425](../py_modules/steam_shortcuts.py) `_generate_non_steam_app_id()` |
 | aria2 下单 | [aria2_manager.py:452](../py_modules/aria2_manager.py) `add_uri()` |
 | 分享解析 / 直链 | [tianyi_client.py:1081](../py_modules/tianyi_client.py) `resolve_share()`、[tianyi_client.py:1640](../py_modules/tianyi_client.py) `fetch_access_token()`、[tianyi_client.py:1683](../py_modules/tianyi_client.py) `fetch_download_url()` |
-| 后台维护 | [tianyi_service.py:650](../py_modules/tianyi_service.py) `maintenance_tick()` |
+| 后台维护 | [tianyi_service.py:8270](../py_modules/tianyi_service.py) `maintenance_tick()` |
 | 多分卷归档识别 | [archive_bundle.py:88](../py_modules/archive_bundle.py) `detect_archive_sets()` / [archive_bundle.py:228](../py_modules/archive_bundle.py) `build_bundle_index()` |
-| 解压前 settle / 预检 | [tianyi_service.py:7675](../py_modules/tianyi_service.py) `_wait_payload_settled()` / [tianyi_service.py:7719](../py_modules/tianyi_service.py) `_precheck_archive_payload()` |
-| 分卷只解主卷 / bundled | [tianyi_service.py:7549](../py_modules/tianyi_service.py) `_post_process_completed_task()` / [tianyi_service.py:7762](../py_modules/tianyi_service.py) `_install_payload()` |
-| 坏文件隔离 / 自愈 | [tianyi_service.py:6248](../py_modules/tianyi_service.py) `_quarantine_download_file()` |
+| 解压前 settle / 预检 | [tianyi_service.py:8316](../py_modules/tianyi_service.py) `_wait_payload_settled()` / [tianyi_service.py:650](../py_modules/tianyi_service.py) `_precheck_archive_payload()` |
+| 分卷只解主卷 / bundled | [tianyi_service.py:7653](../py_modules/tianyi_service.py) `_post_process_completed_task()` / [tianyi_service.py:7697](../py_modules/tianyi_service.py) `_install_payload()` |
+| 坏文件隔离 / 自愈 | [tianyi_service.py:7527](../py_modules/tianyi_service.py) `_quarantine_download_file()` |
 | aria2 运行时复用（meta+flock） | [aria2_manager.py:158](../py_modules/aria2_manager.py) `_read_runtime_meta()` / [aria2_manager.py:248](../py_modules/aria2_manager.py) `_attach_existing()` / [aria2_manager.py:205](../py_modules/aria2_manager.py) `_try_acquire_owner_lock()` |
 | 直链原地换链 | [aria2_manager.py:510](../py_modules/aria2_manager.py) `replace_uri()` |
-| 重启恢复（gid 丢失） | [tianyi_service.py:6212](../py_modules/tianyi_service.py) `_try_recover_task()` / [tianyi_service.py:6137](../py_modules/tianyi_service.py) `_file_matches_expected_size()` / [tianyi_service.py:6268](../py_modules/tianyi_service.py) `_readd_task_download()` |
-| 分卷分组安装 | [tianyi_service.py:6167](../py_modules/tianyi_service.py) `_install_group_members()` / [tianyi_service.py:6183](../py_modules/tianyi_service.py) `_maybe_schedule_group_post_process()` / [tianyi_service.py:7762](../py_modules/tianyi_service.py) `_install_payload()` / [tianyi_service.py:7857](../py_modules/tianyi_service.py) `_finalize_group_install()` |
-| 下载完整性校验 | [tianyi_service.py:6148](../py_modules/tianyi_service.py) `_verify_downloaded_file()` |
+| 重启恢复（gid 丢失） | [tianyi_service.py:7740](../py_modules/tianyi_service.py) `_try_recover_task()` / [tianyi_service.py:6226](../py_modules/tianyi_service.py) `_file_matches_expected_size()` / [tianyi_service.py:6190](../py_modules/tianyi_service.py) `_readd_task_download()` |
+| 分卷分组安装 | [tianyi_service.py:6115](../py_modules/tianyi_service.py) `_install_group_members()` / [tianyi_service.py:6246](../py_modules/tianyi_service.py) `_maybe_schedule_group_post_process()` / [tianyi_service.py:6145](../py_modules/tianyi_service.py) `_install_payload()` / [tianyi_service.py:6161](../py_modules/tianyi_service.py) `_finalize_group_install()` |
+| 下载完整性校验 | [tianyi_service.py:7740](../py_modules/tianyi_service.py) `_verify_downloaded_file()` |
 | 归档 `7z t` 校验 | [seven_zip_manager.py:66](../py_modules/seven_zip_manager.py) `test_archive()` |
-| 校验失败自动重下 | [tianyi_service.py:7740](../py_modules/tianyi_service.py) `_schedule_archive_repair()` / [tianyi_service.py:253](../py_modules/tianyi_service.py) `ArchiveRepairScheduled` |
-| 失败任务重试 | [tianyi_service.py:6556](../py_modules/tianyi_service.py) `retry_task()` |
-| 卸载预览 / compatdata 回收 | [tianyi_service.py:5466](../py_modules/tianyi_service.py) `preview_uninstall()` / [tianyi_service.py:5456](../py_modules/tianyi_service.py) `_can_remove_compatdata_dir()` / [steam_shortcuts.py:165](../py_modules/steam_shortcuts.py) `find_compatdata_dirs()` |
+| 校验失败自动重下 | [tianyi_service.py:7835](../py_modules/tianyi_service.py) `_schedule_archive_repair()` / [tianyi_service.py:6126](../py_modules/tianyi_service.py) `ArchiveRepairScheduled` |
+| 失败任务重试 | [tianyi_service.py:7718](../py_modules/tianyi_service.py) `retry_task()` |
+| 卸载预览 / compatdata 回收 | [tianyi_service.py:253](../py_modules/tianyi_service.py) `preview_uninstall()` / [tianyi_service.py:6534](../py_modules/tianyi_service.py) `_can_remove_compatdata_dir()` / [steam_shortcuts.py:165](../py_modules/steam_shortcuts.py) `find_compatdata_dirs()` |
 | aria2 全量列表（恢复用） | [aria2_manager.py:534](../py_modules/aria2_manager.py) `list_downloads()` |
 
 **几个容易误解的点**
@@ -814,7 +815,7 @@ Steam 库里出现游戏（写完后备份 + 回读校验；需重启 Steam 生�
 
 ### 6.1 重启恢复：gid 变化与直链过期
 
-插件重载现在会附着到仍存活的 aria2（见 6.4），**gid 通常不变**；但**设备重启**后 aria2 会话重建、gid 会变，直链也可能过期。`state.json` 里存的旧 gid 查不到时，`refresh_tasks()` 对查询失败的任务按以下顺序恢复（[tianyi_service.py:6212](../py_modules/tianyi_service.py) `_try_recover_task()` / [tianyi_service.py:6137](../py_modules/tianyi_service.py) `_file_matches_expected_size()` / [tianyi_service.py:6268](../py_modules/tianyi_service.py) `_readd_task_download()`）：
+插件重载现在会附着到仍存活的 aria2（见 6.4），**gid 通常不变**；但**设备重启**后 aria2 会话重建、gid 会变，直链也可能过期。`state.json` 里存的旧 gid 查不到时，`refresh_tasks()` 对查询失败的任务按以下顺序恢复（[tianyi_service.py:5444](../py_modules/tianyi_service.py) `_try_recover_task()` / [tianyi_service.py:5434](../py_modules/tianyi_service.py) `_file_matches_expected_size()` / [tianyi_service.py:6190](../py_modules/tianyi_service.py) `_readd_task_download()`）：
 
 ```text
 aria2.tellStatus(旧 gid) 失败（GID not found / aria2 未运行）
@@ -832,12 +833,12 @@ aria2.tellStatus(旧 gid) 失败（GID not found / aria2 未运行）
 
 ### 6.2 分卷 / 多包安装语义
 
-同一安装计划（`install/prepare` 返回的多个文件）在创建任务时共享一个 `group_id`，`group_total` 记录包数。**"代表任务" = 组内 `created_at` 最早的那个**（[tianyi_service.py:6167](../py_modules/tianyi_service.py) `_install_group_members()` 按 `(created_at, task_id)` 排序），Steam 注册与已安装记录都以它为准。
+同一安装计划（`install/prepare` 返回的多个文件）在创建任务时共享一个 `group_id`，`group_total` 记录包数。**"代表任务" = 组内 `created_at` 最早的那个**（[tianyi_service.py:6115](../py_modules/tianyi_service.py) `_install_group_members()` 按 `(created_at, task_id)` 排序），Steam 注册与已安装记录都以它为准。
 
 - **下载阶段**：`_maybe_schedule_group_post_process()` 只在整组任务全部 `complete` 后才调度安装。
   - 组内某包 `error`：不安装；已完成的包显示"同一安装计划中有分卷下载失败，移除失败任务后可继续安装"；
   - 用户移除失败任务后（`removed` 状态不参与分组），剩余的 complete 分卷会被重新调度安装。
-- **安装阶段**：逐包解压到同一目标目录（目录级互斥串行），全部成功才 [tianyi_service.py:7857](../py_modules/tianyi_service.py) `_finalize_group_install()`：
+- **安装阶段**：逐包解压到同一目标目录（目录级互斥串行），全部成功才 [tianyi_service.py:6246](../py_modules/tianyi_service.py) `_finalize_group_install()`：
   - 写一条已安装记录，`size_bytes` = 组内各包 `file_size` 之和；
   - 只注册一次 Steam 快捷方式 / Proton / 封面（用代表任务）；
   - `auto_delete_package` 为真时删除组内全部压缩包；
@@ -886,7 +887,7 @@ ensure_running()
 - **token 去重**：新条目同时写 `LaunchOptions="freedeckcy:tianyi:<token>"` 与 `DevkitGameID=<token>`；匹配时读 `DevkitGameID` 或旧 `LaunchOptions` 任一（[steam_shortcuts.py:413](../py_modules/steam_shortcuts.py) `_shortcut_tokens()`），避免用户手动改启动项后重复建条目；启动前缀常量 `FREEDECKCY_LAUNCH_PREFIX`。
 - **差异写入**：目标条目字段全部一致且文件存在时返回 `action="unchanged"`，不重写文件。
 - **写前备份**：`shortcuts.vdf` / `config.vdf` 写入前复制为 `*.freedeckcy-bak-<YYYYmmdd_HHMMSS>`（[steam_shortcuts.py:380](../py_modules/steam_shortcuts.py) `_backup_file()`），同类备份只保留最近 **12** 份；`config.vdf` 的 Proton 映射改写同样先备份。
-- **Proton 工具解析与设置（v0.4.0）**：设置项 `proton_tool`（默认 `auto`）落在 [tianyi_store.py:94](../py_modules/tianyi_store.py) `TianyiSettings`；RPC/HTTP 透传为 [main.py:282](../main.py) `set_tianyi_settings()`、[tianyi_http.py:473](../py_modules/tianyi_http.py) `handle_settings_get()` / [tianyi_http.py:482](../py_modules/tianyi_http.py) `handle_settings_set()`，服务层 [tianyi_service.py:5629](../py_modules/tianyi_service.py) `update_settings()`；`GET /api/tianyi/settings` 额外返回 `proton_tool_resolved` / `droiddeck_detected`（[tianyi_service.py:2826](../py_modules/tianyi_service.py) `get_settings()`）。写快捷方式时 [steam_shortcuts.py:1068](../py_modules/steam_shortcuts.py) `add_or_update_tianyi_shortcut(proton_tool=...)`：`auto` → `detect_proton_tool()`，`none`/`skip`/`disabled` → 跳过映射，其它值直接当工具名；最终由 `_set_proton_mapping_sync()` 写入 `config.vdf` 的 `CompatToolMapping`。
+- **Proton 工具解析与设置（v0.4.0）**：设置项 `proton_tool`（默认 `auto`）落在 [tianyi_store.py:94](../py_modules/tianyi_store.py) `TianyiSettings`；RPC/HTTP 透传为 [main.py:282](../main.py) `set_tianyi_settings()`、[tianyi_http.py:473](../py_modules/tianyi_http.py) `handle_settings_get()` / [tianyi_http.py:482](../py_modules/tianyi_http.py) `handle_settings_set()`，服务层 [tianyi_service.py:6145](../py_modules/tianyi_service.py) `update_settings()`；`GET /api/tianyi/settings` 额外返回 `proton_tool_resolved` / `droiddeck_detected`（[tianyi_service.py:7835](../py_modules/tianyi_service.py) `get_settings()`）。写快捷方式时 [steam_shortcuts.py:1068](../py_modules/steam_shortcuts.py) `add_or_update_tianyi_shortcut(proton_tool=...)`：`auto` → `detect_proton_tool()`，`none`/`skip`/`disabled` → 跳过映射，其它值直接当工具名；最终由 `_set_proton_mapping_sync()` 写入 `config.vdf` 的 `CompatToolMapping`。
 - **写后校验**：`shortcuts.vdf` 写完重新读回，确认 token 真的落盘，否则返回失败（防"以为写成功"）。
 - **compatdata 用户名打分**：`find_compat_user_dir()` 先试 `steamuser` / `deck` / `root`，再对自定义 Wine 用户名按 `AppData`(+3)/`Documents`(+2)/`Saved Games`(+2) 打分挑选（参考 v0.6 同类实现）。
 
@@ -963,19 +964,26 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | 环节 | 代码位置 |
 |---|---|
 | 多库 compatdata 定位 | [steam_shortcuts.py:184](../py_modules/steam_shortcuts.py) `find_compat_user_dir()` / [steam_shortcuts.py:130](../py_modules/steam_shortcuts.py) `_steam_library_paths()` |
-| 上传入口 | [tianyi_service.py:3093](../py_modules/tianyi_service.py) `start_cloud_save_upload()` |
-| 上传后台任务 | [tianyi_service.py:5179](../py_modules/tianyi_service.py) `_run_cloud_save_upload_task()` |
-| 候选目录扫描 | [tianyi_service.py:4448](../py_modules/tianyi_service.py) `_collect_cloud_save_candidates()` |
-| 打包 + manifest | [tianyi_service.py:5070](../py_modules/tianyi_service.py) `_archive_single_game_saves()` |
+| 上传入口 | [tianyi_service.py:5607](../py_modules/tianyi_service.py) `start_cloud_save_upload()` |
+| 上传后台任务 | [tianyi_service.py:2804](../py_modules/tianyi_service.py) `_run_cloud_save_upload_task()` |
+| 候选目录扫描 | [tianyi_service.py:3071](../py_modules/tianyi_service.py) `_collect_cloud_save_candidates()` |
+| 打包 + manifest | [tianyi_service.py:5157](../py_modules/tianyi_service.py) `_archive_single_game_saves()` |
 | 云端上传 / 列版本 / 下载 | [tianyi_client.py:2079](../py_modules/tianyi_client.py) `upload_archive_to_cloud()`、[tianyi_client.py:2116](../py_modules/tianyi_client.py) `list_cloud_archives()`、[tianyi_client.py:2167](../py_modules/tianyi_client.py) `download_cloud_archive()` |
-| 恢复四步 | [tianyi_service.py:3149](../py_modules/tianyi_service.py) `list_cloud_save_restore_options()`、[tianyi_service.py:3263](../py_modules/tianyi_service.py) `list_cloud_save_restore_entries()`、[tianyi_service.py:3456](../py_modules/tianyi_service.py) `plan_cloud_save_restore()`、[tianyi_service.py:3699](../py_modules/tianyi_service.py) `apply_cloud_save_restore()` |
+| 恢复四步 | [tianyi_service.py:4426](../py_modules/tianyi_service.py) `list_cloud_save_restore_options()`、[tianyi_service.py:5048](../py_modules/tianyi_service.py) `list_cloud_save_restore_entries()`、[tianyi_service.py:3127](../py_modules/tianyi_service.py) `plan_cloud_save_restore()`、[tianyi_service.py:3241](../py_modules/tianyi_service.py) `apply_cloud_save_restore()` |
 
-### 7.3 游玩时长（独立小链路）
+### 7.3 游玩时长（独立小链路，v0.25.0 加 managed 门禁）
 
 - `SteamClient.Apps.RegisterForGameActionStart/End` 全局监听 → `record_tianyi_game_action`（[src/index.tsx:1000](../src/index.tsx) `installGlobalGameActionReporter()`）→ `TianyiService.record_game_action()`：重复 start 且间隔超过 5 秒视为上一局结束，单局封顶 12 小时，重启后能恢复会话。
-- 库游戏详情页：用 `routerHook.addPatch("/library/app/:appid")` **patch Steam 库页面的 `renderFunc` 和组件 `type`**，把"我的游玩 / 主线 / 总时长（HowLongToBeat）"插进去（[src/index.tsx:1554](../src/index.tsx) `installLibraryPlaytimePatch()`）。这是全项目最"黑魔法"的一段，依赖 Steam UI 内部结构。
+- **库页插入**：`routerHook.addPatch("/library/app/:appid")` patch Steam 库详情页的 `renderFunc` 和组件 `type`，把「我的游玩 / 主线 / 总时长（HowLongToBeat）」插进去（[src/index.tsx:1555](../src/index.tsx) `installLibraryPlaytimePatch()`、`LibraryTimeBlock`）。这是全项目最"黑魔法"的一段，依赖 Steam UI 内部结构。
 
----
+**managed 门禁（v0.25.0）**：
+
+- 前端 `LibraryTimeBlock` 只在 `data.managed === true` 时渲染；未匹配/未加载/请求失败直接 `return null`，**不再对 Steam 原有游戏插入任何时长块，也不先显示"加载中"**；
+- 后端 [tianyi_service.py:3434](../py_modules/tianyi_service.py) `get_library_game_time_stats()`：**先按 AppID** [tianyi_service.py:3677](../py_modules/tianyi_service.py) `_resolve_installed_record_by_app_id()` 精确匹配已安装记录，未命中再按标题归一化匹配（`_normalize_cover_text`，双向包含）；**避免 Steam 原有游戏与插件游戏同名时误判**；
+- 未匹配 → 直接返回 `{managed:false, reason:"not_managed", ...全 0}`，**不调用 `resolve_hltb_stats`、不返回 HLTB 数据**；
+- 只有匹配到 `store.installed_games` 的记录才返回 `managed:true` + 时长/HLTB，前端才插入块。
+
+**边界**：只影响「插件安装/补录的游戏」；Steam 自己买/装的原版游戏详情页**不会出现**插件的时长块（除非被扫描补录为插件记录）；标题匹配可能把同名 Steam 游戏误判为插件游戏（AppID 优先已降低概率，仍非绝对）；HLTB 查询失败只影响块内数据，不影响库页本身。
 
 ## 8. 登录：四种方式，UI 只走二维码
 
@@ -986,7 +994,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | **Cookie DB 直读** | 读 `~/.local/share/Steam/config/htmlcache/Cookies` 等 SQLite，过滤 `189.cn` 域 | 旧方案；`v10/v11` 加密的 cookie 直接跳过 |
 | 手动粘贴 cookie | `POST /api/tianyi/login/manual` | 兜底 API 保留 |
 
-代码位置：二维码 [tianyi_service.py:1721](../py_modules/tianyi_service.py) `start_qr_login()` / [tianyi_service.py:1807](../py_modules/tianyi_service.py) `poll_qr_login()`；CDP [tianyi_service.py:9105](../py_modules/tianyi_service.py) `_collect_tianyi_cookie_from_cdp()`；Cookie DB [tianyi_service.py:9304](../py_modules/tianyi_service.py) `_collect_tianyi_cookie_from_cookie_db()`；手动 cookie [tianyi_http.py:151](../py_modules/tianyi_http.py) `handle_login_manual()`。
+代码位置：二维码 [tianyi_service.py:1699](../py_modules/tianyi_service.py) `start_qr_login()` / [tianyi_service.py:1785](../py_modules/tianyi_service.py) `poll_qr_login()`；CDP [tianyi_service.py:9083](../py_modules/tianyi_service.py) `_collect_tianyi_cookie_from_cdp()`；Cookie DB [tianyi_service.py:9282](../py_modules/tianyi_service.py) `_collect_tianyi_cookie_from_cookie_db()`；手动 cookie [tianyi_http.py:151](../py_modules/tianyi_http.py) `handle_login_manual()`。
 
 注意：**cookie 从不经过浏览器回传**，登录桥页面只负责显示二维码和状态，全程由 Python 侧完成。
 
@@ -1088,7 +1096,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### P2：工程性
 
-21. `tianyi_service.py` 约 9500 行、单类 100+ 方法；`src/index.tsx` 约 4200 行单文件。已补 `tests/`（353 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+21. `tianyi_service.py` 约 9500 行、单类 100+ 方法；`src/index.tsx` 约 4200 行单文件。已补 `tests/`（354 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
 22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
 23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
 24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）
@@ -1117,6 +1125,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 47. **诊断自检的边界（v0.22.0）**：自检是一次性快照（版本/目录/运行时/Steam/存储/网络/百度 QR/任务/日志），网络项受连通性影响；「运行自检」不自动修复，只给 detail/fix；`baidu_qr` 只输出 sign 长度（不输出 sign/cookie）；导出诊断包会写 0600 zip 到下载目录并包含 300 行日志（已脱敏），仍建议提交前自行过目；不支持在线查看日志或上传诊断包。（已知限制）
 48. **原生库兜底/扫码超时的边界（v0.23.0）**：`showModal(<LibraryPage />)` 失败才走全屏路由，两者都失败才 toast；**前端未重载/旧 `dist` 仍可能打开旧网页或没有版本标识**（以 `QAM 原生 UI v0.23.0`/`原生 UI · v0.23.0` 为准）；百度扫码前后端超时（start 20s/12s、poll 15s）依赖网络/TLS，超时只提示不自动重试；`Baidu QR` 日志只记 sign 长度，不记 sign/cookie。（已知限制）
 49. **原生库返回/关闭的边界（v0.24.0）**：modal 模式依赖 `onClose` 回调关闭，route 模式用 `Navigation.NavigateBack()`；Steam 覆盖层的 B/Esc 不一定能关闭 modal，需用显式「返回」/「Steam 库」按钮；`Router.NavigateToLibraryTab()` 不可用时只回退 `NavigateBack`；sticky 栏只覆盖库页内部滚动，不改变 Steam 全局导航行为。（已知限制）
+50. **库详情时长块的边界（v0.25.0）**：只有 `managed=true`（AppID 或标题匹配到 `installed_games`）才插入时长块；未匹配的 Steam 原有游戏直接 `return null` 且不查 HLTB；AppID 优先已降低同名误判，但标题匹配仍可能把同名 Steam 游戏认成插件游戏；HLTB 失败只影响块内数据；仍依赖 Steam 库页内部结构（patch 可能随 Steam 更新失效）。（已知限制）
 
 ---
 
@@ -1168,7 +1177,8 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | shortcuts.vdf | `userdata/<uid>/config/shortcuts.vdf`，非 Steam 游戏的快捷方式库（二进制 VDF） |
 | grid | `userdata/<uid>/config/grid/`，自定义封面图目录（`p`=竖版、`_hero`、`_logo`、`_wide`） |
 | 非 Steam 游戏 appid | `CRC32(exe路径+显示名) \| 0x80000000`，Steam 用它区分"手动添加的游戏" |
-| HLTB | How Long To Beat，游戏时长数据库，本项目用它显示"主线 / 总时长" |
+| HLTB | How Long To Beat，游戏时长数据库，本项目用它显示"主线 / 总时长"；v0.25.0 起只对 `managed=true`（插件安装记录）查询 |
+| managed 门禁 | v0.25.0 的库页时长隔离：前端只在 `data.managed===true` 渲染 `LibraryTimeBlock`，后端未匹配已安装记录直接返回 `managed=false` 且不查 HLTB |
 | gid | aria2 内部的下载任务 ID；本版本用运行时元数据 + flock 让插件重载后附着同一 aria2，gid 通常不变 |
 | 多分卷归档 / 主卷 | 一个大压缩包被拆成多个文件（`.7z.001`、`.part1.rar`、`.z01+zip` …）；主卷是入口卷，只有它需要解压 |
 | `bundled` | 任务 `install_status` 的一种：该文件属于多分卷归档但非主卷，由主卷统一解压 |

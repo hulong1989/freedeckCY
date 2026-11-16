@@ -1616,7 +1616,10 @@ class TianyiService:
         title_norm = self._normalize_cover_text(title_raw)
 
         record: Optional[TianyiInstalledGame] = None
-        if title_norm:
+        # 先按 AppID 精确匹配，避免 Steam 原有游戏与插件游戏同名时被误判。
+        if app_id_unsigned > 0:
+            record = await self._resolve_installed_record_by_app_id(app_id_unsigned)
+        if record is None and title_norm:
             for candidate in list(self.store.installed_games or []):
                 candidate_title = str(candidate.game_title or "").strip()
                 if not candidate_title:
@@ -1628,33 +1631,8 @@ class TianyiService:
                     record = candidate
                     break
 
-        if record is None and app_id_unsigned > 0:
-            record = await self._resolve_installed_record_by_app_id(app_id_unsigned)
-
         if record is None:
-            fallback_hltb: Dict[str, Any] = {}
-            if title_raw:
-                try:
-                    fallback_hltb = await self.resolve_hltb_stats(
-                        game_id="",
-                        title=title_raw,
-                        categories="",
-                        app_id=app_id_unsigned,
-                        force_refresh=False,
-                    )
-                except Exception as exc:
-                    config.logger.warning("库页面未匹配记录时查询 HLTB 失败: title=%s error=%s", title_raw, exc)
-
-            fallback_main_hours = 0.0
-            fallback_total_hours = 0.0
-            try:
-                fallback_main_hours = max(0.0, float(fallback_hltb.get("main_story_hours", 0.0) or 0.0))
-            except Exception:
-                fallback_main_hours = 0.0
-            try:
-                fallback_total_hours = max(0.0, float(fallback_hltb.get("total_hours", 0.0) or 0.0))
-            except Exception:
-                fallback_total_hours = 0.0
+            # Steam 原有游戏：不查询 HLTB、不返回时长/日期，前端也不会插入任何块。
             return {
                 "managed": False,
                 "reason": "not_managed",
@@ -1663,10 +1641,10 @@ class TianyiService:
                 "title": title_raw,
                 "my_playtime_seconds": 0,
                 "my_playtime_text": "-",
-                "main_story_hours": fallback_main_hours,
-                "main_story_time_text": str(fallback_hltb.get("main_story_text", "") or "").strip() or "-",
-                "total_hours": fallback_total_hours,
-                "total_time_text": str(fallback_hltb.get("total_time_text", "") or "").strip() or "-",
+                "main_story_hours": 0.0,
+                "main_story_time_text": "-",
+                "total_hours": 0.0,
+                "total_time_text": "-",
             }
 
         game_id = str(record.game_id or "").strip()
