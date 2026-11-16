@@ -1,6 +1,6 @@
 # freedeckCY 架构说明
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.19.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.20.0**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -18,11 +18,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 这是阅读本仓库最容易踩的坑：**GitHub Releases 里的成品功能远多于仓库代码**。
 
-> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.19.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
+> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.20.0**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.19.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择 |
+| 本仓库 `main` | `package.json` 版本 `0.20.0`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页） |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -31,6 +31,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 - **仓库代码只是早期版本**：releases 里的百度网盘、模拟器、资源池等模块在 `main` 上完全不存在。不要在本仓库里寻找它们。
 - **仓库缺运行时二进制**：`aria2_manager.py` / `seven_zip_manager.py` / `tianyi_client.py` 会优先查找 `defaults/runtime/` 下的 `aria2c`、`7zz`、`node`，但仓库本身不提交这些文件（已在 `.gitignore` 中）。插件可以不带它们启动，但要完整跑通下载/安装/云存档，克隆后必须先执行 `make runtime` 补齐，否则会分别报"下载组件不可用 / 解压组件不可用 / 未找到 node 运行时"。release zip 约 50 MB 与源码约 1 MB 的差值，主要就是这些二进制。
 - **作者已停止维护**：NewFreedeck v0.1 的发布说明原文是"目前我没有精力与时间继续维护，抱歉，所以可以根据我整理的 skill 自行修改，最后可以给我推 pr"。
+- **v0.20.0 Decky 原生游戏库**：QAM 新增 `LibraryPage`（路由 `/freedeckcy/library`，`routerHook.addRoute` 注册/卸载移除），主页「游戏库」按钮改为 `Navigation.Navigate(LIBRARY_ROUTE)`；原生库含「游戏库/已安装/刷新」Tab、搜索 + 平台/分类/排序下拉、20 条/页分页、安装 `ConfirmModal`（下载/安装大小、目录、模拟器/BIOS/setup 提示）与已安装启动/打开目录/卸载/扫描；全部走 Decky callable，不依赖本地 HTTP/CORS；网页库保留为备用（见 5.16）。
 - **v0.19.0 下载/安装目录支持 SD 卡**：新增 `py_modules/storage_options.py`——解析 `/proc/mounts` 识别 `/run/media`（SteamOS SD）、`/media`、`/mnt`、`/storage`（DroidDeck）等可写挂载，过滤 proc/sysfs/tmpfs/overlay 等系统 fstype 与根挂载，`shutil.disk_usage` 返回 free/total；每个外置挂载给出 `freedeckCY/downloads`、`freedeckCY/installed` 建议目录；`GET /api/tianyi/storage/options` + QAM「路径」页一键切换（无外置时提示）（见 5.15）。
 - **v0.18.0 扫描已安装 + 百度扫码错误诊断**：`scan_installed_games()` 扫 `settings.install_dir` **一层子目录**，按目录名/标题与目录条目匹配，跳过已记录 path/game_id，回填 Steam appid，模拟器平台用 `find_rom_file()` 找 ROM；HTTP `POST /api/tianyi/installed/scan` + 网页库「扫描已安装」按钮；百度扫码补 **BAIDUID CookieJar**、HTTP 状态/响应片段错误、轮询网络错误 `stage=failed`（不再一直 waiting）（见 5.13 / 5.14）。
 - **v0.17.0 百度扫码登录（主链路）**：新增 `py_modules/baidu_qr.py`（Passport `getqrcode` → `unicast` 长轮询 → `qrbdusslogin` 换 `BDUSS/STOKEN/PTOKEN`）；QAM「百度网盘（扫码登录）」显示二维码，Cookie 持久化到 `state.json` 的 `baidu_login`；百度安装计划**优先 Cookie**，没有才用 OpenAPI（可选回退），都没有则提示扫码；任务 aria2 带百度 Cookie/Referer/UA；**仍不接 CDP/网页逆向**（见 5.13）。
@@ -106,7 +107,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 repo/
 ├── main.py                     # 插件入口：Plugin 类，24 个可调用 RPC，大部分薄转发给 TianyiService / server_manager
 ├── plugin.json                 # Decky 元信息（api_version=1, flags=[]，publish 描述已更新）
-├── package.json                # 版本 0.19.0；build=rollup；前端依赖
+├── package.json                # 版本 0.20.0；build=rollup；前端依赖
 ├── decky.pyi                   # Decky Python API 类型存根
 ├── Makefile                    # runtime / package / test / doctor / validate-catalog / validate-submissions / clean / help 目标（见 DEVELOPMENT.md）
 ├── requirements-dev.txt        # 开发与 CI 依赖（pytest 等，运行期依赖由 Decky 自带）
@@ -163,7 +164,7 @@ repo/
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（351 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock）
+├── tests/                      # pytest 单测（351 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库为前端构建验证）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -226,11 +227,11 @@ Steam Deck (Game Mode)
 | 交互特点 | 900 ms / 6 s / 30 s 三档轮询 | 手柄/键盘双焦点模型（160 ms 轮询、方向键导航、A/B/X/Y/L1/R1 快捷键，为掌机设计；详见 5.8） |
 | 怎么打开 | 插件自带 | 调 RPC 拿 URL → `SteamClient.Browser.OpenUrl`（Steam 内置浏览器），不是 iframe/webview |
 
-QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `PanelSection` 组成，代码在 [src/index.tsx:2891](../src/index.tsx) `Content()` 到文件末尾；设置页是 `Tabs` 四页（路径 / 安装 / 下载 / 账号），在 [src/index.tsx:1652](../src/index.tsx) `SettingsPage()`。
+QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `PanelSection` 组成，代码在 [src/index.tsx:2949](../src/index.tsx) `Content()` 到文件末尾；设置页是 `Tabs` 四页（路径 / 安装 / 下载 / 账号），在 [src/index.tsx:1710](../src/index.tsx) `SettingsPage()`。
 
 ### 5.4 前端调用面
 
-**RPC（[src/index.tsx:357](../src/index.tsx) 起，全部 `callable("...")`，共 20 个天翼 RPC）**
+**RPC（[src/index.tsx:408](../src/index.tsx) 起，全部 `callable("...")`，共 20 个天翼 RPC）**
 
 | RPC | 用途 |
 |---|---|
@@ -565,10 +566,10 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **扫码链路（`py_modules/baidu_qr.py`）**：
 
-1. [baidu_qr.py:27](../py_modules/baidu_qr.py) `request_qr()`：GET `https://passport.baidu.com/v2/api/getqrcode?lp=pc&qrloginfrom=pc`，返回 `sign` + `imgurl`；
-2. [baidu_qr.py:67](../py_modules/baidu_qr.py) `fetch_qr_image()` 下载二维码 PNG；服务层 `start_baidu_qr_login()` 转 `data:image/png;base64,...` 给 QAM，**session 只存内存、180 秒过期**（`expires_at`）；
-3. [baidu_qr.py:79](../py_modules/baidu_qr.py) `poll_qr(sign)` 对 `https://passport.baidu.com/channel/unicast` 做长轮询：空响应/`errno=1` 视为 waiting，`channel_v` 里 `status=1` 是 scanned，带 `v` 是 confirmed；
-4. [baidu_qr.py:147](../py_modules/baidu_qr.py) `complete_login(v)`：GET `https://passport.baidu.com/v3/login/main/qrbdusslogin?bduss=<v>...`，解析 `data.session.bduss/stoken/ptoken`，拼成 `BDUSS=...; STOKEN=...; PTOKEN=...` Cookie 并尽量取用户名；
+1. [baidu_qr.py:80](../py_modules/baidu_qr.py) `request_qr()`：GET `https://passport.baidu.com/v2/api/getqrcode?lp=pc&qrloginfrom=pc`，返回 `sign` + `imgurl`；
+2. [baidu_qr.py:123](../py_modules/baidu_qr.py) `fetch_qr_image()` 下载二维码 PNG；服务层 `start_baidu_qr_login()` 转 `data:image/png;base64,...` 给 QAM，**session 只存内存、180 秒过期**（`expires_at`）；
+3. [baidu_qr.py:143](../py_modules/baidu_qr.py) `poll_qr(sign)` 对 `https://passport.baidu.com/channel/unicast` 做长轮询：空响应/`errno=1` 视为 waiting，`channel_v` 里 `status=1` 是 scanned，带 `v` 是 confirmed；
+4. [baidu_qr.py:222](../py_modules/baidu_qr.py) `complete_login(v)`：GET `https://passport.baidu.com/v3/login/main/qrbdusslogin?bduss=<v>...`，解析 `data.session.bduss/stoken/ptoken`，拼成 `BDUSS=...; STOKEN=...; PTOKEN=...` Cookie 并尽量取用户名；
 5. 服务层 [tianyi_service.py:911](../py_modules/tianyi_service.py) `start_baidu_qr_login()` / [tianyi_service.py:941](../py_modules/tianyi_service.py) `poll_baidu_qr_login()`：waiting→scanned→confirmed→success，成功后写入 `state.json` 的 `baidu_login` 并清空内存 session；[tianyi_service.py:978](../py_modules/tianyi_service.py) `cancel_baidu_qr_login()` 取消；[tianyi_service.py:983](../py_modules/tianyi_service.py) `clear_baidu_login()` 退出登录（清 cookie/账号）；
 6. 状态持久化：[tianyi_store.py:60](../py_modules/tianyi_store.py) `BaiduLoginState(cookie, user_account, updated_at)`，`logged_in` 检查 Cookie 里是否有 `BDUSS=`；`state.json` 权限 0600，诊断/日志沿用 cookie/token 脱敏，不把 Cookie 打进诊断包。
 
@@ -628,6 +629,25 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 **API / UI**：`GET /api/tianyi/storage/options`（`tianyi_http.handle_storage_options`、`main.get_tianyi_storage_options`）；QAM「路径」页在下载/安装目录下按外置挂载渲染「下载到 <label>（剩余 X）」「安装到 <label>（剩余 X）」按钮，点击 `savePatch` 切换目录并刷新；没有外置挂载时显示"未检测到可写 SD 卡/外置存储"；原「选择下载目录/安装目录」保留。
 
 **边界**：只看已挂载且**可写**的挂载（未挂载/只读/权限不足不会出现）；`/mnt`、`/media`、`/storage` 的**挂载根本身**会被跳过（子挂载如 `/mnt/sdcard` 可显示）；容量是检测时的快照；不会自动 `mkdir`/格式化/挂载；**不做 Steam 库同盘检测**（切目录后 Steam 库是否同盘需用户自行判断）；建议子目录固定为 `freedeckCY/{downloads,installed}`（暂不支持自定义名字）。
+
+### 5.16 Decky 原生游戏库（v0.20.0）
+
+**背景**：之前 QAM「游戏库」按钮打开的是本地网页库（`defaults/tianyi_library_ui/`，依赖本地 HTTP 服务/浏览器）。v0.20.0 起改为 Decky 原生 React 页面，网页库保留为备用（桌面浏览器/调试/回退）。
+
+**路由与入口**：
+
+- [src/index.tsx:32](../src/index.tsx) `LIBRARY_ROUTE = "/freedeckcy/library"`；[src/index.tsx:3494](../src/index.tsx) `LibraryPage()` 是页面组件；[src/index.tsx:3881](../src/index.tsx) `routerHook.addRoute(LIBRARY_ROUTE, LibraryPage)` 在插件挂载时注册，`onDismount()` 里 `removeRoute`；
+- QAM 主页「游戏库」按钮改为 `Navigation.Navigate(LIBRARY_ROUTE)`（不再调用后端打开网页）；网页库入口仍保留在设置/文档中作备用。
+
+**页面能力**：
+
+- Tab：「游戏库 / 已安装 / 刷新」；游戏库页：搜索 `TextField`（Enter 触发）+「搜索/重置」、「平台/分类/排序」三个 `DropdownItem`、**20 条/页**分页（上一页/下一页）；
+- 游戏行：标题、平台（大写）、大小、分类 + 「安装」按钮；点击走 `prepare_tianyi_install` 生成计划，`ConfirmModal` 显示下载/安装大小、目标目录、模拟器名与 `emulator_info.setup_hint`（BIOS/setup 提示），确认后 `start_tianyi_install` 入队；
+- 已安装页：`list_tianyi_installed_games` 列表，显示安装路径/大小/时长；「启动」`launch_tianyi_installed_game`、「目录」`open_tianyi_installed_folder`、「卸载」`ConfirmModal`（`delete_files=true`）→ `uninstall_tianyi_installed_game`、「扫描已安装」`scan_tianyi_installed_games`。
+
+**callable 链路**：`main.py` 暴露 `list_tianyi_catalog`（query/page/page_size/platform/category/sort）、`prepare_tianyi_install`、`start_tianyi_install`、`list_tianyi_installed_games`、`launch_tianyi_installed_game`、`open_tianyi_installed_folder`、`scan_tianyi_installed_games`（扫描实现仍是 `settings.install_dir` 一层 + 目录名/标题匹配，见 5.14）；前端通过 `callable("...")` 直连 Python，**不经过本地 HTTP，也没有 CORS/浏览器依赖**。
+
+**边界**：原生库只做浏览/安装/已安装动作，**任务进度仍在 QAM 主页任务区**（不在库页）；列表是行式（无封面卡片视图）；分页固定 20 条；扫描仍只认 `settings.install_dir` 一层；卸载固定 `delete_files=true`（不弹 compatdata 回收选项）；网页库作为备用保留，功能以原生库为准。
 
 ---
 
@@ -901,8 +921,8 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### 7.3 游玩时长（独立小链路）
 
-- `SteamClient.Apps.RegisterForGameActionStart/End` 全局监听 → `record_tianyi_game_action`（[src/index.tsx:923](../src/index.tsx) `installGlobalGameActionReporter()`）→ `TianyiService.record_game_action()`：重复 start 且间隔超过 5 秒视为上一局结束，单局封顶 12 小时，重启后能恢复会话。
-- 库游戏详情页：用 `routerHook.addPatch("/library/app/:appid")` **patch Steam 库页面的 `renderFunc` 和组件 `type`**，把"我的游玩 / 主线 / 总时长（HowLongToBeat）"插进去（[src/index.tsx:1477](../src/index.tsx) `installLibraryPlaytimePatch()`）。这是全项目最"黑魔法"的一段，依赖 Steam UI 内部结构。
+- `SteamClient.Apps.RegisterForGameActionStart/End` 全局监听 → `record_tianyi_game_action`（[src/index.tsx:981](../src/index.tsx) `installGlobalGameActionReporter()`）→ `TianyiService.record_game_action()`：重复 start 且间隔超过 5 秒视为上一局结束，单局封顶 12 小时，重启后能恢复会话。
+- 库游戏详情页：用 `routerHook.addPatch("/library/app/:appid")` **patch Steam 库页面的 `renderFunc` 和组件 `type`**，把"我的游玩 / 主线 / 总时长（HowLongToBeat）"插进去（[src/index.tsx:1535](../src/index.tsx) `installLibraryPlaytimePatch()`）。这是全项目最"黑魔法"的一段，依赖 Steam UI 内部结构。
 
 ---
 
@@ -1017,7 +1037,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### P2：工程性
 
-21. `tianyi_service.py` 约 9100 行、单类 100+ 方法；`src/index.tsx` 约 100 KB / 3000 行单文件。已补 `tests/`（351 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+21. `tianyi_service.py` 约 9100 行、单类 100+ 方法；`src/index.tsx` 约 3900 行单文件。已补 `tests/`（351 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
 22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
 23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
 24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）
@@ -1041,6 +1061,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 42. **模拟器存档恢复/多碟的边界（v0.16.0）**：恢复目标受已知存档根白名单限制（`restore_roots`），跨设备 3DS 可能退化到根目录；PS1/PS2/Switch 共享卡/目录覆盖不能只挑单个游戏，冲突需确认后整文件覆盖（有 `*.freedeckcy-bak-<时间戳>` 备份）；PS1 多碟只在多张 `.cue/.chd` 时自动生成 `freedeckcy-multidisc.m3u`，单碟/已有 m3u 不生成；m3u 按文件名自然排序，碟号命名不规范时顺序可能不符合预期。（已知限制）
 43. **扫描已安装的边界（v0.18.0）**：只扫安装目录一层、最多 500 项；目录名需与目录标题归一化匹配（改名可能 `catalog_no_match`）；只补已安装记录/回填 appid/找 ROM，**不创建 Steam 快捷方式**；模拟器 ROM 找不到时记录仍建但 `rom_path` 为空；扫描不会删除/修正已有记录。（已知限制）
 44. **存储位置选择的边界（v0.19.0）**：只显示已挂载且可写的 `/run/media`、`/media`、`/mnt`、`/storage`、`/sdcard` 子挂载；挂载根（如 `/mnt` 本身）跳过；只读/权限不足/未挂载不会出现；容量为快照；不会自动创建/挂载/格式化，也不检测 Steam 库是否同盘；建议子目录固定 `freedeckCY/{downloads,installed}`。（已知限制）
+45. **Decky 原生游戏库的边界（v0.20.0）**：任务进度仍在 QAM 主页任务区，库页只有列表/分页/安装/已安装动作；没有封面卡片视图，固定 20 条/页；扫描仍只认 `settings.install_dir` 一层；卸载固定删文件（不含 compatdata 回收选项）；网页库仅作备用，两套 UI 可能短暂不同步（以原生库/接口为准）。（已知限制）
 
 ---
 
@@ -1109,6 +1130,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | 模拟器注册表 / 闭环 | v0.11.0：`EmulatorSpec` 注册表接入 10 平台（GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch）；**全部首次安装在线下载、插件包不集成**；下载 ROM → 生成启动脚本 → Steam 原生快捷方式（不经 Proton） |
 | 架构能力矩阵 / available_platforms | 按当前架构是否有官方资产决定可用平台：x86_64 全部 10 个；aarch64 仅 GBA/PSP/NDS/PS1/FC/MD/Switch（3DS/PS2/PS3 无 arm64 包 → 目录白名单隐藏条目与筛选条） |
 | EmulatorSpec | 平台注册表条目：官方资产（repo/版本/各 arch 文件名）、archive（appimage/zip）、launch_args、rom_extensions、env_var、min_bytes、state_key（缓存目录名，FC/MD 共用 mesen）、executables（zip 内可执行文件名）、bios_required |
+| 原生游戏库 / LibraryPage | v0.20.0 的 Decky 原生库：路由 `/freedeckcy/library`，Tab（游戏库/已安装/刷新）、搜索/筛选/排序/20 条分页、安装确认与已安装启动/目录/卸载/扫描；全部走 callable，不依赖本地网页 |
 | 存储位置 / storage_options | v0.19.0 的 SD 卡选择：解析 `/proc/mounts` 找可写外置挂载（SteamOS `/run/media`、DroidDeck `/storage` 等），给 `freedeckCY/{downloads,installed}` 建议目录与容量，QAM「路径」页一键切换 |
 | 扫描已安装 / scan_installed_games | v0.18.0 的补录入口：扫安装目录一层，按目录名/标题匹配目录条目，回填 appid、模拟器找 ROM，补 `TianyiInstalledGame`；不创建 Steam 快捷方式 |
 | 百度扫码 / BaiduLoginState | v0.17.0 的百度主链路：Passport 二维码（`getqrcode` → `unicast` → `qrbdusslogin`）换 BDUSS/STOKEN/PTOKEN，Cookie 存 `state.json` 的 `baidu_login`；安装计划优先 Cookie |

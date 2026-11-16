@@ -29,6 +29,7 @@ import { FaCloudDownloadAlt } from "react-icons/fa";
 
 type ApiStatus = "success" | "error";
 const SETTINGS_ROUTE = "/freedeckcy/settings";
+const LIBRARY_ROUTE = "/freedeckcy/library";
 
 interface ApiResponse<T> {
   status: ApiStatus;
@@ -152,6 +153,56 @@ interface StorageOptionsState {
   internal?: StorageOption;
   external?: StorageOption[];
   options?: StorageOption[];
+}
+
+interface CatalogItem {
+  game_id: string;
+  title: string;
+  platform: string;
+  categories: string;
+  size_text: string;
+  cover_url?: string;
+  cover_portrait_url?: string;
+}
+
+interface CatalogPage {
+  total: number;
+  page: number;
+  page_size: number;
+  platforms?: { value: string; label: string; count: number }[];
+  categories?: { value: string; label: string; count: number }[];
+  items: CatalogItem[];
+}
+
+interface InstalledItem {
+  game_id: string;
+  title: string;
+  install_path: string;
+  status: string;
+  size_text: string;
+  platform: string;
+  steam_app_id: number;
+  playtime_text?: string;
+  playtime_active?: boolean;
+  exists?: boolean;
+}
+
+interface InstalledList {
+  total: number;
+  items: InstalledItem[];
+}
+
+interface InstallPlanData {
+  game_title?: string;
+  provider?: string;
+  platform?: string;
+  can_install?: boolean;
+  required_download_human?: string;
+  required_install_human?: string;
+  download_dir?: string;
+  install_dir?: string;
+  emulator_info?: { name?: string; setup_hint?: string; bios_required?: boolean; bios_present?: boolean };
+  message?: string;
 }
 
 interface UrlResponse {
@@ -355,8 +406,15 @@ interface LibraryGameTimeStatsData {
 }
 
 const getTianyiPanelState = callable<[Record<string, unknown>?], ApiResponse<PanelState>>("get_tianyi_panel_state");
-const getTianyiLibraryUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_library_url");
 const getTianyiStorageOptions = callable<[], ApiResponse<StorageOptionsState>>("get_tianyi_storage_options");
+const listTianyiCatalog = callable<[Record<string, unknown>], ApiResponse<CatalogPage>>("list_tianyi_catalog");
+const prepareTianyiInstall = callable<[Record<string, unknown>], ApiResponse<InstallPlanData>>("prepare_tianyi_install");
+const startTianyiInstall = callable<[Record<string, unknown>], ApiResponse<Record<string, unknown>>>("start_tianyi_install");
+const listTianyiInstalledGames = callable<[], ApiResponse<InstalledList>>("list_tianyi_installed_games");
+const launchTianyiInstalledGame = callable<[string], ApiResponse<Record<string, unknown>>>("launch_tianyi_installed_game");
+const openTianyiInstalledFolder = callable<[string], ApiResponse<Record<string, unknown>>>("open_tianyi_installed_folder");
+const scanTianyiInstalledGames = callable<[], ApiResponse<Record<string, unknown>>>("scan_tianyi_installed_games");
+const uninstallTianyiInstalled = callable<[Record<string, unknown>], ApiResponse<Record<string, unknown>>>("uninstall_tianyi_installed_game");
 const getTianyiLoginUrl = callable<[], ApiResponse<UrlResponse>>("get_tianyi_login_url");
 const setTianyiSettings = callable<[SettingsPayload], ApiResponse<SettingsState>>("set_tianyi_settings");
 const clearTianyiLogin = callable<[], ApiResponse<ClearLoginResponse>>("clear_tianyi_login");
@@ -2892,7 +2950,6 @@ function Content() {
   const [loading, setLoading] = useState<boolean>(true);
   const [state, setState] = useState<PanelState>(EMPTY_STATE);
   const [openingLogin, setOpeningLogin] = useState<boolean>(false);
-  const [openingLibrary, setOpeningLibrary] = useState<boolean>(false);
   const [uninstallingKey, setUninstallingKey] = useState<string>("");
   const [taskActionKey, setTaskActionKey] = useState<string>("");
   const [previewingKey, setPreviewingKey] = useState<string>("");
@@ -3022,21 +3079,18 @@ function Content() {
     }
   }, [openingLogin]);
 
-  const onOpenLibrary = useCallback(async () => {
-    if (openingLibrary) return;
-    setOpeningLibrary(true);
+  const onOpenLibrary = useCallback(() => {
     try {
-      const result = await getTianyiLibraryUrl();
-      if (result.status !== "success") {
-        throw new Error(describeOpenError(result, "获取游戏列表地址失败"));
-      }
-      openExternalUrl(result.url || result.data?.url || state.library_url || "");
-    } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
-    } finally {
-      setOpeningLibrary(false);
+      Router.CloseSideMenus?.();
+    } catch {
+      // 忽略菜单关闭失败。
     }
-  }, [openingLibrary, state.library_url]);
+    try {
+      Navigation.Navigate(LIBRARY_ROUTE);
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: `打开游戏库失败：${error}` });
+    }
+  }, []);
 
   const onOpenSettings = useCallback(() => {
     try {
@@ -3275,12 +3329,12 @@ function Content() {
         </PanelSectionRow>
         <PanelSectionRow>
           {!state.login.logged_in && (
-            <ButtonItem layout="below" onClick={onLogin} disabled={openingLogin || openingLibrary}>
+            <ButtonItem layout="below" onClick={onLogin} disabled={openingLogin}>
               {openingLogin ? "登录入口准备中..." : "登录"}
             </ButtonItem>
           )}
-          <ButtonItem layout="below" onClick={onOpenLibrary} disabled={openingLibrary || openingLogin}>
-            {openingLibrary ? "游戏列表准备中..." : "游戏列表"}
+          <ButtonItem layout="below" onClick={onOpenLibrary} disabled={openingLogin}>
+            游戏库
           </ButtonItem>
           <ButtonItem layout="below" onClick={onOpenSettings}>设置</ButtonItem>
         </PanelSectionRow>
@@ -3436,8 +3490,395 @@ function Content() {
   );
 }
 
+
+function LibraryPage() {
+  const [tab, setTab] = useState<"catalog" | "installed">("catalog");
+  const [query, setQuery] = useState<string>("");
+  const [activeQuery, setActiveQuery] = useState<string>("");
+  const [platform, setPlatform] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
+  const [sort, setSort] = useState<string>("");
+  const [page, setPage] = useState<number>(1);
+  const [catalog, setCatalog] = useState<CatalogPage>({ total: 0, page: 1, page_size: 20, items: [] });
+  const [installed, setInstalled] = useState<InstalledList>({ total: 0, items: [] });
+  const [loadingCatalog, setLoadingCatalog] = useState<boolean>(false);
+  const [loadingInstalled, setLoadingInstalled] = useState<boolean>(false);
+  const [busyKey, setBusyKey] = useState<string>("");
+  const pageSize = 20;
+
+  const loadCatalog = useCallback(
+    async (targetPage: number) => {
+      setLoadingCatalog(true);
+      try {
+        const result = await listTianyiCatalog({
+          query: activeQuery,
+          page: Math.max(1, targetPage),
+          page_size: pageSize,
+          platform,
+          category,
+          sort,
+        });
+        if (result.status !== "success" || !result.data) {
+          throw new Error(result.message || "读取游戏列表失败");
+        }
+        setCatalog({
+          total: Number(result.data.total || 0),
+          page: Number(result.data.page || 1),
+          page_size: Number(result.data.page_size || pageSize),
+          platforms: result.data.platforms || [],
+          categories: result.data.categories || [],
+          items: result.data.items || [],
+        });
+        setPage(Number(result.data.page || 1));
+      } catch (error) {
+        toaster.toast({ title: "freedeckCY", body: String(error) });
+      } finally {
+        setLoadingCatalog(false);
+      }
+    },
+    [activeQuery, platform, category, sort],
+  );
+
+  const loadInstalled = useCallback(async () => {
+    setLoadingInstalled(true);
+    try {
+      const result = await listTianyiInstalledGames();
+      if (result.status !== "success" || !result.data) {
+        throw new Error(result.message || "读取已安装列表失败");
+      }
+      setInstalled(result.data);
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setLoadingInstalled(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCatalog(1);
+  }, [loadCatalog]);
+
+  useEffect(() => {
+    if (tab === "installed") void loadInstalled();
+  }, [tab, loadInstalled]);
+
+  const platformOptions = useMemo(
+    () => [{ data: "", label: "全部平台" }, ...(catalog.platforms || []).map((item) => ({
+      data: String(item.value || ""),
+      label: `${item.label || item.value}（${item.count || 0}）`,
+    }))],
+    [catalog.platforms],
+  );
+  const categoryOptions = useMemo(
+    () => [{ data: "", label: "全部分类" }, ...(catalog.categories || []).slice(0, 30).map((item) => ({
+      data: String(item.value || ""),
+      label: String(item.label || item.value || ""),
+    }))],
+    [catalog.categories],
+  );
+  const sortOptions = useMemo(
+    () => [
+      { data: "", label: "默认排序" },
+      { data: "title", label: "名称" },
+      { data: "size_desc", label: "大小从大到小" },
+      { data: "size_asc", label: "大小从小到大" },
+    ],
+    [],
+  );
+
+  const onPrepareInstall = useCallback(async (item: CatalogItem) => {
+    if (busyKey) return;
+    setBusyKey(item.game_id);
+    try {
+      const result = await prepareTianyiInstall({ game_id: item.game_id });
+      if (result.status !== "success" || !result.data) {
+        throw new Error(result.message || "生成安装计划失败");
+      }
+      const plan = result.data;
+      if (!plan.can_install) {
+        throw new Error(plan.message || "磁盘空间不足，无法安装");
+      }
+      const emulatorText = plan.emulator_info?.name ? `模拟器：${plan.emulator_info.name}` : "PC / Proton";
+      const setupText = plan.emulator_info?.setup_hint ? `\n提示：${plan.emulator_info.setup_hint}` : "";
+      showModal(
+        <ConfirmModal
+          strTitle={`安装 ${plan.game_title || item.title}`}
+          strDescription={
+            `下载：${plan.required_download_human || "未知"} → ${plan.download_dir || "-"}\n` +
+            `安装：${plan.required_install_human || "未知"} → ${plan.install_dir || "-"}\n` +
+            `${emulatorText}${setupText}`
+          }
+          strOKButtonText="开始下载"
+          strCancelButtonText="取消"
+          onOK={() => {
+            void (async () => {
+              try {
+                const started = await startTianyiInstall({ game_id: item.game_id });
+                if (started.status !== "success") {
+                  throw new Error(started.message || "启动安装失败");
+                }
+                toaster.toast({ title: "freedeckCY", body: "已加入下载队列，可在插件主页查看任务进度" });
+              } catch (error) {
+                toaster.toast({ title: "freedeckCY", body: String(error) });
+              }
+            })();
+          }}
+          onCancel={() => {}}
+        />,
+      );
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBusyKey("");
+    }
+  }, [busyKey, loadInstalled]);
+
+  const onLaunchInstalled = useCallback(async (item: InstalledItem) => {
+    if (busyKey) return;
+    setBusyKey(item.game_id);
+    try {
+      const result = await launchTianyiInstalledGame(item.game_id);
+      if (result.status !== "success") throw new Error(result.message || "启动失败");
+      toaster.toast({ title: "freedeckCY", body: `正在启动 ${item.title}` });
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBusyKey("");
+    }
+  }, [busyKey]);
+
+  const onOpenFolder = useCallback(async (item: InstalledItem) => {
+    if (busyKey) return;
+    setBusyKey(item.game_id);
+    try {
+      const result = await openTianyiInstalledFolder(item.game_id);
+      if (result.status !== "success") throw new Error(result.message || "打开目录失败");
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setBusyKey("");
+    }
+  }, [busyKey]);
+
+  const onUninstall = useCallback((item: InstalledItem) => {
+    showModal(
+      <ConfirmModal
+        strTitle={`卸载 ${item.title}`}
+        strDescription="将删除安装目录并移除记录，是否继续？"
+        strOKButtonText="卸载"
+        strCancelButtonText="取消"
+        onOK={() => {
+          void (async () => {
+            try {
+              const result = await uninstallTianyiInstalled({
+                game_id: item.game_id,
+                install_path: item.install_path,
+                delete_files: true,
+              });
+              if (result.status !== "success") throw new Error(result.message || "卸载失败");
+              toaster.toast({ title: "freedeckCY", body: "已卸载" });
+              await loadInstalled();
+            } catch (error) {
+              toaster.toast({ title: "freedeckCY", body: String(error) });
+            }
+          })();
+        }}
+        onCancel={() => {}}
+      />,
+    );
+  }, [loadInstalled]);
+
+  const onScanInstalled = useCallback(async () => {
+    if (loadingInstalled) return;
+    setLoadingInstalled(true);
+    try {
+      const result = await scanTianyiInstalledGames();
+      if (result.status !== "success") throw new Error(result.message || "扫描失败");
+      const message = String((result.data as Record<string, unknown>)?.message || "扫描完成");
+      toaster.toast({ title: "freedeckCY", body: message });
+      await loadInstalled();
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: String(error) });
+    } finally {
+      setLoadingInstalled(false);
+    }
+  }, [loadingInstalled, loadInstalled]);
+
+  const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
+
+  return (
+    <div style={{ height: "100%", overflowY: "auto", padding: "0 8px 32px" }}>
+      <PanelSection>
+        <PanelSectionRow>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }}>
+            <div style={{ fontSize: "18px", fontWeight: 700 }}>freedeckCY 游戏库</div>
+            <Focusable style={{ display: "flex", gap: "6px" }}>
+              <DialogButton
+                onClick={() => setTab("catalog")}
+                style={{ padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }}
+              >游戏库</DialogButton>
+              <DialogButton
+                onClick={() => setTab("installed")}
+                style={{ padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }}
+              >已安装{installed.total ? `(${installed.total})` : ""}</DialogButton>
+              <DialogButton
+                onClick={() => { if (tab === "catalog") void loadCatalog(page); else void loadInstalled(); }}
+                style={{ padding: "6px 12px" }}
+              >刷新</DialogButton>
+            </Focusable>
+          </div>
+        </PanelSectionRow>
+      </PanelSection>
+
+      {tab === "catalog" ? (
+        <>
+          <PanelSection title="搜索与筛选">
+            <PanelSectionRow>
+              <TextField
+                label="搜索游戏"
+                value={query}
+                onChange={(event) => setQuery(getTextFieldValue(event))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    setActiveQuery(query.trim());
+                    setPage(1);
+                  }
+                }}
+              />
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <Focusable style={{ display: "flex", gap: "6px" }}>
+                <DialogButton
+                  onClick={() => { setActiveQuery(query.trim()); setPage(1); }}
+                  style={{ padding: "6px 12px" }}
+                >搜索</DialogButton>
+                <DialogButton
+                  onClick={() => { setQuery(""); setActiveQuery(""); setPlatform(""); setCategory(""); setSort(""); setPage(1); }}
+                  style={{ padding: "6px 12px" }}
+                >重置</DialogButton>
+              </Focusable>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <DropdownItem
+                label="平台"
+                rgOptions={platformOptions}
+                selectedOption={platform}
+                onChange={(option) => { setPlatform(String(option?.data || "")); setPage(1); }}
+              />
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <DropdownItem
+                label="分类"
+                rgOptions={categoryOptions}
+                selectedOption={category}
+                onChange={(option) => { setCategory(String(option?.data || "")); setPage(1); }}
+              />
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <DropdownItem
+                label="排序"
+                rgOptions={sortOptions}
+                selectedOption={sort}
+                onChange={(option) => { setSort(String(option?.data || "")); setPage(1); }}
+              />
+            </PanelSectionRow>
+          </PanelSection>
+
+          <PanelSection title={`游戏列表（${catalog.total}）`}>
+            {loadingCatalog ? (
+              <PanelSectionRow><div style={{ fontSize: "12px" }}>加载中...</div></PanelSectionRow>
+            ) : catalog.items.length === 0 ? (
+              <PanelSectionRow><div style={{ fontSize: "12px" }}>没有匹配游戏</div></PanelSectionRow>
+            ) : (
+              catalog.items.map((item) => (
+                <PanelSectionRow key={item.game_id}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title || "未命名游戏"}</div>
+                      <div style={{ fontSize: "12px", opacity: 0.8 }}>
+                        {`${String(item.platform || "pc").toUpperCase()} · ${item.size_text || "-"}${item.categories ? ` · ${item.categories}` : ""}`}
+                      </div>
+                    </div>
+                    <Focusable style={{ flex: "0 0 auto" }}>
+                      <DialogButton
+                        onClick={() => void onPrepareInstall(item)}
+                        disabled={Boolean(busyKey)}
+                        style={{ minWidth: "72px", padding: "6px 12px" }}
+                      >{busyKey === item.game_id ? "处理中..." : "安装"}</DialogButton>
+                    </Focusable>
+                  </div>
+                </PanelSectionRow>
+              ))
+            )}
+            <PanelSectionRow>
+              <Focusable style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", width: "100%" }}>
+                <DialogButton
+                  onClick={() => void loadCatalog(page - 1)}
+                  disabled={loadingCatalog || page <= 1}
+                  style={{ padding: "6px 12px" }}
+                >上一页</DialogButton>
+                <div style={{ fontSize: "12px" }}>{`${page} / ${totalPages}`}</div>
+                <DialogButton
+                  onClick={() => void loadCatalog(page + 1)}
+                  disabled={loadingCatalog || page >= totalPages}
+                  style={{ padding: "6px 12px" }}
+                >下一页</DialogButton>
+              </Focusable>
+            </PanelSectionRow>
+          </PanelSection>
+        </>
+      ) : (
+        <PanelSection title={`已安装（${installed.total}）`}>
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={onScanInstalled} disabled={loadingInstalled}>
+              {loadingInstalled ? "处理中..." : "扫描已安装"}
+            </ButtonItem>
+          </PanelSectionRow>
+          {installed.items.length === 0 ? (
+            <PanelSectionRow><div style={{ fontSize: "12px" }}>还没有已安装游戏</div></PanelSectionRow>
+          ) : (
+            installed.items.map((item) => (
+              <PanelSectionRow key={item.game_id}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title || "未命名游戏"}</div>
+                    <div style={{ fontSize: "12px", opacity: 0.8 }}>
+                      {`${String(item.platform || "pc").toUpperCase()} · ${item.size_text || "-"}${item.playtime_text ? ` · ${item.playtime_text}` : ""}`}
+                    </div>
+                    <div style={{ fontSize: "11px", opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={item.install_path}>
+                      {item.install_path || "-"}
+                    </div>
+                  </div>
+                  <Focusable style={{ display: "flex", gap: "6px", flex: "0 0 auto" }}>
+                    <DialogButton
+                      onClick={() => void onLaunchInstalled(item)}
+                      disabled={Boolean(busyKey)}
+                      style={{ padding: "6px 10px" }}
+                    >启动</DialogButton>
+                    <DialogButton
+                      onClick={() => void onOpenFolder(item)}
+                      disabled={Boolean(busyKey)}
+                      style={{ padding: "6px 10px" }}
+                    >目录</DialogButton>
+                    <DialogButton
+                      onClick={() => onUninstall(item)}
+                      disabled={Boolean(busyKey)}
+                      style={{ padding: "6px 10px", background: "rgba(255,106,106,0.22)" }}
+                    >卸载</DialogButton>
+                  </Focusable>
+                </div>
+              </PanelSectionRow>
+            ))
+          )}
+        </PanelSection>
+      )}
+    </div>
+  );
+}
+
 export default definePlugin(() => {
   routerHook.addRoute(SETTINGS_ROUTE, SettingsPage);
+  routerHook.addRoute(LIBRARY_ROUTE, LibraryPage);
   const unpatchLibraryPlaytime = installLibraryPlaytimePatch();
   let uninstallGameActionReporter = () => {};
   try {
@@ -3455,6 +3896,7 @@ export default definePlugin(() => {
       uninstallGameActionReporter();
       unpatchLibraryPlaytime();
       routerHook.removeRoute(SETTINGS_ROUTE);
+      routerHook.removeRoute(LIBRARY_ROUTE);
     },
   };
 });

@@ -88,9 +88,17 @@ function FaCloudDownloadAlt (props) {
 }
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
+const LIBRARY_ROUTE = "/freedeckcy/library";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
-const getTianyiLibraryUrl = callable("get_tianyi_library_url");
 const getTianyiStorageOptions = callable("get_tianyi_storage_options");
+const listTianyiCatalog = callable("list_tianyi_catalog");
+const prepareTianyiInstall = callable("prepare_tianyi_install");
+const startTianyiInstall = callable("start_tianyi_install");
+const listTianyiInstalledGames = callable("list_tianyi_installed_games");
+const launchTianyiInstalledGame = callable("launch_tianyi_installed_game");
+const openTianyiInstalledFolder = callable("open_tianyi_installed_folder");
+const scanTianyiInstalledGames = callable("scan_tianyi_installed_games");
+const uninstallTianyiInstalled = callable("uninstall_tianyi_installed_game");
 const getTianyiLoginUrl = callable("get_tianyi_login_url");
 const setTianyiSettings = callable("set_tianyi_settings");
 const clearTianyiLogin = callable("clear_tianyi_login");
@@ -2126,7 +2134,6 @@ function Content() {
     const [loading, setLoading] = SP_REACT.useState(true);
     const [state, setState] = SP_REACT.useState(EMPTY_STATE);
     const [openingLogin, setOpeningLogin] = SP_REACT.useState(false);
-    const [openingLibrary, setOpeningLibrary] = SP_REACT.useState(false);
     const [uninstallingKey, setUninstallingKey] = SP_REACT.useState("");
     const [taskActionKey, setTaskActionKey] = SP_REACT.useState("");
     const [previewingKey, setPreviewingKey] = SP_REACT.useState("");
@@ -2254,24 +2261,20 @@ function Content() {
             setOpeningLogin(false);
         }
     }, [openingLogin]);
-    const onOpenLibrary = SP_REACT.useCallback(async () => {
-        if (openingLibrary)
-            return;
-        setOpeningLibrary(true);
+    const onOpenLibrary = SP_REACT.useCallback(() => {
         try {
-            const result = await getTianyiLibraryUrl();
-            if (result.status !== "success") {
-                throw new Error(describeOpenError(result, "获取游戏列表地址失败"));
-            }
-            openExternalUrl(result.url || result.data?.url || state.library_url || "");
+            DFL.Router.CloseSideMenus?.();
+        }
+        catch {
+            // 忽略菜单关闭失败。
+        }
+        try {
+            DFL.Navigation.Navigate(LIBRARY_ROUTE);
         }
         catch (error) {
-            toaster.toast({ title: "freedeckCY", body: String(error) });
+            toaster.toast({ title: "freedeckCY", body: `打开游戏库失败：${error}` });
         }
-        finally {
-            setOpeningLibrary(false);
-        }
-    }, [openingLibrary, state.library_url]);
+    }, []);
     const onOpenSettings = SP_REACT.useCallback(() => {
         try {
             DFL.Router.CloseSideMenus?.();
@@ -2453,7 +2456,7 @@ function Content() {
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
-                            }, title: loginStatusText, children: loginStatusText }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [!state.login.logged_in && (SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLogin, disabled: openingLogin || openingLibrary, children: openingLogin ? "登录入口准备中..." : "登录" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenLibrary, disabled: openingLibrary || openingLogin, children: openingLibrary ? "游戏列表准备中..." : "游戏列表" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenSettings, children: "\u8BBE\u7F6E" })] })] }), visibleTasks.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `下载列表（${visibleTasks.length}）`, children: visibleTasks.slice(0, 20).map((task) => {
+                            }, title: loginStatusText, children: loginStatusText }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [!state.login.logged_in && (SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLogin, disabled: openingLogin, children: openingLogin ? "登录入口准备中..." : "登录" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenLibrary, disabled: openingLogin, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenSettings, children: "\u8BBE\u7F6E" })] })] }), visibleTasks.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `下载列表（${visibleTasks.length}）`, children: visibleTasks.slice(0, 20).map((task) => {
                     const taskId = String(task.task_id || "");
                     const status = String(task.status || "");
                     const canPause = status === "active" || status === "waiting";
@@ -2501,8 +2504,213 @@ function Content() {
                                         }, children: uninstalling ? "卸载中..." : "卸载" }) })] }) }, `${item.game_id || item.title || "game"}_${index}`));
                 }) }))] }));
 }
+function LibraryPage() {
+    const [tab, setTab] = SP_REACT.useState("catalog");
+    const [query, setQuery] = SP_REACT.useState("");
+    const [activeQuery, setActiveQuery] = SP_REACT.useState("");
+    const [platform, setPlatform] = SP_REACT.useState("");
+    const [category, setCategory] = SP_REACT.useState("");
+    const [sort, setSort] = SP_REACT.useState("");
+    const [page, setPage] = SP_REACT.useState(1);
+    const [catalog, setCatalog] = SP_REACT.useState({ total: 0, page: 1, page_size: 20, items: [] });
+    const [installed, setInstalled] = SP_REACT.useState({ total: 0, items: [] });
+    const [loadingCatalog, setLoadingCatalog] = SP_REACT.useState(false);
+    const [loadingInstalled, setLoadingInstalled] = SP_REACT.useState(false);
+    const [busyKey, setBusyKey] = SP_REACT.useState("");
+    const pageSize = 20;
+    const loadCatalog = SP_REACT.useCallback(async (targetPage) => {
+        setLoadingCatalog(true);
+        try {
+            const result = await listTianyiCatalog({
+                query: activeQuery,
+                page: Math.max(1, targetPage),
+                page_size: pageSize,
+                platform,
+                category,
+                sort,
+            });
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "读取游戏列表失败");
+            }
+            setCatalog({
+                total: Number(result.data.total || 0),
+                page: Number(result.data.page || 1),
+                page_size: Number(result.data.page_size || pageSize),
+                platforms: result.data.platforms || [],
+                categories: result.data.categories || [],
+                items: result.data.items || [],
+            });
+            setPage(Number(result.data.page || 1));
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setLoadingCatalog(false);
+        }
+    }, [activeQuery, platform, category, sort]);
+    const loadInstalled = SP_REACT.useCallback(async () => {
+        setLoadingInstalled(true);
+        try {
+            const result = await listTianyiInstalledGames();
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "读取已安装列表失败");
+            }
+            setInstalled(result.data);
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setLoadingInstalled(false);
+        }
+    }, []);
+    SP_REACT.useEffect(() => {
+        void loadCatalog(1);
+    }, [loadCatalog]);
+    SP_REACT.useEffect(() => {
+        if (tab === "installed")
+            void loadInstalled();
+    }, [tab, loadInstalled]);
+    const platformOptions = SP_REACT.useMemo(() => [{ data: "", label: "全部平台" }, ...(catalog.platforms || []).map((item) => ({
+            data: String(item.value || ""),
+            label: `${item.label || item.value}（${item.count || 0}）`,
+        }))], [catalog.platforms]);
+    const categoryOptions = SP_REACT.useMemo(() => [{ data: "", label: "全部分类" }, ...(catalog.categories || []).slice(0, 30).map((item) => ({
+            data: String(item.value || ""),
+            label: String(item.label || item.value || ""),
+        }))], [catalog.categories]);
+    const sortOptions = SP_REACT.useMemo(() => [
+        { data: "", label: "默认排序" },
+        { data: "title", label: "名称" },
+        { data: "size_desc", label: "大小从大到小" },
+        { data: "size_asc", label: "大小从小到大" },
+    ], []);
+    const onPrepareInstall = SP_REACT.useCallback(async (item) => {
+        if (busyKey)
+            return;
+        setBusyKey(item.game_id);
+        try {
+            const result = await prepareTianyiInstall({ game_id: item.game_id });
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "生成安装计划失败");
+            }
+            const plan = result.data;
+            if (!plan.can_install) {
+                throw new Error(plan.message || "磁盘空间不足，无法安装");
+            }
+            const emulatorText = plan.emulator_info?.name ? `模拟器：${plan.emulator_info.name}` : "PC / Proton";
+            const setupText = plan.emulator_info?.setup_hint ? `\n提示：${plan.emulator_info.setup_hint}` : "";
+            DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `安装 ${plan.game_title || item.title}`, strDescription: `下载：${plan.required_download_human || "未知"} → ${plan.download_dir || "-"}\n` +
+                    `安装：${plan.required_install_human || "未知"} → ${plan.install_dir || "-"}\n` +
+                    `${emulatorText}${setupText}`, strOKButtonText: "\u5F00\u59CB\u4E0B\u8F7D", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
+                    void (async () => {
+                        try {
+                            const started = await startTianyiInstall({ game_id: item.game_id });
+                            if (started.status !== "success") {
+                                throw new Error(started.message || "启动安装失败");
+                            }
+                            toaster.toast({ title: "freedeckCY", body: "已加入下载队列，可在插件主页查看任务进度" });
+                        }
+                        catch (error) {
+                            toaster.toast({ title: "freedeckCY", body: String(error) });
+                        }
+                    })();
+                }, onCancel: () => { } }));
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBusyKey("");
+        }
+    }, [busyKey, loadInstalled]);
+    const onLaunchInstalled = SP_REACT.useCallback(async (item) => {
+        if (busyKey)
+            return;
+        setBusyKey(item.game_id);
+        try {
+            const result = await launchTianyiInstalledGame(item.game_id);
+            if (result.status !== "success")
+                throw new Error(result.message || "启动失败");
+            toaster.toast({ title: "freedeckCY", body: `正在启动 ${item.title}` });
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBusyKey("");
+        }
+    }, [busyKey]);
+    const onOpenFolder = SP_REACT.useCallback(async (item) => {
+        if (busyKey)
+            return;
+        setBusyKey(item.game_id);
+        try {
+            const result = await openTianyiInstalledFolder(item.game_id);
+            if (result.status !== "success")
+                throw new Error(result.message || "打开目录失败");
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setBusyKey("");
+        }
+    }, [busyKey]);
+    const onUninstall = SP_REACT.useCallback((item) => {
+        DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `卸载 ${item.title}`, strDescription: "\u5C06\u5220\u9664\u5B89\u88C5\u76EE\u5F55\u5E76\u79FB\u9664\u8BB0\u5F55\uFF0C\u662F\u5426\u7EE7\u7EED\uFF1F", strOKButtonText: "\u5378\u8F7D", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
+                void (async () => {
+                    try {
+                        const result = await uninstallTianyiInstalled({
+                            game_id: item.game_id,
+                            install_path: item.install_path,
+                            delete_files: true,
+                        });
+                        if (result.status !== "success")
+                            throw new Error(result.message || "卸载失败");
+                        toaster.toast({ title: "freedeckCY", body: "已卸载" });
+                        await loadInstalled();
+                    }
+                    catch (error) {
+                        toaster.toast({ title: "freedeckCY", body: String(error) });
+                    }
+                })();
+            }, onCancel: () => { } }));
+    }, [loadInstalled]);
+    const onScanInstalled = SP_REACT.useCallback(async () => {
+        if (loadingInstalled)
+            return;
+        setLoadingInstalled(true);
+        try {
+            const result = await scanTianyiInstalledGames();
+            if (result.status !== "success")
+                throw new Error(result.message || "扫描失败");
+            const message = String(result.data?.message || "扫描完成");
+            toaster.toast({ title: "freedeckCY", body: message });
+            await loadInstalled();
+        }
+        catch (error) {
+            toaster.toast({ title: "freedeckCY", body: String(error) });
+        }
+        finally {
+            setLoadingInstalled(false);
+        }
+    }, [loadingInstalled, loadInstalled]);
+    const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
+    return (SP_JSX.jsxs("div", { style: { height: "100%", overflowY: "auto", padding: "0 8px 32px" }, children: [SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
+                                            void loadCatalog(page);
+                                        else
+                                            void loadInstalled(); }, style: { padding: "6px 12px" }, children: "\u5237\u65B0" })] })] }) }) }), tab === "catalog" ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u641C\u7D22\u4E0E\u7B5B\u9009", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u641C\u7D22\u6E38\u620F", value: query, onChange: (event) => setQuery(getTextFieldValue(event)), onKeyDown: (event) => {
+                                        if (event.key === "Enter") {
+                                            setActiveQuery(query.trim());
+                                            setPage(1);
+                                        }
+                                    } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => { setActiveQuery(query.trim()); setPage(1); }, style: { padding: "6px 12px" }, children: "\u641C\u7D22" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { setQuery(""); setActiveQuery(""); setPlatform(""); setCategory(""); setSort(""); setPage(1); }, style: { padding: "6px 12px" }, children: "\u91CD\u7F6E" })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5E73\u53F0", rgOptions: platformOptions, selectedOption: platform, onChange: (option) => { setPlatform(String(option?.data || "")); setPage(1); } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5206\u7C7B", rgOptions: categoryOptions, selectedOption: category, onChange: (option) => { setCategory(String(option?.data || "")); setPage(1); } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u6392\u5E8F", rgOptions: sortOptions, selectedOption: sort, onChange: (option) => { setSort(String(option?.data || "")); setPage(1); } }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: `游戏列表（${catalog.total}）`, children: [loadingCatalog ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) })) : catalog.items.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u6CA1\u6709\u5339\u914D\u6E38\u620F" }) })) : (catalog.items.map((item) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0, flex: 1 }, children: [SP_JSX.jsx("div", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: item.title || "未命名游戏" }), SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: `${String(item.platform || "pc").toUpperCase()} · ${item.size_text || "-"}${item.categories ? ` · ${item.categories}` : ""}` })] }), SP_JSX.jsx(DFL.Focusable, { style: { flex: "0 0 auto" }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onPrepareInstall(item), disabled: Boolean(busyKey), style: { minWidth: "72px", padding: "6px 12px" }, children: busyKey === item.game_id ? "处理中..." : "安装" }) })] }) }, item.game_id)))), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void loadCatalog(page - 1), disabled: loadingCatalog || page <= 1, style: { padding: "6px 12px" }, children: "\u4E0A\u4E00\u9875" }), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: `${page} / ${totalPages}` }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void loadCatalog(page + 1), disabled: loadingCatalog || page >= totalPages, style: { padding: "6px 12px" }, children: "\u4E0B\u4E00\u9875" })] }) })] })] })) : (SP_JSX.jsxs(DFL.PanelSection, { title: `已安装（${installed.total}）`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onScanInstalled, disabled: loadingInstalled, children: loadingInstalled ? "处理中..." : "扫描已安装" }) }), installed.items.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u8FD8\u6CA1\u6709\u5DF2\u5B89\u88C5\u6E38\u620F" }) })) : (installed.items.map((item) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0, flex: 1 }, children: [SP_JSX.jsx("div", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: item.title || "未命名游戏" }), SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: `${String(item.platform || "pc").toUpperCase()} · ${item.size_text || "-"}${item.playtime_text ? ` · ${item.playtime_text}` : ""}` }), SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: item.install_path, children: item.install_path || "-" })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px", flex: "0 0 auto" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onLaunchInstalled(item), disabled: Boolean(busyKey), style: { padding: "6px 10px" }, children: "\u542F\u52A8" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onOpenFolder(item), disabled: Boolean(busyKey), style: { padding: "6px 10px" }, children: "\u76EE\u5F55" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstall(item), disabled: Boolean(busyKey), style: { padding: "6px 10px", background: "rgba(255,106,106,0.22)" }, children: "\u5378\u8F7D" })] })] }) }, item.game_id))))] }))] }));
+}
 var index = definePlugin(() => {
     routerHook.addRoute(SETTINGS_ROUTE, SettingsPage);
+    routerHook.addRoute(LIBRARY_ROUTE, LibraryPage);
     const unpatchLibraryPlaytime = installLibraryPlaytimePatch();
     let uninstallGameActionReporter = () => { };
     try {
@@ -2520,6 +2728,7 @@ var index = definePlugin(() => {
             uninstallGameActionReporter();
             unpatchLibraryPlaytime();
             routerHook.removeRoute(SETTINGS_ROUTE);
+            routerHook.removeRoute(LIBRARY_ROUTE);
         },
     };
 });

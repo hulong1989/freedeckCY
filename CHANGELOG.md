@@ -2,6 +2,26 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.20.0
+
+### 新增
+
+- **Decky 原生游戏库（不再依赖网页）**：新增 `/freedeckcy/library` 路由，
+  QAM 主页「游戏库」直接打开原生页面：
+  - 游戏库：搜索、平台/分类/排序、分页、封面/标题/大小/分类展示，逐条安装；
+  - 安装确认弹窗：下载/安装大小、目标目录、模拟器/BIOS 提示；
+  - 已安装：启动、打开目录、卸载、扫描已安装；
+  - 全部通过 Decky callable（`list_tianyi_catalog` / `prepare_tianyi_install` /
+    `start_tianyi_install` / `list_tianyi_installed_games` / `launch/open/uninstall`）
+    调用，不经过本地 HTTP 网页，也不受网页 CORS/浏览器限制。
+- 扫描仍以设置里的「安装目录」为根目录；只扫一层、目录名需匹配标题。
+
+### 变更
+
+- QAM 主页「游戏库」按钮改为 `Navigation.Navigate("/freedeckcy/library")`；
+  原本地网页库保留为备用，但不再是默认入口。
+- 测试仍 351（新增为前端构建验证）。
+
 ## v0.19.2
 
 ### 修复

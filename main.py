@@ -330,6 +330,80 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def list_tianyi_catalog(self, payload=None, query: str = "", page: int = 1, page_size: int = 20, platform: str = "", category: str = "", sort: str = "") -> dict:
+        """原生 QAM 游戏库：分页查询目录。"""
+        try:
+            if isinstance(payload, dict):
+                query = str(payload.get("query", query) or "")
+                page = int(payload.get("page", page) or 1)
+                page_size = int(payload.get("page_size", page_size) or 20)
+                platform = str(payload.get("platform", platform) or "")
+                category = str(payload.get("category", category) or "")
+                sort = str(payload.get("sort", sort) or "")
+            data = await self._get_tianyi_service().list_catalog(
+                query=query,
+                page=max(1, page),
+                page_size=max(1, min(100, page_size)),
+                platform=platform,
+                category=category,
+                sort=sort,
+            )
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def prepare_tianyi_install(self, payload=None, game_id: str = "", share_url: str = "", file_ids=None) -> dict:
+        """原生 QAM：生成安装确认数据。"""
+        try:
+            if isinstance(payload, dict):
+                game_id = str(payload.get("game_id", game_id) or "")
+                share_url = str(payload.get("share_url", share_url) or "")
+            data = await self._get_tianyi_service().prepare_install(
+                game_id=game_id,
+                share_url=share_url,
+                file_ids=list(file_ids or []),
+            )
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def start_tianyi_install(self, payload=None, game_id: str = "", share_url: str = "", file_ids=None) -> dict:
+        """原生 QAM：确认后开始下载/安装。"""
+        try:
+            if isinstance(payload, dict):
+                game_id = str(payload.get("game_id", game_id) or "")
+                share_url = str(payload.get("share_url", share_url) or "")
+            data = await self._get_tianyi_service().start_install(
+                game_id=game_id,
+                share_url=share_url,
+                file_ids=list(file_ids or []),
+            )
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def list_tianyi_installed_games(self) -> dict:
+        """原生 QAM：已安装列表。"""
+        try:
+            data = await self._get_tianyi_service().list_installed_games()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def launch_tianyi_installed_game(self, game_id: str = "") -> dict:
+        try:
+            data = await self._get_tianyi_service().launch_installed_game(game_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def open_tianyi_installed_folder(self, game_id: str = "") -> dict:
+        try:
+            data = await self._get_tianyi_service().open_installed_folder(game_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def scan_tianyi_installed_games(self) -> dict:
         """扫描安装目录，补回已安装游戏。"""
         try:
