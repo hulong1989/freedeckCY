@@ -27,6 +27,16 @@ python3 scripts/export_remote_catalog.py \
 
 CI 中的 `tests/test_committed_catalog_json.py` 会校验 `manifest.json` 的哈希与条数；改 CSV 后忘记重新生成会红。
 
+## 插件运行时读取
+
+默认插件读 CSV；如需直接读这份 JSON（例如想验证导出一致性），设置环境变量后重启插件：
+
+```bash
+export FREEDECKCY_CATALOG_JSON="$PWD/catalog-json/all.json"
+```
+
+JSON 加载失败/为空时会自动回退 CSV（`FREEDECKCY_CATALOG_JSON` 指向的文件不存在时也会回退）。
+
 ## 自托管
 
 ```bash

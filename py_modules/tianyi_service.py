@@ -39,6 +39,7 @@ from emulator_manager import (
 )
 from game_catalog import (
     GameCatalog,
+    resolve_default_catalog_json_path,
     resolve_default_catalog_path,
     resolve_default_cover_index_path,
 )
@@ -412,6 +413,7 @@ class TianyiService:
         self.catalog = GameCatalog(
             resolve_default_catalog_path(),
             cover_index_path=resolve_default_cover_index_path(),
+            json_path=resolve_default_catalog_json_path(),
         )
         self._cover_cache_path = os.path.join(state_dir, "cover_cache.json")
         self._update_cache: Dict[str, Any] = {}
@@ -5964,6 +5966,8 @@ class TianyiService:
                 "droiddeck": is_droiddeck(steam_root),
             },
             "catalog": {
+                "source": str(getattr(self.catalog, "source", "csv")),
+                "json_path": _redact_text(str(getattr(self.catalog, "json_path", "") or "")),
                 "total": len(self.catalog.entries),
                 "platforms": self.catalog.platform_counts(),
                 "cover_index_total": self.catalog.cover_index_total,

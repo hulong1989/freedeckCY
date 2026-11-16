@@ -3,99 +3,99 @@
   "files": {
     "all.json": {
       "count": 7084,
-      "sha256": "5b9148f457199c5bab8e566f1cd59bd03ad029d1257d3d621881992c645dd6af"
+      "sha256": "6f9d8fd27e26966df6fb741636912e1d192ade9fd03f08baa26764523a95f3b3"
     },
     "curated/3ds.json": {
       "count": 60,
-      "sha256": "ff9dc860e111f9d0366838add16ec7c69fb2220981e59365555c04cee4878cfd"
+      "sha256": "a05014a82c7d3d834480d8bc770bcf46bad919edab30682b8ed4163a5ecc8434"
     },
     "curated/fc.json": {
       "count": 60,
-      "sha256": "aef8d12b0e080d2610a4d0e35fddf3ce3761f1cc0f4fcd0db917dc368e65ac25"
+      "sha256": "aa91c8ef0bbc9a5d85b9f4cfa008457131720ca01777f5813fb362ec65e24662"
     },
     "curated/gba.json": {
       "count": 60,
-      "sha256": "40b306f34ed868b910d4f7591b2f916b3d8cafe201e9c943e9bfccdcd9894d7f"
+      "sha256": "2592205fc52079aca36f83af994c4e49f0563093a991592884995bac4f61af8a"
     },
     "curated/md.json": {
       "count": 60,
-      "sha256": "0fd6faa4928b0fab4640a80bf3199e044de41ef08e699ebf9954526b1bdb022e"
+      "sha256": "5e0f4e75d0e77835d17c274f5b685cc06b2ffe24aa1b25071b7f9cf798f00f50"
     },
     "curated/nds.json": {
       "count": 60,
-      "sha256": "dc19625d781d7c08c63e389b4e0cff4252641bb865b37c22f0c8569cb0feaf69"
+      "sha256": "ebd3b81807ae760e445cb483938fca0eda8272e1d3199e6ac409549aa49822a4"
     },
     "curated/pc.json": {
       "count": 60,
-      "sha256": "21a63b6bba932b63863cee7d43f9a66e542351225e2a56ecd68909ba7ea12dc8"
+      "sha256": "8026ff3b80596230d378542e532a7020dd1fe40570010567def57462540b7342"
     },
     "curated/ps1.json": {
       "count": 60,
-      "sha256": "8fb1b383316e5fa8540edae22ac79f03c664bce36c6562dc2fd0918928510bcc"
+      "sha256": "cb0d58de6b1df53aaf616c2b88de7edc82ba4e0ee7980ae1d2605e145bb08cc3"
     },
     "curated/ps2.json": {
       "count": 60,
-      "sha256": "3234b247c58ffe7b370a1a9dafc3c267072d64c25199e3fe29c457a9d3a3c590"
+      "sha256": "af7d66a85ee06163da58fbd1fb9c01250250346c6083508b55a703648a949e6c"
     },
     "curated/ps3.json": {
       "count": 60,
-      "sha256": "9db63b8b0444195a5d11fb3c50d2336bbd055fcaaf4f1bb189c893356ad6ad87"
+      "sha256": "2f9f05979671bc0136c710553ad86ca3db75594f5cc78ce0ec52d2329edd1da2"
     },
     "curated/psp.json": {
       "count": 60,
-      "sha256": "0214101b80607213701a8ea43deb627d10ae6184565af2773e9707c169902948"
+      "sha256": "4bea8cf181800a63afcaeb76837b57d4ce7d782499da1ac9402065195e7ab733"
     },
     "curated/switch.json": {
       "count": 60,
-      "sha256": "8460eea6a443063027c0ef10036563f386c5bc6dd01e3205ab2e7bf62accefb4"
+      "sha256": "29c13b8d5f664d78273b560488306de60917b199e86092fc2a038c0f281a5600"
     },
     "platform/3ds.json": {
       "count": 305,
-      "sha256": "eacc0c464be6e45e69817262a8ea96cb18df8fda18964aacd309223854321ff2"
+      "sha256": "7addc34e2817ebd582d36d350fe2f0d77bd609aebc6f3c51de0455775dbb0570"
     },
     "platform/fc.json": {
       "count": 1475,
-      "sha256": "a61979fa3c5ed82159678486bab57cd6f6d8c86f4929ba60022db4ed4e43948b"
+      "sha256": "76f54796e3e3c9eaee5c9ec183a1af00eb6582fe0fed40c92dd07ba45f31e391"
     },
     "platform/gba.json": {
       "count": 553,
-      "sha256": "ff0fee77600295fb1caf3e524df440bb54a9c8ff977b53d0a39594ad48880e22"
+      "sha256": "ebc950999641e351c84fa6f5148def16c1bc29d005828d7c03f240268f580ae8"
     },
     "platform/md.json": {
       "count": 191,
-      "sha256": "9324884d426308fadd6901721ec346e56a3c4bb7ca25b9117bac150a4c95f196"
+      "sha256": "466a33437d861d2f6285e6676e9577fe7946c3e137af6e6789f78480e47c82bf"
     },
     "platform/nds.json": {
       "count": 722,
-      "sha256": "3a17d84b6e248fde882ddb27cb32236b73da5da01f3b2904f049cff2d0837fb6"
+      "sha256": "8fd96074af007396a7b2b8aa4cfb33d78911b307dd16b1959727657ab423a423"
     },
     "platform/pc.json": {
       "count": 2540,
-      "sha256": "84576489e913bc97abc2d2877ff061cda7b90f909a8a626d002b1e803cdaa585"
+      "sha256": "0ebaca4830c7fb5a73504edf964bc75f2017a1923b5985d71933ec9e8d876e02"
     },
     "platform/ps1.json": {
       "count": 194,
-      "sha256": "9e370ceb0aa264bf9de0f41b1197d4dee5ea19e4dfa799a497a340bebc7dc1af"
+      "sha256": "5619cf6ad4f51aa38aa9a1ac74583d6642e8fb28af4be731487c1a7143ed49e1"
     },
     "platform/ps2.json": {
       "count": 250,
-      "sha256": "63cd1970a411f1bcefaea692a493f27b1f35c2b609719e6d41282c69065504b3"
+      "sha256": "2b32cb23550eeded498160e09428059c2e6a50fa6bc6a3e518a29bd9c8f79c54"
     },
     "platform/ps3.json": {
       "count": 194,
-      "sha256": "323b678b154c003ab9f533c36354d3ad2659741d471fa677c096f2ff7b98bc18"
+      "sha256": "065a528656093ab1bca550bbb3438c4933944a5f4e985359a68b06f21d87f64a"
     },
     "platform/psp.json": {
       "count": 575,
-      "sha256": "4c306f2d9fa0458be9f6ca0be619d22af4ed5c2ace7e8aa740774ecc98dee247"
+      "sha256": "7b58f7d4d9d484db9836afad981140cc19778f6a8511e970e068a198f63c4173"
     },
     "platform/switch.json": {
       "count": 85,
-      "sha256": "6aa679fa775cf4cadfea789da75926fee988e9b160c87e47c4037fcd354003dc"
+      "sha256": "79b07552767a23bb764b47e21e92f52776a1eb0094ef59a4ebe83301050e23f6"
     }
   },
-  "generated_at": 1794821852,
-  "generated_at_text": "2026-11-16 17:37:32",
+  "generated_at": 1794821977,
+  "generated_at_text": "2026-11-16 17:39:37",
   "platforms": {
     "3ds": 305,
     "fc": 1475,

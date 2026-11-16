@@ -647,7 +647,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 | 环节 | 代码位置 |
 |---|---|
 | 多库 compatdata 定位 | [steam_shortcuts.py:184](../py_modules/steam_shortcuts.py) `find_compat_user_dir()` / [steam_shortcuts.py:130](../py_modules/steam_shortcuts.py) `_steam_library_paths()` |
-| 上传入口 | [tianyi_service.py:2678](../py_modules/tianyi_service.py) `start_cloud_save_upload()` |
+| 上传入口 | [tianyi_service.py:2718](../py_modules/tianyi_service.py) `start_cloud_save_upload()` |
 | 上传后台任务 | [tianyi_service.py:4432](../py_modules/tianyi_service.py) `_run_cloud_save_upload_task()` |
 | 候选目录扫描 | [tianyi_service.py:3910](../py_modules/tianyi_service.py) `_collect_cloud_save_candidates()` |
 | 打包 + manifest | [tianyi_service.py:4323](../py_modules/tianyi_service.py) `_archive_single_game_saves()` |

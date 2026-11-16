@@ -13,6 +13,7 @@
     "size_text": { "type": "string" },
     "genre": { "type": "string" },
     "down_url": { "type": "string", "pattern": "^https?://cloud\\.189\\.cn/" },
+    "openpath": { "type": "string" },
     "file_name": { "type": "string" },
     "size_bytes": { "type": "integer", "minimum": 0 },
     "pwd": { "type": "string" },

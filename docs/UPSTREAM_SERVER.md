@@ -131,6 +131,8 @@ python3 -m http.server 8000
 # curated: http://127.0.0.1:8000/curated/gba.json
 ```
 
+freedeckCY 自身也可以用 `FREEDECKCY_CATALOG_JSON=/path/to/all.json` 在运行时直接读这份 JSON（默认仍读 CSV，失败自动回退）。
+
 要把 NewFreedeck 指到这份数据，需要改它的常量/URL（`main.py` 的 `all.json`、`platform/...`、`curated/...`，以及 `catalog_cache.py` 的 `_CATALOG_BASE`）；我们仓库不直接改第三方代码，只提供数据格式与导出工具。
 
 ### 7.2 模拟器下载源：改用官方发行版

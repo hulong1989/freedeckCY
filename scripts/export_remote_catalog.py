@@ -82,6 +82,7 @@ def to_remote_item(row: Dict[str, str]) -> Dict[str, Any]:
         "size_text": _str(row, "list_filesize"),
         "genre": _str(row, "categories"),
         "down_url": _str(row, "down_url"),
+        "openpath": openpath,
         "file_name": file_name,
         "size_bytes": size_bytes,
         "pwd": _str(row, "pwd"),

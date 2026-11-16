@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 import re
 from dataclasses import asdict, dataclass
@@ -161,6 +162,25 @@ def resolve_default_catalog_path() -> str:
     return _pick_existing(candidates)
 
 
+def resolve_default_catalog_json_path() -> str:
+    """解析可选的 NewFreedeck 兼容 JSON 目录。
+
+    仅通过 `FREEDECKCY_CATALOG_JSON` 显式开启；默认仍读 CSV，避免发布包行为漂移。
+    """
+    for env_name in ("FREEDECKCY_CATALOG_JSON", "FRIENDECK_CATALOG_JSON"):
+        env_path = (os.getenv(env_name) or "").strip()
+        if not env_path:
+            continue
+        try:
+            resolved = Path(env_path).expanduser().resolve()
+        except Exception:
+            continue
+        if resolved.is_file():
+            return str(resolved)
+        config.logger.warning("FREEDECKCY_CATALOG_JSON 指向的文件不存在: %s", env_path)
+    return ""
+
+
 def resolve_default_cover_index_path() -> str:
     """解析封面索引文件路径（可选；不存在时返回空串）。"""
     candidates: List[Path] = []
@@ -182,22 +202,134 @@ def resolve_default_cover_index_path() -> str:
     return _pick_existing(candidates)
 
 
+def _entry_from_json_item(item: object) -> Optional[GameCatalogEntry]:
+    """NewFreedeck 兼容 JSON item → GameCatalogEntry。"""
+    if not isinstance(item, dict):
+        return None
+    game_id = str(item.get("game_id") or item.get("id") or "").strip()
+    title = _normalize_title(
+        str(item.get("title") or item.get("title_zh") or item.get("title_en") or "")
+    )
+    down_url = str(item.get("down_url") or "").strip()
+    if not title or not _is_valid_tianyi_url(down_url):
+        return None
+    platform = _normalize_platform(item.get("platform"))
+    size_bytes = _safe_int(item.get("size_bytes") or item.get("filesize_z") or 0)
+    size_text = str(item.get("size_text") or item.get("list_filesize") or "").strip()
+    if not size_text and size_bytes > 0:
+        size_text = _format_size(size_bytes)
+    return GameCatalogEntry(
+        game_id=game_id or title,
+        title=title,
+        category_parent=str(item.get("category_parent") or "").strip(),
+        categories=normalize_categories(item.get("genre") or item.get("categories"), platform),
+        down_url=down_url,
+        pwd=str(item.get("pwd") or "").strip(),
+        openpath=str(item.get("openpath") or item.get("file_name") or "").strip(),
+        size_bytes=size_bytes,
+        size_text=size_text,
+        platform=platform,
+        cover_url=str(item.get("cover_url") or "").strip(),
+        cover_portrait_url=str(
+            item.get("cover_portrait_url") or item.get("square_cover_url") or ""
+        ).strip(),
+        steam_appid=_safe_int(item.get("steam_appid") or item.get("app_id") or 0),
+    )
+
+
 class GameCatalog:
     """游戏目录仓库。"""
 
-    def __init__(self, csv_path: str, cover_index_path: str = ""):
+    def __init__(self, csv_path: str, cover_index_path: str = "", json_path: str = ""):
         self.csv_path = csv_path
         self.cover_index_path = cover_index_path
+        self.json_path = json_path
+        self.source = "csv"
         self.entries: List[GameCatalogEntry] = []
         self._by_id: Dict[str, GameCatalogEntry] = {}
         self.invalid_rows = 0
         self.cover_index_total = 0
 
     def load(self) -> None:
-        """加载 CSV 到内存，并合并可选的封面索引。"""
+        """加载目录：优先显式指定的 JSON，否则 CSV；两者都兼容封面索引。"""
         self.entries = []
         self.invalid_rows = 0
         self.cover_index_total = 0
+        self.source = "csv"
+
+        json_path = str(self.json_path or "").strip()
+        if json_path:
+            if os.path.isfile(json_path):
+                self._load_json(json_path)
+                if self.entries:
+                    self.source = "json"
+                else:
+                    config.logger.warning("JSON 目录没有有效条目，回退 CSV: %s", json_path)
+            else:
+                config.logger.warning("JSON 目录不存在，回退 CSV: %s", json_path)
+
+        if not self.entries:
+            self._load_csv()
+
+        self._merge_cover_index()
+        self._by_id = {entry.game_id: entry for entry in self.entries}
+
+        config.logger.info(
+            "已加载游戏目录: source=%s total=%s invalid=%s cover_index=%s file=%s",
+            self.source,
+            len(self.entries),
+            self.invalid_rows,
+            self.cover_index_total,
+            json_path if self.source == "json" else self.csv_path,
+        )
+
+    def _load_json(self, path: str) -> None:
+        """加载 NewFreedeck 兼容 JSON（数组，或 {games|items|data: []}，支持 variants）。"""
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+        except Exception as exc:
+            config.logger.warning("读取 JSON 目录失败 %s: %s", path, exc)
+            self.invalid_rows += 1
+            return
+
+        if isinstance(payload, dict):
+            raw_items = payload.get("games") or payload.get("items") or payload.get("data") or []
+        elif isinstance(payload, list):
+            raw_items = payload
+        else:
+            raw_items = []
+
+        if not isinstance(raw_items, list):
+            config.logger.warning("JSON 目录格式不支持（顶层不是数组）: %s", path)
+            self.invalid_rows += 1
+            return
+
+        seen = set()
+
+        def add_item(item: object) -> None:
+            entry = _entry_from_json_item(item)
+            if entry is None:
+                self.invalid_rows += 1
+                return
+            if entry.game_id in seen:
+                return
+            seen.add(entry.game_id)
+            self.entries.append(entry)
+
+        for item in raw_items:
+            if not isinstance(item, dict):
+                self.invalid_rows += 1
+                continue
+            variants = item.get("variants")
+            if isinstance(variants, list) and variants:
+                for variant in variants:
+                    add_item(variant)
+            else:
+                add_item(item)
+
+    def _load_csv(self) -> None:
+        """加载 CSV 目录。"""
         if not self.csv_path:
             config.logger.warning("未找到游戏目录 CSV 路径")
             return
@@ -241,17 +373,6 @@ class GameCatalog:
                     steam_appid=_safe_int(row.get("steam_appid", "0")),
                 )
                 self.entries.append(entry)
-
-        self._merge_cover_index()
-        self._by_id = {entry.game_id: entry for entry in self.entries}
-
-        config.logger.info(
-            "已加载游戏目录: total=%s invalid=%s cover_index=%s file=%s",
-            len(self.entries),
-            self.invalid_rows,
-            self.cover_index_total,
-            self.csv_path,
-        )
 
     def _merge_cover_index(self) -> None:
         """把 cover_index.csv 的封面/平台/appid 合并进目录条目（不覆盖已有值）。"""
@@ -300,7 +421,9 @@ class GameCatalog:
     def summary(self) -> Dict[str, object]:
         """返回目录摘要。"""
         return {
+            "source": self.source,
             "path": self.csv_path,
+            "json_path": self.json_path,
             "cover_index_path": self.cover_index_path,
             "cover_index_total": self.cover_index_total,
             "total": len(self.entries),
