@@ -89,6 +89,7 @@ function FaCloudDownloadAlt (props) {
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
+const PLUGIN_UI_BUILD = "0.23.0";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const getTianyiStorageOptions = callable("get_tianyi_storage_options");
 const listTianyiCatalog = callable("list_tianyi_catalog");
@@ -1626,7 +1627,7 @@ function SettingsPage() {
                 return;
             baiduQrPollBusyRef.current = true;
             try {
-                const result = await pollBaiduQrLogin();
+                const result = await withTimeout(pollBaiduQrLogin(), 15000, "轮询百度扫码状态超时");
                 if (cancelled)
                     return;
                 if (result.status !== "success" || !result.data)
@@ -1659,8 +1660,9 @@ function SettingsPage() {
         if (baiduQrBusy)
             return;
         setBaiduQrBusy(true);
+        toaster.toast({ title: "freedeckCY", body: "正在获取百度二维码..." });
         try {
-            const result = await startBaiduQrLogin();
+            const result = await withTimeout(startBaiduQrLogin(), 20000, "获取百度二维码超时（网络/TLS 可能受阻，请稍后重试或运行诊断）");
             if (result.status !== "success" || !result.data) {
                 throw new Error(result.message || "获取百度二维码失败");
             }
@@ -2364,6 +2366,14 @@ function Content() {
         catch {
             // 忽略菜单关闭失败。
         }
+        // 优先用 QAM 原生 Modal，避免路由未注册时被 Steam 当成网页路径。
+        try {
+            DFL.showModal(SP_JSX.jsx(LibraryPage, {}));
+            return;
+        }
+        catch {
+            // 继续尝试全屏路由。
+        }
         try {
             DFL.Navigation.Navigate(LIBRARY_ROUTE);
         }
@@ -2552,7 +2562,7 @@ function Content() {
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
-                            }, title: loginStatusText, children: loginStatusText }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [!state.login.logged_in && (SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLogin, disabled: openingLogin, children: openingLogin ? "登录入口准备中..." : "登录" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenLibrary, disabled: openingLogin, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenSettings, children: "\u8BBE\u7F6E" })] })] }), visibleTasks.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `下载列表（${visibleTasks.length}）`, children: visibleTasks.slice(0, 20).map((task) => {
+                            }, title: loginStatusText, children: loginStatusText }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.55 }, children: `QAM 原生 UI v${PLUGIN_UI_BUILD}` }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [!state.login.logged_in && (SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLogin, disabled: openingLogin, children: openingLogin ? "登录入口准备中..." : "登录" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenLibrary, disabled: openingLogin, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenSettings, children: "\u8BBE\u7F6E" })] })] }), visibleTasks.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `下载列表（${visibleTasks.length}）`, children: visibleTasks.slice(0, 20).map((task) => {
                     const taskId = String(task.task_id || "");
                     const status = String(task.status || "");
                     const canPause = status === "active" || status === "waiting";
@@ -2775,7 +2785,7 @@ function LibraryPage() {
             }, onCancel: () => { } }));
     }, [loadInstalled]);
     const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
-    return (SP_JSX.jsxs("div", { style: { height: "100%", overflowY: "auto", padding: "0 8px 32px" }, children: [SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
+    return (SP_JSX.jsxs("div", { style: { height: "100%", overflowY: "auto", padding: "0 8px 32px" }, children: [SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column" }, children: [SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65 }, children: `原生 UI · v${PLUGIN_UI_BUILD}` })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
                                             void loadCatalog(page);
                                         else
                                             void loadInstalled(); }, style: { padding: "6px 12px" }, children: "\u5237\u65B0" })] })] }) }) }), tab === "catalog" ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u641C\u7D22\u4E0E\u7B5B\u9009", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u641C\u7D22\u6E38\u620F", value: query, onChange: (event) => setQuery(getTextFieldValue(event)), onKeyDown: (event) => {

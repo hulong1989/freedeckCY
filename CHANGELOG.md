@@ -2,6 +2,23 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.23.0
+
+### 修复
+
+- **游戏库仍打开网页**：QAM「游戏库」改为优先 `showModal(<LibraryPage />)` 原生弹层，
+  不再先走 `Navigation.Navigate`；路由注册仍保留作全屏入口。页面顶部显示
+  `原生 UI · v0.23.0`，主页显示 `QAM 原生 UI v0.23.0`，便于确认前端是否真的更新。
+- **百度扫码点击没反应**：
+  - 点击后立即 toast「正在获取百度二维码...」；
+  - 前端 `withTimeout` 20s（轮询 15s），后端 `asyncio.wait_for(request_qr, 12s)`；
+  - 超时返回明确错误，不再一直 busy/无反馈；
+  - 后端记录 `Baidu QR start requested` / `Baidu QR ready sign_len=...` / 超时日志。
+
+### 变更
+
+- 测试仍 353。
+
 ## v0.22.0
 
 ### 新增

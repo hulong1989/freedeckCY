@@ -30,6 +30,7 @@ import { FaCloudDownloadAlt } from "react-icons/fa";
 type ApiStatus = "success" | "error";
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
+const PLUGIN_UI_BUILD = "0.23.0";
 
 interface ApiResponse<T> {
   status: ApiStatus;
@@ -2081,7 +2082,11 @@ function SettingsPage() {
       if (cancelled || baiduQrPollBusyRef.current) return;
       baiduQrPollBusyRef.current = true;
       try {
-        const result = await pollBaiduQrLogin();
+        const result = await withTimeout(
+          pollBaiduQrLogin(),
+          15000,
+          "轮询百度扫码状态超时",
+        );
         if (cancelled) return;
         if (result.status !== "success" || !result.data) return;
         const next = result.data;
@@ -2110,8 +2115,13 @@ function SettingsPage() {
   const onStartBaiduQr = useCallback(async () => {
     if (baiduQrBusy) return;
     setBaiduQrBusy(true);
+    toaster.toast({ title: "freedeckCY", body: "正在获取百度二维码..." });
     try {
-      const result = await startBaiduQrLogin();
+      const result = await withTimeout(
+        startBaiduQrLogin(),
+        20000,
+        "获取百度二维码超时（网络/TLS 可能受阻，请稍后重试或运行诊断）",
+      );
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "获取百度二维码失败");
       }
@@ -3262,6 +3272,13 @@ function Content() {
     } catch {
       // 忽略菜单关闭失败。
     }
+    // 优先用 QAM 原生 Modal，避免路由未注册时被 Steam 当成网页路径。
+    try {
+      showModal(<LibraryPage />);
+      return;
+    } catch {
+      // 继续尝试全屏路由。
+    }
     try {
       Navigation.Navigate(LIBRARY_ROUTE);
     } catch (error) {
@@ -3503,6 +3520,9 @@ function Content() {
           >
             {loginStatusText}
           </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <div style={{ fontSize: "10px", opacity: 0.55 }}>{`QAM 原生 UI v${PLUGIN_UI_BUILD}`}</div>
         </PanelSectionRow>
         <PanelSectionRow>
           {!state.login.logged_in && (
@@ -3872,7 +3892,10 @@ function LibraryPage() {
       <PanelSection>
         <PanelSectionRow>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }}>
-            <div style={{ fontSize: "18px", fontWeight: 700 }}>freedeckCY 游戏库</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: "18px", fontWeight: 700 }}>freedeckCY 游戏库</div>
+              <div style={{ fontSize: "11px", opacity: 0.65 }}>{`原生 UI · v${PLUGIN_UI_BUILD}`}</div>
+            </div>
             <Focusable style={{ display: "flex", gap: "6px" }}>
               <DialogButton
                 onClick={() => setTab("catalog")}

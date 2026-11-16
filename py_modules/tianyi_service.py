@@ -922,14 +922,19 @@ class TianyiService:
     async def start_baidu_qr_login(self) -> Dict[str, Any]:
         """百度网页版扫码：返回二维码 data URL。"""
         async with self._baidu_qr_lock:
+            config.logger.info("Baidu QR start requested")
             try:
-                qr = await request_qr()
+                qr = await asyncio.wait_for(request_qr(), timeout=12)
+            except asyncio.TimeoutError as exc:
+                config.logger.warning("Baidu QR request timed out")
+                raise TianyiApiError("获取百度二维码超时（网络/TLS 可能受阻，请重试或运行诊断）") from exc
             except Exception as exc:
                 config.logger.warning("Baidu QR request failed: %s", exc)
                 raise TianyiApiError(f"获取百度二维码失败：{exc}") from exc
+            config.logger.info("Baidu QR ready sign_len=%s", len(str(qr.get("sign", ""))))
             raw = b""
             try:
-                raw = await fetch_qr_image(str(qr.get("imgurl", "") or ""))
+                raw = await asyncio.wait_for(fetch_qr_image(str(qr.get("imgurl", "") or "")), timeout=10)
             except Exception as exc:
                 config.logger.warning("下载百度二维码图片失败: %s", exc)
             qr_data_url = ""

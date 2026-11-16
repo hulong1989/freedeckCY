@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.22.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.23.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -741,6 +741,8 @@ make validate-catalog                      # 合并后再跑目录体检
 2. 用百度 App/百度网盘 App 扫码，QAM 会从 waiting→scanned（已扫码待确认）→success；
 3. 成功后 Cookie 写入 `state.json` 的 `baidu_login`（`BDUSS=...; STOKEN=...; PTOKEN=...`），可安装百度分享；「退出百度网盘」清空。
 
+**点击反馈与超时（v0.23.0）**：点击「扫码登录百度网盘」立即 toast「正在获取百度二维码...」；前端 `withTimeout`（start 20s、poll 15s），后端 `wait_for(request_qr, 12)` + 图片 `wait_for(..., 10)`，超时提示"获取百度二维码超时（网络/TLS 可能受阻...）"。复现/排查：看 `/tmp/freedeckcy.log` 的 `Baidu QR start requested`、`Baidu QR ready sign_len=`、`Baidu QR request timed out`/`failed`；只记 sign 长度不记 sign/cookie。前端超时看 QAM toast 与 `withTimeout` 文案。
+
 **扫码错误诊断（v0.18.0）**：
 
 - `request_qr()` 直接请求 `getqrcode`；v0.19.1 起 aiohttp 会依次尝试系统证书、跳过证书校验，仍失败则回退 urllib（部分 Decky/SteamOS 环境 aiohttp TLS 不可用）；v0.19.2 起 `fetch_qr_image/poll_qr/complete_login` 也做同样的 TLS 回退；错误消息带具体异常类型/HTTP 状态/响应片段；
@@ -862,7 +864,9 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 
 ### 6.14 Decky 原生游戏库（v0.20.0）
 
-**入口**：QAM 主页「游戏库」→ `Navigation.Navigate("/freedeckcy/library")`；`routerHook.addRoute` 注册 `LibraryPage`，卸载移除。旧的网页库（`defaults/tianyi_library_ui/`）保留为备用（桌面浏览器/回退），两者共用同一后端。
+**入口（v0.23.0）**：QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)`**，失败才 `Navigation.Navigate("/freedeckcy/library")`；`routerHook.addRoute` 仍注册全屏入口，卸载移除。旧的网页库（`defaults/tianyi_library_ui/`）保留为备用（桌面浏览器/回退），两者共用同一后端。
+
+**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v0.23.0`，库页标题下显示 `原生 UI · v0.23.0`（`PLUGIN_UI_BUILD`）。看不到这两个标识说明 **前端 dist 未更新/插件未重载**，仍可能打开旧网页；`pnpm build` + 重载 Decky 插件后再看。
 
 **调试 callable**（`main.py`，均返回 `{status,data,message}`）：
 
@@ -881,7 +885,7 @@ scan_tianyi_installed_games()
 
 | 现象 | 处理 |
 |---|---|
-| QAM 点「游戏库」没页面/路由不存在 | 确认插件版本 v0.20.0+ 且已重载；路由是 `/freedeckcy/library`；`routerHook.addRoute` 失败通常看 Decky 日志 |
+| QAM 点「游戏库」仍打开网页/没页面 | v0.23.0 起优先 `showModal(<LibraryPage />)`、失败才走路由；先确认主页有 `QAM 原生 UI v0.23.0`、库页有 `原生 UI · v0.23.0`（没有即 dist 未更新/未重载）；再看 Decky 日志里 modal/route 报错 |
 | 列表空/搜索无结果 | 目录 CSV 是否加载；`list_tianyi_catalog` 的 query/platform/category/sort/page_size 参数；空查询应返回全部 |
 | 点安装报"磁盘空间不足" | `prepare_tianyi_install` 返回 `can_install=false`，看 `required_download/install`、目标目录与 SD 卡剩余（§6.13） |
 | 安装计划里没有模拟器/BIOS/setup 提示 | 看 `emulator_info.name/setup_hint/bios_required`；模拟器渠道/平台白名单（§6.8） |
@@ -1096,6 +1100,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 - [ ] 改 BIOS/固件部署后验证 `bios/<platform>/`（含压缩包）→ `<AppDir>`/用户目录的复制与 portable INI 只改目标键；用 `tests/test_emulator.py` 的 setup 用例回归；
 - [ ] 改模拟器存档发现/恢复后跑 `pytest tests/test_emulator_saves.py -q`：单游戏不退化成整目录、共享目录去重、PARAM.SFO/3DS 拆分、恢复目标白名单、开关关闭；PS1 多碟跑 `tests/test_emulator.py` 的 m3u 用例；
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
+- [ ] 改原生库入口/百度 QR 后跑 `pnpm build`、重载插件：确认 `QAM 原生 UI v0.23.0`/`原生 UI · v0.23.0`、点游戏库走 modal；QR 超时日志包含 `Baidu QR ...`；
 - [ ] 改诊断后跑 `pytest tests/test_diagnostics.py -q`，确认 checks 结构/summary；导出包含 `self-check.json` 且权限 0600；
 - [ ] 改原生库后跑 `pnpm build`、重载插件；确认 `/freedeckcy/library` 路由、搜索/筛选/分页、安装确认与已安装动作；`make test` 仍 351；
 - [ ] 改存储检测后跑 `pytest tests/test_storage_options.py -q`，确认系统挂载过滤、外置目录/容量字段；QAM 路径页按钮能切换且刷新；
