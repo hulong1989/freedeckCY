@@ -122,6 +122,7 @@ const EMPTY_SETTINGS = {
     page_size: 50,
     auto_delete_package: false,
     auto_install: true,
+    cloud_save_auto_upload: true,
 };
 const EMPTY_CLOUD_SAVE_STATE = {
     stage: "idle",
@@ -370,6 +371,7 @@ function toPayload(settings) {
         page_size: Math.max(10, Math.min(200, Number(settings.page_size || 50))),
         auto_delete_package: Boolean(settings.auto_delete_package),
         auto_install: true,
+        cloud_save_auto_upload: Boolean(settings.cloud_save_auto_upload),
     };
 }
 function normalizeCloudSaveUploadState(raw) {
@@ -1768,7 +1770,7 @@ function SettingsPage() {
             title: "账号",
             content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u5929\u7FFC\u4E91\u8D26\u53F7", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: login.logged_in
                                         ? `当前已登录：${login.user_account || "未知账号"}`
-                                        : "当前未登录" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E91\u5B58\u6863\u4E0A\u4F20", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveUpload, disabled: saving || clearingLogin || startingCloudSaveUpload || !login.logged_in || cloudSaveUploadState.running, children: startingCloudSaveUpload
+                                        : "当前未登录" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E91\u5B58\u6863\u4E0A\u4F20", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "\u6E38\u620F\u9000\u51FA\u540E\u81EA\u52A8\u4E0A\u4F20", description: "\u540E\u53F0\u68C0\u6D4B\u6E38\u620F\u8FDB\u7A0B\uFF0C\u9000\u51FA\u540E\u81EA\u52A8\u6253\u5305\u4E0A\u4F20\uFF1B\u9ED8\u8BA4\u5F00\u542F", checked: Boolean(settings.cloud_save_auto_upload), onChange: (value) => savePatch({ cloud_save_auto_upload: value }), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveUpload, disabled: saving || clearingLogin || startingCloudSaveUpload || !login.logged_in || cloudSaveUploadState.running, children: startingCloudSaveUpload
                                         ? "启动中..."
                                         : cloudSaveUploadState.running
                                             ? "上传进行中..."

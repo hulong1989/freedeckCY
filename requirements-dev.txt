@@ -11,3 +11,5 @@ pytest>=8.0,<9
 pytest-asyncio>=0.24,<2
 aiohttp>=3.9
 yarl>=1.9
+# 仅构建 Ludusavi 清单（scripts/fetch_ludusavi_manifest.py）时需要，运行时不依赖
+pyyaml>=6.0

@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.7.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.8.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -19,6 +19,8 @@
 | `py_modules/tianyi_store.py` | 数据类（登录/设置/任务/已装游戏，含 `file_size` / `group_id` / `group_total`）+ `state.json` 原子读写；写入时目录 0700 / 文件 0600 |
 | `py_modules/aria2_manager.py` | aria2 子进程管理（运行时元数据 `aria2-runtime.json` + `flock` 让插件重载可附着存活实例）+ JSON-RPC（`addUri` / `changeUri` / `tellStatus` / `listDownloads` …） |
 | `py_modules/seven_zip_manager.py` | 7z 解压 / 压缩（带进度回调）；`test_archive()` 跑 `7z t` 做解压前校验（7z 不可用时 best-effort 跳过） |
+| `py_modules/save_manifest.py` | **Ludusavi 存档清单（v0.8.0）**：加载本地 JSON、标题/SteamID 匹配、`<base>/<winAppData>/...` 占位符解析到 Proton 前缀、glob 展开（最多 200 路径）；运行时不联网 |
+| `py_modules/gamewatch.py` | **游戏进程检测（v0.8.0）**：后台每 8 s 扫 `/proc/*/cmdline`（无 `/proc` 回退 `pgrep -f`），状态切换产出 start/end 事件（自动云存档只在 end 触发） |
 | `py_modules/emulator_manager.py` | **通用模拟器注册表（v0.7.0）**：`EmulatorSpec`/`EMULATORS` 描述 GBA（mGBA，内置）/ PSP（PPSSPP，按需下载）/ NDS（melonDS，按需下载 zip）；官方资产解析、按需下载、`--appimage-extract` 解包、系统/Flatpak/env 回退、`find_rom_file()`、`create_launch_wrapper()`、`emulator_status()` |
 | `py_modules/steam_shortcuts.py` | 写 `shortcuts.vdf`（`DevkitGameID` token 去重、无变化不重写、写前备份 12 份、写后回读）、改 `config.vdf` 的 Proton 映射、下载 `grid` 封面、解析 appid；Steam 多库 / Flatpak / **DroidDeck** 识别（`is_droiddeck` / `_steam_root_candidates` / `detect_proton_tool`）、自定义用户名打分；`find_compatdata_dirs()` 跨库定位待清理的 Proton 前缀 |
 | `py_modules/game_catalog.py` | 读 CSV 资源清单（16 列 / 7084 条 / 11 平台，新目录优先、旧目录回退）：校验、搜索、分页、按 `game_id` 查找；`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底）；支持 `cover_index.csv` 合并（不覆盖已有值）；`list()` 支持 platform/category 过滤并返回 `platforms`/Top12 `categories`；`_is_valid_tianyi_url()` 兼容 `/t/` 与 `/web/share?code=` |
@@ -34,10 +36,11 @@
 | `scripts/fetch_runtime.sh` | 下载 aria2c / 7zz / node 到 `defaults/runtime/`（`make runtime` 调用它） |
 | `scripts/package.sh` | 组装 Decky 插件 zip 到 `dist-artifacts/`（`make package` 调用它）；`PACKAGE_ARCH=x86_64|aarch64|all` 控制目标架构与产物后缀 |
 | `scripts/fetch_emulator.sh` | 下载 mGBA AppImage（x86_64/aarch64）到 `defaults/runtime/mgba/<arch>/`（`make emulator-runtime` 调用） |
+| `scripts/fetch_ludusavi_manifest.py` | 从上游 YAML 下载并转换 Ludusavi 存档清单到 `defaults/ludusavi/manifest.json.gz`（`make ludusavi-manifest` 调用；PyYAML 仅构建时需要） |
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（280 个用例）：目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**GBA/PSP/NDS 计划/ROM 查找/wrapper/注册表**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（289 个用例）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**GBA/PSP/NDS 计划/ROM 查找/wrapper/注册表**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -219,6 +222,7 @@ defaults/runtime/node/<arch>/bin/node
 | `FREEDECKCY_NODE_BIN` | node 可执行文件路径（需 ≥ 18） |
 | `FREEDECKCY_GAME_CATALOG_CSV` | 覆盖资源清单 CSV 路径（兼容旧拼写 `FRIENDECK_GAME_CATALOG_CSV`） |
 | `FREEDECKCY_COVER_INDEX_CSV` | 覆盖封面索引 CSV 路径（兼容旧拼写 `FRIENDECK_COVER_INDEX_CSV`；文件可选） |
+| `FREEDECKCY_LUDUSAVI_MANIFEST` | 覆盖 Ludusavi 存档清单 JSON 路径（默认 `defaults/ludusavi/manifest.json.gz`） |
 | `FREEDECKCY_STEAM_ROOT` | 覆盖 Steam 根目录（Flatpak / 自定义安装 / 多盘位 / DroidDeck 双客户端时用） |
 | `FREEDECKCY_PROTON_TOOL` | 覆盖 Proton 兼容工具名；`none` 表示不写映射（DroidDeck 默认 `droiddeck-proton-arm64`） |
 | `FREEDECKCY_CATALOG_JSON` | 运行时改读 NewFreedeck 兼容 JSON（默认 CSV，失败回退） |
@@ -246,7 +250,7 @@ bash scripts/package.sh --help          # 查看全部参数
 - 默认复用已提交的 `dist/index.js`，不会强制跑 `pnpm build`；需要重新构建前端时用 `bash scripts/package.sh --build-ui`（要求 PATH 里有 pnpm）；
 - 如果此前跑过 `make runtime`，`defaults/runtime/` 会被一起打进 zip（这是能离线安装的关键）；因此 `make clean` 默认**保留** `defaults/runtime/`，要删需 `make clean CLEAN_RUNTIME=1`；
 - 自定义输出目录：`bash scripts/package.sh --out-dir /tmp/freedeckcy-build`；
-- 如果 `defaults/runtime/` 还没准备，脚本只警告不失败——但这样打出来的包在目标机上仍会缺运行时，请先 `make runtime`；
+- 如果 `defaults/runtime/` 还没准备，脚本只警告不失败——但这样打出来的包在目标机上仍会缺运行时，请先 `make runtime`；`defaults/ludusavi/manifest.json.gz` 缺失时也只警告（自动云存档会退回纯 Proton 目录扫描），发布包应包含它（`make ludusavi-manifest`）；
 - 安装：Decky Loader → 设置 → 开发者 → 从压缩包安装插件（不同 Decky 版本措辞略有差异），或解压到 `~/homebrew/plugins/freedeckCY/` 后重启插件加载器。
 
 ### 4.1 ARM64 / DroidDeck 打包与调试（v0.4.0）
@@ -291,7 +295,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **280 个用例**（`make test` 实测 `280 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **289 个用例**（`make test` 实测 `289 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -494,6 +498,58 @@ cat ~/.local/share/freedeckCY/tianyi/state.json | python3 -m json.tool | grep -A
 
 Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:tianyi:<token>`，**Proton 映射为 none**（原生 Linux）。日志关键字：`Auto add GBA to Steam`、`Resolve GBA cover failed`、`Auto add to Steam exception`。**PSP/NDS 不在包内**，首次安装需要联网下载（失败会在安装消息/日志里给出 HTTP 状态或解包错误）。
 
+### 6.9 自动云存档调试（Ludusavi + gamewatch，v0.8.0）
+
+**清单**：`defaults/ludusavi/manifest.json.gz`（53,549 款游戏，gzip 约 2 MB / 未压缩 14 MB，MIT；来源 mtkennerly/ludusavi-manifest）。运行时只读本地文件，**不联网**。
+
+```bash
+# 重新生成清单（需要 PyYAML，仅构建时；requirements-dev.txt 已含）
+pip install pyyaml            # 或 .venv/bin/pip install -r requirements-dev.txt
+make ludusavi-manifest        # = python3 scripts/fetch_ludusavi_manifest.py
+
+# 覆盖清单路径（调试/替换用）
+FREEDECKCY_LUDUSAVI_MANIFEST=/path/to/manifest.json ...
+```
+
+清单转换脚本会同时更新 `defaults/ludusavi/{README.md,LICENSE}`（README 记录上游 URL、条目数、字节数、sha256）。
+
+**匹配与诊断**：上传候选收集时先用快捷方式拿到 `compat_user_dir`/appid，再查清单；上传状态里的 `diagnostics.collect` 会给出每款游戏的 `source_strategy`：
+
+| source_strategy | 含义 |
+|---|---|
+| `ludusavi` | 清单命中且 Proton 目录扫描未命中 |
+| `ludusavi+proton` | 两者都命中（路径已经去重合并） |
+| `proton_prefix` | 仅原有 Proton 目录扫描命中（清单未命中/未启用） |
+| `install_fallback` | 无 Proton 前缀，按安装目录白名单兜底 |
+
+`diagnostics.ludusavi = {matched, path_count}` 可确认标题/SteamID 是否命中；日志里搜 `Ludusavi 清单已加载: N 款游戏`。
+
+**gamewatch 调试**：后台维护每 8 s 检查一次已安装游戏的运行状态。
+
+```bash
+# 手工看进程命令行（Steam 直接用脚本启动时，install_path 会出现在 cmdline 里）
+cat /proc/<pid>/cmdline | tr '\0' ' '
+# 或直接搜安装目录
+grep -l "<install_path>" /proc/*/cmdline 2>/dev/null
+
+# 容器/proot 没有 /proc 时，代码回退 pgrep -f（需要系统有 pgrep）
+pgrep -af "<install_path>"
+```
+
+状态机：首次 poll 只建立基线，之后"运行→退出"才产 `end` 事件；游戏从已安装列表移除会清掉状态。日志关键字：`auto cloud save upload after exit game=... accepted=...`、`gamewatch poll failed`。
+
+**自动上传开关**：设置项 `cloud_save_auto_upload` 默认 **true**；QAM「云存档上传」页有「游戏退出后自动上传」开关；也可以走 HTTP：
+
+```bash
+curl -s -X POST http://127.0.0.1:59271/api/tianyi/settings -H 'Content-Type: application/json' \
+  -d '{"cloud_save_auto_upload": false}'
+curl -s http://127.0.0.1:59271/api/tianyi/settings | python3 -m json.tool | grep cloud_save_auto_upload
+```
+
+触发条件：设置开启 + 已登录 + 当前没有云存档上传/自动上传任务 + 距上次自动上传 ≥ 30 s；只会把**该 game_id** 传给 `start_cloud_save_upload(game_ids=[...])`。
+
+**指纹与重置**：指纹 = `sha256(相对路径|size|mtime_ns …)`（每个游戏最多 5000 个文件），持久化在 `state.json` 的 `cloud_save_fingerprints`。上传前相同则跳过，结果 `reason=unchanged`。想强制重新上传：退出插件后编辑 `state.json` 删除对应 `game_key` 的指纹（或删除整个 `cloud_save_fingerprints` 字段），再重载插件。
+
 ---
 
 ## 7. 常见故障排查
@@ -525,6 +581,9 @@ Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:ti
 | **点了非 PC 卡片只弹提示、装不了** | GBA/PSP/NDS 应可正常安装（mGBA/PPSSPP/melonDS，见 §6.8）；其它平台仍是预期行为：前端提示 + 后端 `_build_install_plan` 拒绝（只放行 PC + 注册表平台）。报错多为模拟器缺失或 ROM 名不匹配 |
 | 目录里 **`/web/share?code=` 链接没被加载** | v0.3.0 起 `_is_valid_tianyi_url()` 与 `tianyi_client.parse_share_url()` 都支持该形式；检查链接是否带 `code=`、域名是否 `cloud.189.cn`。旧版本目录需重载插件生效 |
 | **已安装页签点卡片启动失败** | ① 看 flash 提示：`该游戏缺少 Steam AppID` 说明记录里没有 appid，去 Steam 库手动启动；② `当前环境没有 xdg-open/gio` 说明后端无法拉起外部程序（DroidDeck 桌面需有 xdg-open）；③ 用 `curl /api/tianyi/installed` 确认 `steam_appid` 与 `exists` |
+| **自动云存档没触发** | ① 确认设置 `cloud_save_auto_upload` 为 true（QAM 开关/设置接口）；② 需要已登录天翼账号且当前无进行中的上传任务；③ gamewatch 需要进程命令行包含 install_path（自定义 wrapper 可能不满足；容器无 `/proc` 时回退 `pgrep -f`，需系统有 pgrep）；④ 自动上传有 30 s 防抖，连续退出多个游戏只有第一个会立即上传；⑤ 看日志 `auto cloud save upload after exit` / `gamewatch poll failed` |
+| **上传被跳过（reason=unchanged）** | 存档指纹和上次上传相同（相对路径+大小+mtime 未变）。确属未变化是预期；想强制上传：退出插件后删除 `state.json` 里对应游戏的 `cloud_save_fingerprints` 条目，或删除整个字段后重载插件 |
+| **Ludusavi 清单未命中（退回 proton_prefix/install_fallback）** | ① 确认 `defaults/ludusavi/manifest.json.gz` 存在（`make ludusavi-manifest`，发布包自带）；② 上传状态 `diagnostics.collect` 里看 `ludusavi.matched/path_count` 与 `source_strategy`；③ 标题差异大时只能靠 Steam AppID 匹配（先看快捷方式是否解析出 appid）；④ 封面/标题含特殊字符时 `normalize_title()` 会去掉非字母数字/CJK 字符 |
 | **导出诊断没反应/下载失败** | 诊断 zip 由浏览器直接 `GET /api/tianyi/diagnostics/export` 下载；若浏览器拦截下载，用 `curl -s -OJ http://127.0.0.1:59271/api/tianyi/diagnostics/export` 手工保存；接口本身失败时看 `/tmp/freedeckcy.log` 的 traceback |
 | **检查更新失败** | `update-check` 依赖 `api.github.com`：无网络、代理不通或 GitHub API 未认证限流（60 次/小时/IP）都会返回 `ok:false` + message；等一会儿或手工打开 Release 页；成功结果会缓存 1 小时，不必连续点 |
 | **GBA 计划报「未找到 mGBA」** | 先 `make emulator-runtime`（或 `make emulator-runtime ARCH=aarch64`）；也可 `FREEDECKCY_MGBA_BIN=/path/to/mgba` 指向系统 mGBA / AppImage，或安装 Flatpak `io.mgba.mGBA`；诊断接口 `emulators.gba` 会显示 available/source/message |
@@ -551,7 +610,7 @@ Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:ti
 - **资源源只有天翼云盘**：百度网盘、模拟器整合、用户资源池只存在于 GitHub Releases（v0.5 之后 / NewFreedeck），**本仓库没有实现**。
 - **仅支持 SteamOS / Linux（含 DroidDeck 的 proot 环境）**：依赖 `7zz`、Proton、Steam 的 Linux 目录结构；Windows / macOS 无法运行。Steam 根目录支持原生 / Flatpak / **DroidDeck 双客户端**，SD 卡/第二块盘通过 `libraryfolders.vdf` 扫描。
 - **作者已停止维护**：上游不再更新，接口失效只能自行修；release 与仓库版本存在代差（仓库落后）。
-- **仅早期版本**：`package.json` 版本 0.7.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
+- **仅早期版本**：`package.json` 版本 0.8.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
 - **DroidDeck 适配未真机验证**：ARM64 运行环境、FEX/ARM Proton、Android 存储映射都可能有差异；实测失败时优先参考 [DROIDDECK.md](DROIDDECK.md) 的排障与日志收集。
 - **目录数据需保持干净**：新增/合并目录后必须跑 `make normalize-catalog` 与 `make validate-catalog`（CI 对内置目录执行 `--strict`）；「模拟器」是清洗后的兜底分类，不是真实游戏分类。
 - **GBA/PSP/NDS 可安装，其它模拟器平台仍只可浏览**（v0.7.0）：GBA（mGBA，内置）、PSP（PPSSPP，按需下载）、NDS（melonDS，按需下载 zip）可安装/启动（原生 Linux 快捷方式，不写 Proton）；PS1 因 BIOS 依赖暂缓，PS2/PS3/3DS/FC/MD/Switch 仍只提示/拒绝（见 ROADMAP 9.8）。模拟器只识别注册表内扩展名，**不含 BIOS/存档管理**；PSP/NDS 首次安装需要联网；所有 AppImage 解包会额外占一份空间；ARM64/DroidDeck 上 PSP/NDS/mGBA 尚未真机验证。
@@ -560,6 +619,7 @@ Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:ti
 - **compatdata 清理默认关闭**：卸载默认只删游戏文件；"连 Proton 前缀一起删"需要显式选择，避免误删存档。
 - **隔离文件与备份不会自动清理**：`*.freedeckcy-archive-invalid-*`、`*.freedeckcy-size-mismatch-*`、`*.freedeckcy-bak-*` 会留在原目录，需要手工清理（或后续 ROADMAP 项）。
 - **更新检查/诊断的能力边界**：`update-check` 未走 GitHub 认证（限流 60 次/小时/IP），失败只返回 message 不缓存失败；诊断包只脱敏常见键值（cookie/token/HOME），提交 issue 前仍建议自己过目一遍。
+- **自动云存档的边界（v0.8.0）**：只做"游戏退出后自动上传"，没有自动恢复/冲突策略（恢复仍需手动）；模拟器（GBA/PSP/NDS）存档在模拟器自身配置目录（如 `~/.local/share/PPSSPP`），暂未纳入清单/Proton 扫描；指纹只看相对路径+大小+mtime（最多 5000 文件），不读内容；`cloud_save_auto_upload` 默认开启；gamewatch 依赖进程命令行含 install_path（自定义 wrapper 可能漏检），无 `/proc` 时用 `pgrep -f`。
 - **无 i18n**：界面全硬编码中文，文案散落在 `src/index.tsx`、`defaults/tianyi_library_ui/` 与 Python 返回值里。
 - **无 Python 类型检查**：只有 pytest 单测 + CI，没有 mypy/ruff 之类的门禁。
 - **天翼接口未公开**：签名、接口、风控随时可能变，失败时优先看 `/tmp/freedeckcy.log` 里的协议诊断。
@@ -584,6 +644,8 @@ Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:ti
 | 改 Steam 快捷方式 / 封面 / Proton | `py_modules/steam_shortcuts.py`（appid、`shortcuts.vdf`、`config.vdf`、`grid`） |
 | 改重启恢复 / 分组语义 / 完整性校验 | `py_modules/tianyi_service.py` 的 `_try_recover_task` / `_readd_task_download` / `_maybe_schedule_group_post_process` / `_finalize_group_install` / `_verify_downloaded_file` |
 | 改归档校验 / 自动重下 | `py_modules/seven_zip_manager.py` 的 `test_archive` + `py_modules/tianyi_service.py` 的 `_schedule_archive_repair` / `ArchiveRepairScheduled` |
+| 改 Ludusavi 清单/匹配 | `scripts/fetch_ludusavi_manifest.py`（重新生成）、`py_modules/save_manifest.py`（`match_manifest` / `resolve_manifest_paths` / `_placeholder_bases`） |
+| 改 gamewatch / 自动上传 | `py_modules/gamewatch.py`（`GameWatcher.poll` / `is_game_running`）、`tianyi_service._poll_game_watch` / `_maybe_auto_cloud_upload` / `_cloud_save_fingerprint`、设置项 `cloud_save_auto_upload` |
 | 改卸载 / Proton 前缀回收 | `py_modules/tianyi_service.py` 的 `preview_uninstall` / `uninstall_installed_game` / `_can_remove_compatdata_dir` + `py_modules/steam_shortcuts.py` 的 `find_compatdata_dirs` |
 | 改任务重试语义 | `py_modules/tianyi_service.py` 的 `retry_task` + `src/index.tsx`（任务行「重试」按钮） |
 | 扩展环境诊断 | `scripts/doctor.sh`（只读；新增检查项直接加 `section`/`ok`/`warn`） |
@@ -604,9 +666,10 @@ Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:ti
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 280 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 289 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
+- [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
 - [ ] 改动打包/运行时时验证两种架构：`make package`（x86_64）与 `make package-droiddeck`（aarch64），确认产物后缀与包内 `defaults/runtime/<arch>/`（含 `mgba/mGBA.AppImage`）正确；PSP/NDS 首次安装需联网下载，打包不内置；
 - [ ] 改了 `src/` → `pnpm build` 并提交 `dist/index.js(.map)`；
 - [ ] 没有新增 `__pycache__` / `*.pyc` / `.DS_Store` / `node_modules` 等产物；

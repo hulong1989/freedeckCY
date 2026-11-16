@@ -85,6 +85,7 @@ interface SettingsState {
   page_size: number;
   auto_delete_package: boolean;
   auto_install: boolean;
+  cloud_save_auto_upload: boolean;
 }
 
 interface PanelState {
@@ -103,6 +104,7 @@ interface SettingsPayload {
   page_size: number;
   auto_delete_package: boolean;
   auto_install: boolean;
+  cloud_save_auto_upload: boolean;
 }
 
 interface UrlResponse {
@@ -367,6 +369,7 @@ const EMPTY_SETTINGS: SettingsState = {
   page_size: 50,
   auto_delete_package: false,
   auto_install: true,
+  cloud_save_auto_upload: true,
 };
 
 const EMPTY_CLOUD_SAVE_STATE: CloudSaveUploadState = {
@@ -654,6 +657,7 @@ function toPayload(settings: SettingsState): SettingsPayload {
     page_size: Math.max(10, Math.min(200, Number(settings.page_size || 50))),
     auto_delete_package: Boolean(settings.auto_delete_package),
     auto_install: true,
+    cloud_save_auto_upload: Boolean(settings.cloud_save_auto_upload),
   };
 }
 
@@ -2206,6 +2210,15 @@ function SettingsPage() {
             </PanelSection>
 
             <PanelSection title="云存档上传">
+              <PanelSectionRow>
+                <ToggleField
+                  label="游戏退出后自动上传"
+                  description="后台检测游戏进程，退出后自动打包上传；默认开启"
+                  checked={Boolean(settings.cloud_save_auto_upload)}
+                  onChange={(value: boolean) => savePatch({ cloud_save_auto_upload: value })}
+                  disabled={saving}
+                />
+              </PanelSectionRow>
               <PanelSectionRow>
                 <ButtonItem
                   layout="below"

@@ -1,12 +1,12 @@
 # freedeckCY 后续路线图（ROADMAP）
 
-> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配 + v0.5.0 第一梯队 + v0.6.0 GBA 闭环 + v0.7.0 模拟器注册表之后**（v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 平台字段/封面缓存/分类筛选；v0.3.0 全量目录与平台筛选 UI；v0.3.1 分类清洗 + 数据体检 CI；v0.4.0 Android/ARM64 的 DroidDeck 适配；v0.5.0 目录浏览/分页/排序/已安装页签/诊断导出/更新检查；v0.6.0 GBA 模拟器闭环；v0.6.1/v0.6.2 远程 JSON 目录；v0.7.0 通用模拟器注册表 + PSP/NDS 接入）值得继续做、以及明确不建议做的方向。当前版本 **v0.7.0**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
+> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配 + v0.5.0 第一梯队 + v0.6.0 GBA 闭环 + v0.7.0 模拟器注册表 + v0.8.0 自动云存档之后**（v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 平台字段/封面缓存/分类筛选；v0.3.0 全量目录与平台筛选 UI；v0.3.1 分类清洗 + 数据体检 CI；v0.4.0 Android/ARM64 的 DroidDeck 适配；v0.5.0 目录浏览/分页/排序/已安装页签/诊断导出/更新检查；v0.6.0 GBA 模拟器闭环；v0.6.1/v0.6.2 远程 JSON 目录；v0.7.0 通用模拟器注册表 + PSP/NDS 接入；v0.8.0 Ludusavi + gamewatch 自动云存档）值得继续做、以及明确不建议做的方向。当前版本 **v0.8.0**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
 >
 > 背景：上游作者已停止维护，`main` 只是早期版本，Releases 里的百度网盘 / 模拟器 / 资源池代码**不在本仓库**（见 [ARCHITECTURE.md](ARCHITECTURE.md) §2）。
 >
 > ⚠️ 合规提示：本项目分发的资源链接来自互联网，属于盗版资源分发，违反云盘服务条款并涉及版权风险。本路线图只讨论**工程改进**，不建议部署使用，更不建议扩大资源分发能力。
 >
-> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0/v0.3.0 —— 目录平台字段 + `cover_index.csv` + 封面磁盘缓存 + **全量目录（7084 条 / 11 平台）+ 平台/分类双筛选 UI**（§9.6）；v0.3.1 —— 分类清洗（606 行，「模拟器」606 条）+ `validate_catalog --strict` 进 CI；v0.4.0 —— **DroidDeck（Android/ARM64）适配**：ARM64 运行时/ARM Proton 解析/双 Steam 根/`PACKAGE_ARCH` 打包（见 [DROIDDECK.md](DROIDDECK.md)，尚未真机验证）；v0.5.0 —— **第一梯队**：目录浏览/分页/排序、已安装页签（启动/打开目录/卸载）、诊断 JSON+zip 导出（脱敏）、GitHub 更新检查（1 h 缓存）；v0.6.0 —— **GBA 模拟器闭环**：内置 mGBA AppImage、分享分页找 ROM、启动脚本 + 原生 Steam 快捷方式（不写 Proton）；v0.6.1/v0.6.2 —— **远程 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 读本地/HTTP JSON（远程缓存 6 h、失败回退 CSV，默认关闭）；v0.7.0 —— **通用模拟器注册表**：`EmulatorSpec` 接入 GBA/PSP/NDS，GBA 内置、PSP/NDS 首次安装按需下载官方 AppImage，启动脚本按平台参数生成。
+> **已落地（本文件不再列为候选）**：v0.1.1 —— 卸载可选回收 Proton 前缀（§9.2）、`7z t` best-effort 校验 + 自动重下（§9.4）、失败任务「重试」、`make doctor`；v0.2.0/v0.3.0 —— 目录平台字段 + `cover_index.csv` + 封面磁盘缓存 + **全量目录（7084 条 / 11 平台）+ 平台/分类双筛选 UI**（§9.6）；v0.3.1 —— 分类清洗（606 行，「模拟器」606 条）+ `validate_catalog --strict` 进 CI；v0.4.0 —— **DroidDeck（Android/ARM64）适配**：ARM64 运行时/ARM Proton 解析/双 Steam 根/`PACKAGE_ARCH` 打包（见 [DROIDDECK.md](DROIDDECK.md)，尚未真机验证）；v0.5.0 —— **第一梯队**：目录浏览/分页/排序、已安装页签（启动/打开目录/卸载）、诊断 JSON+zip 导出（脱敏）、GitHub 更新检查（1 h 缓存）；v0.6.0 —— **GBA 模拟器闭环**：内置 mGBA AppImage、分享分页找 ROM、启动脚本 + 原生 Steam 快捷方式（不写 Proton）；v0.6.1/v0.6.2 —— **远程 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 读本地/HTTP JSON（远程缓存 6 h、失败回退 CSV，默认关闭）；v0.7.0 —— **通用模拟器注册表**：`EmulatorSpec` 接入 GBA/PSP/NDS，GBA 内置、PSP/NDS 首次安装按需下载官方 AppImage，启动脚本按平台参数生成；v0.8.0 —— **自动云存档**：内置 Ludusavi 清单（53,549 游戏）+ gamewatch 进程检测，游戏退出后只上传该游戏（30 s 防抖、指纹去重 reason=unchanged、设置 `cloud_save_auto_upload` 默认开）。
 
 ---
 
@@ -14,7 +14,7 @@
 
 | # | 事项 | 优先级 | 预估 | 一句话收益 |
 |---|---|---|---|---|
-| 1 | 拆分 `tianyi_service.py` | P0（工程健康） | 大 | 让 8000 行巨型类可维护、可测试 |
+| 1 | 拆分 `tianyi_service.py` | P0（工程健康） | 大 | 让 8200 行巨型类可维护、可测试 |
 | 2 | CI 增加 `ruff` / `mypy` | P0（工程健康） | 中 | 拦住低级错误与类型漂移 |
 | 3 | 云存档 plan/apply 与 HTTP handler 测试 | P1（数据安全） | 中 | 覆盖最容易丢存档的路径 |
 | 4 | 去掉 node 依赖（纯 Python 实现） | P1（可部署性） | 中 | 去掉约 90 MB 的 node 运行时与跨架构问题 |
@@ -28,9 +28,9 @@
 
 ---
 
-## 1. 拆分 `tianyi_service.py`（P0，当前约 8000 行）
+## 1. 拆分 `tianyi_service.py`（P0，当前约 8200 行）
 
-**现状**：`py_modules/tianyi_service.py` 约 8000 行、单个 `TianyiService` 类 100+ 方法，覆盖安装、云存档、登录采集、时长、面板缓存等互相独立的职责；此外 `_post_process_completed_task` / `_collect_cloud_save_candidates` 等长函数仍在膨胀。
+**现状**：`py_modules/tianyi_service.py` 约 8200 行、单个 `TianyiService` 类 100+ 方法，覆盖安装、云存档、登录采集、时长、面板缓存等互相独立的职责；此外 `_post_process_completed_task` / `_collect_cloud_save_candidates` 等长函数仍在膨胀。
 
 **为什么**：巨型类导致改动风险高、review 困难、测试只能整体起实例；第二轮的"分组安装 / 重启恢复"是在这个文件里继续叠加的，再拖延拆分成本只会更高。
 
@@ -40,7 +40,7 @@
 
 - 拆出至少 4 个模块（建议：`install_flow.py`、`cloud_save_flow.py`、`login_flow.py`、`playtime.py`），`TianyiService` 只做编排与状态持有；
 - `main.py` / `tianyi_http.py` 的调用面不变（RPC 与 HTTP 契约不动）；
-- `make test`（当前 280 个用例）保持全绿，新增用例覆盖搬迁后的模块；
+- `make test`（当前 289 个用例）保持全绿，新增用例覆盖搬迁后的模块；
 - 单个 Python 文件 < 1500 行；`docs/ARCHITECTURE.md` 的引用与模块图同步更新。
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_http.py`、`docs/ARCHITECTURE.md`。
@@ -280,7 +280,7 @@
 - **平台/分类双筛选 UI**：库页两行筛选条（全部平台 + 各平台；全部分类 + Top12 分类），手柄焦点顺序 搜索框→搜索按钮→平台条→分类条→卡片；
 - **链接格式**：`_is_valid_tianyi_url()` / `parse_share_url()` 支持 `/t/<code>` 与 `/web/share?code=` 两种天翼分享链接；
 - **数据质量（v0.3.1）**：`normalize_categories()` 加载时清洗分类（去平台名/去重/模拟器兜底），数据 606 行改写、「模拟器」606 条；`scripts/validate_catalog.py --strict` 进 CI，重复 `game_id`/非法链接/空标题/分类混平台名会让 CI 红；
-- 测试：`make test` 280 用例（含 `tests/test_catalog_platform.py` / `tests/test_droiddeck.py` / `tests/test_emulator.py` 与分类清洗/默认目录洁净度用例）。
+- 测试：`make test` 289 用例（含 `tests/test_catalog_platform.py` / `tests/test_droiddeck.py` / `tests/test_emulator.py` / `tests/test_cloud_auto.py` 与分类清洗/默认目录洁净度用例）。
 
 **仍未做**：封面索引的**生成流水线**（`generate_*_cover_urls.py` 类脚本；当前 index 直接来自 v0.6）、无网络时纯离线封面库、其它平台模拟器安装（GBA/PSP/NDS 已落地，见 9.8）。
 
@@ -314,7 +314,7 @@
 - 安装完成后 `find_rom_file(platform)` 按平台扩展名找 ROM → `ensure_emulator(platform)` → `create_launch_wrapper()` 按 `launch_args` 生成 `<install_dir>/launch-freedeckcy.sh` → Steam 快捷方式 Exe=脚本、LaunchOptions 带 `freedeckcy:tianyi:<token>`、**Proton=none（原生 Linux）**；已安装记录写 `platform/emulator/rom_path/launcher_path`；
 - 诊断包 `emulators` 遍历已接入平台输出状态；库页放行 pc/gba/psp/nds，弹窗显示对应模拟器名；
 - 构建侧 `scripts/fetch_emulator.sh` + `make emulator-runtime` 只预置 GBA 的 mGBA；PSP/NDS 不内置，首次安装联网下载；打包按架构裁剪并检查 `mGBA.AppImage`；
-- 测试 `tests/test_emulator.py`；`make test` 280 用例。
+- 测试 `tests/test_emulator.py`；`make test` 289 用例。
 
 **仍未做**：**PS1 暂缓**——主流 PS1 模拟器必须由用户自备 BIOS（版权/合规风险、区域校验严格），因此不做自动闭环；PS2/PS3/3DS/FC/MD/Switch 待做（各自涉及 BIOS/固件、键位、存档、模拟器差异）。所有已接平台同样**不含 BIOS/存档管理**，只做"下载 ROM → 生成启动脚本 → 原生快捷方式 → 用模拟器启动"。
 
@@ -369,6 +369,7 @@
 
 | 事项 | 说明 | 验收要点 |
 |---|---|---|
+| 自动云存档（Ludusavi + gamewatch）✅ | **v0.8.0 已落地**：内置 Ludusavi 清单（53,549 游戏，MIT）做标题/SteamID 匹配并解析到 Proton 前缀，与原有 Proton 扫描合并；gamewatch 每 8 s 检测游戏退出，只上传**刚退出的那个 game_id**（30 s 防抖）；指纹（相对路径+size+mtime，≤5000 文件）持久化去重，未变化 `reason=unchanged`；设置 `cloud_save_auto_upload` 默认开、QAM 可关。**仍未做**：自动恢复/冲突策略、模拟器（GBA/PSP/NDS）存档纳入、跨设备同步/版本保留策略 | 已完成；后续按"仍未做"继续 |
 | 第一梯队：目录浏览 / 分页 / 排序 / 已安装管理 / 诊断导出 / 更新检查 ✅ | **v0.5.0 已落地**：库页打开即浏览全部资源（空查询不再隐藏）、平台/分类筛选 + 分页（L1/R1、PageUp/PageDown）+ 排序（默认/名称/大小↓/大小↑）、已安装页签（鼠标点击启动 / 打开目录 / 卸载 confirm）、自定义双按钮 confirm、`GET /catalog?sort=`、`/installed*`、`/diagnostics`+`/diagnostics/export`（zip，cookie/token/HOME 脱敏）、`/update-check`（GitHub release，1 h 缓存） | 已完成；体验小项（已安装页签键盘/手柄启动接线）继续迭代 |
 | DroidDeck 适配 ✅ | **v0.4.0 已落地**：ARM64 运行时选择（`make runtime ARCH=aarch64`）、`is_droiddeck()` 检测、ARM Proton 自动解析（`droiddeck-proton-arm64`/`11-arm64`）、双 Steam 根（x64 客户端优先）、`PACKAGE_ARCH` 打包（`-arm64`/`-universal`）。**尚未真机验证**；GBA/PSP/NDS 已可安装（v0.6.0/v0.7.0，arm64 官方 AppImage），其它模拟器平台仍只可浏览（§9.8） | 真机验证通过后回归本项；详见 [DROIDDECK.md](DROIDDECK.md) |
 | 目录数据体检 / 分类清洗 ✅ | **v0.3.1 已完成**：`normalize_categories` + `normalize_catalog_categories.py` 清洗 606 行，`validate_catalog.py --strict` 进 CI（封面覆盖 96.3%，总大小约 39 TB） | 已完成，后续仅在数据变更时复用 `make normalize-catalog` / `make validate-catalog` |
@@ -384,4 +385,4 @@
 - 架构与问题清单：[ARCHITECTURE.md](ARCHITECTURE.md)
 - 与作者 v0.6 的能力对照：[ARCHITECTURE.md](ARCHITECTURE.md) §13
 - 本地开发、调试、故障排查：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 当前测试基线：`make test` → 280 passed（2026-11 v0.7.0）
+- 当前测试基线：`make test` → 289 passed（2026-11 v0.8.0）

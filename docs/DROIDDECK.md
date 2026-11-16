@@ -1,6 +1,6 @@
 # 在 DroidDeck 上使用 freedeckCY
 
-[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）也可在 DroidDeck 上使用；本文是安装与排障说明。
+[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档也可在 DroidDeck 上使用；本文是安装与排障说明。
 
 > 适配基于 DroidDeck 的源码与 ARM64 运行时结构，**尚未在真机上完整验证**。遇到问题请按文末“排障”收集日志。
 
@@ -20,6 +20,7 @@ freedeckCY 的处理方式：
 - 检测到 DroidDeck 标记（`~/.droiddeck-x64`、`~/.droiddeck-decky-enabled`、`<Steam>/package/droiddeck-installed`）时，Proton 映射自动改用 `droiddeck-proton-arm64`；若 `config.vdf` 里已出现 `droiddeck-proton-11-arm64` 则优先用它。
 - 若 DroidDeck 的 x64 Steam 客户端正在运行（`steam.pid` 存在），优先把快捷方式写到它的 `~/.droiddeck-x64/.local/share/Steam`，否则回退标准路径。
  - GBA 闭环（v0.6.0）使用内置 **mGBA arm64 AppImage**：首次安装 GBA 时用 `--appimage-extract` 解包到 `~/.local/share/freedeckCY/emulators/gba/aarch64/squashfs-root`（GBA 兼容旧 `emulators/aarch64/`；**不依赖 FUSE**，proot 环境可用）；Steam 快捷方式的 Exe 是生成的 `launch-freedeckcy.sh`，**不写 Proton 映射**（原生 Linux 启动）。
+- 自动云存档（v0.8.0）：内置 Ludusavi 清单（53,549 游戏）按标题/SteamID 匹配，并把 Windows 存档路径解析到 **ARM Proton 前缀**（`compatdata/.../pfx` 内布局与 x86_64 一致）；`gamewatch` 每 8 秒扫 `/proc/*/cmdline`（proot 下通常可用；没有 `/proc` 时回退 `pgrep -f`，需要系统有 pgrep），检测到游戏退出后只上传该游戏。自动上传**默认开启**，可在 QAM「云存档上传」里关闭。
 - 模拟器注册表（v0.7.0）在 DroidDeck 上接入 **GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）**：只有 GBA 的 mGBA 随包内置；**PSP/NDS 首次安装时会从官方 GitHub release 下载 arm64 AppImage**（NDS 是 zip 内 AppImage），插件已按 `aarch64` 选资产，解包同样 `--appimage-extract` 到 `~/.local/share/freedeckCY/emulators/<platform>/aarch64/squashfs-root`，不依赖 FUSE。
 
 ## 2. 构建 ARM64 插件包
@@ -65,6 +66,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | 卸载回收 Proton 前缀 | ✅（compatdata 在 ARM Proton 下同样适用） |
 | 任务重试、下载完整性校验、自动重下 | ✅ |
 | 云存档上传/恢复 | ✅ 需要 ARM64 node（`make runtime ARCH=aarch64` 自带） |
+| 自动云存档（Ludusavi + gamewatch，v0.8.0） | ✅ 内置清单随包；游戏退出后自动上传该游戏（30 s 防抖、指纹去重）。`/proc` 在 proot 下通常可用，无则回退 `pgrep -f`；默认开启可在 QAM 关闭；ARM64 未真机验证 |
 | GBA 模拟器（mGBA，v0.6.0） | ✅ 可安装/启动：内置 mGBA arm64 AppImage，首次 `--appimage-extract` 解包（不依赖 FUSE），Steam 快捷方式走原生（无 Proton 映射） |
 | PSP 模拟器（PPSSPP，v0.7.0） | ✅ 可安装/启动：首次安装从 GitHub 下载 arm64 官方 AppImage（已按 aarch64 选资产），解包不依赖 FUSE |
 | NDS 模拟器（melonDS，v0.7.0） | ✅ 可安装/启动：首次安装下载官方 zip（内含 aarch64 AppImage）→ 解 zip → `--appimage-extract`，不依赖 FUSE |
@@ -82,6 +84,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | `FREEDECKCY_PPSSPP_BIN` | 覆盖 PPSSPP 路径（默认用已下载的 arm64 AppImage / 系统 PPSSPP） |
 | `FREEDECKCY_MELONDS_BIN` | 覆盖 melonDS 路径（默认用已下载的 arm64 AppImage / 系统 melonDS） |
 | 设置项 `proton_tool` | `auto`（默认，自动判断）/ `none` / 具体工具名 |
+| 设置项 `cloud_save_auto_upload` | 游戏退出后自动上传云存档（默认 `true`，QAM「云存档上传」可关） |
 
 查看当前解析结果：`GET /api/tianyi/settings`（本地服务返回 `proton_tool_resolved` 与 `droiddeck_detected`）。
 
@@ -125,6 +128,13 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 检查诊断接口 `emulators.psp` / `emulators.nds` 的 `source`（`download` 表示尚未下载）与 `message`；也可用 `FREEDECKCY_PPSSPP_BIN` / `FREEDECKCY_MELONDS_BIN` 指向手工下载的 arm64 AppImage。
 - 手工验证 wrapper：`bash "<安装目录>/launch-freedeckcy.sh"`（PSP 应带 `--fullscreen`，NDS 直接接 ROM）。
 
+**游戏退出后没有自动上传云存档**
+
+- 确认设置 `cloud_save_auto_upload` 为 true（QAM「云存档上传 → 游戏退出后自动上传」）。
+- gamewatch 靠 `/proc/*/cmdline` 判断 install_path 是否在运行；DroidDeck 的 proot 通常提供 `/proc`，若没有会回退 `pgrep -f`（需要系统有 pgrep），两种方式都要求**进程命令行里出现安装目录**（自定义 wrapper 可能不满足）。
+- 自动上传需要已登录天翼账号、当前没有进行中的上传任务，且两次自动上传间至少间隔 30 秒；连续退出多个游戏时只有第一个会立即上传。
+- 日志搜 `auto cloud save upload after exit`（触发）与 `gamewatch poll failed`（检测异常）；上传状态里 `reason=unchanged` 表示存档指纹未变化、已按设计跳过。
+
 **日志**
 
 - 插件日志：`/tmp/freedeckcy.log`
@@ -135,5 +145,6 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 
 - 未在真机验证：DroidDeck 的 FEX/ARM Proton、不同 Android 机型的存储映射都可能影响结果。
 - GBA/PSP/NDS 已可安装/启动（mGBA / PPSSPP / melonDS；v0.6.0/v0.7.0，均为 arm64 官方 AppImage，解包不依赖 FUSE）；PS1（需 BIOS 暂缓）与 FC/3DS/PS2/PS3/MD/Switch 仍只可浏览（见 [ROADMAP.md](ROADMAP.md) 9.8）。**PSP/NDS 首次安装需要联网**从 GitHub 下载官方 AppImage；三者都只识别各自 ROM 扩展名，不含 BIOS/存档管理；ARM64 上 PSP/NDS/mGBA 尚未真机验证。
+- **自动云存档边界（v0.8.0）**：只对 gamewatch 检测到"退出"的游戏自动上传，没有自动恢复/冲突策略；模拟器（GBA/PSP/NDS）存档在模拟器配置目录，暂未纳入清单/Proton 扫描；指纹只看相对路径+大小+mtime（≤5000 文件）；`/proc` 不可用时依赖 `pgrep`；ARM64 上该链路尚未真机验证。
 - DroidDeck 升级/重装 Decky 可能清空插件，需重新导入 zip。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。

@@ -210,6 +210,7 @@ else
     runtime_has_binary 7zz || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 7zz：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
     runtime_has_binary node || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 node：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
     runtime_has_binary mGBA.AppImage || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 mGBA.AppImage：GBA 安装后无法启动，建议先 bash scripts/fetch_emulator.sh --arch ${PACKAGE_ARCH}"
+    [[ -f "$REPO_ROOT/defaults/ludusavi/manifest.json.gz" ]] || warn "缺少 defaults/ludusavi/manifest.json.gz：自动云存档只会退回 Proton 目录扫描（make ludusavi-manifest）"
 fi
 
 # ---- 组装暂存目录 -----------------------------------------------------------

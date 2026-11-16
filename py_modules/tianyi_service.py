@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import json
 import os
@@ -38,6 +39,8 @@ from emulator_manager import (
     find_rom_file,
     supported_platforms,
 )
+from gamewatch import GameWatcher
+from save_manifest import load_manifest, match_manifest, resolve_manifest_paths
 from game_catalog import (
     GameCatalog,
     resolve_default_catalog_json_path,
@@ -475,6 +478,9 @@ class TianyiService:
         self._panel_last_active_tasks = 0
         self._cloud_save_lock = asyncio.Lock()
         self._cloud_save_task: Optional[asyncio.Task] = None
+        self._game_watcher = GameWatcher()
+        self._auto_cloud_upload_task: Optional[asyncio.Task] = None
+        self._last_auto_cloud_upload_at = 0.0
         self._cloud_save_state: Dict[str, Any] = {
             "stage": "idle",
             "message": "未开始",
@@ -552,6 +558,13 @@ class TianyiService:
         async with self._qr_login_lock:
             await self._close_qr_login_context_locked()
         await self._finalize_active_playtime_sessions(reason="service_shutdown")
+        if self._auto_cloud_upload_task and not self._auto_cloud_upload_task.done():
+            self._auto_cloud_upload_task.cancel()
+            try:
+                await self._auto_cloud_upload_task
+            except BaseException:
+                pass
+        self._auto_cloud_upload_task = None
         await self._cancel_cloud_save_task()
         await self._clear_cloud_save_restore_plan()
         jobs = list(self._post_process_jobs.values())
@@ -597,6 +610,7 @@ class TianyiService:
             for task in pending:
                 self._maybe_schedule_group_post_process(task)
             scheduled = len(set(self._post_process_jobs) - jobs_before)
+            self._poll_game_watch()
 
             return {
                 "ok": True,
@@ -2678,8 +2692,8 @@ class TianyiService:
         """返回云存档上传任务状态。"""
         return {"state": await self._get_cloud_save_state_snapshot()}
 
-    async def start_cloud_save_upload(self) -> Dict[str, Any]:
-        """启动云存档上传任务。"""
+    async def start_cloud_save_upload(self, *, game_ids: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+        """启动云存档上传任务；可只上传指定游戏。"""
         login_ok, account, _message = await self.check_login_state()
         if not login_ok:
             raise TianyiApiError("未登录，请先登录天翼云账号")
@@ -2715,7 +2729,11 @@ class TianyiService:
                 }
             )
             self._cloud_save_task = asyncio.create_task(
-                self._run_cloud_save_upload_task(cookie=cookie, user_account=account),
+                self._run_cloud_save_upload_task(
+                    cookie=cookie,
+                    user_account=account,
+                    game_ids=list(game_ids or []),
+                ),
                 name="freedeckcy-cloud-save-upload",
             )
             snapshot = self._cloud_save_state_snapshot_locked()
@@ -3915,6 +3933,12 @@ class TianyiService:
         records = list(self.store.installed_games or [])
         records.sort(key=lambda item: int(item.updated_at or 0), reverse=True)
 
+        try:
+            manifest_data = await asyncio.to_thread(load_manifest, self.plugin_dir)
+        except Exception as exc:
+            manifest_data = {}
+            config.logger.warning("Ludusavi 清单加载失败: %s", exc)
+
         candidates: List[Dict[str, Any]] = []
         ignored: List[Dict[str, Any]] = []
         dedupe_keys = set()
@@ -3956,6 +3980,23 @@ class TianyiService:
             else:
                 shortcut_result = {"ok": False, "message": "game_id_missing"}
 
+            app_id = _safe_int(shortcut_result.get("appid_unsigned"), 0)
+            manifest_key = ""
+            manifest_paths: List[str] = []
+            if compat_user_dir and manifest_data:
+                manifest_key, manifest_info = match_manifest(
+                    manifest_data,
+                    titles=[game_title, os.path.basename(install_path)],
+                    app_id=app_id,
+                )
+                if manifest_info:
+                    manifest_paths = await asyncio.to_thread(
+                        resolve_manifest_paths,
+                        manifest_info,
+                        prefix_dir=compat_user_dir,
+                        install_dir=install_path,
+                    )
+
             source_paths: List[str] = []
             source_strategy = ""
             skip_reason = ""
@@ -3977,6 +4018,9 @@ class TianyiService:
                 )
                 diagnostics["proton_scan"] = proton_diag
                 source_strategy = "proton_prefix"
+                if manifest_paths:
+                    source_paths = self._dedupe_existing_paths([*manifest_paths, *source_paths])
+                    source_strategy = "ludusavi" if not proton_diag.get("matched") else "ludusavi+proton"
                 if not source_paths:
                     skip_reason = "save_path_not_found"
             else:
@@ -3988,6 +4032,11 @@ class TianyiService:
                 source_strategy = "install_fallback"
                 if not source_paths:
                     skip_reason = "prefix_unresolved"
+
+            diagnostics["ludusavi"] = {
+                "matched": manifest_key,
+                "path_count": len(manifest_paths),
+            }
 
             playtime = self._snapshot_record_playtime(record)
 
@@ -4323,6 +4372,86 @@ class TianyiService:
             return parent
         raise ValueError("无法确定打包工作目录")
 
+    def _poll_game_watch(self) -> None:
+        """后台维护周期里检查游戏进程起停（失败不影响下载/安装）。"""
+        try:
+            events = self._game_watcher.poll(list(self.store.installed_games or []))
+        except Exception as exc:
+            config.logger.warning("gamewatch poll failed: %s", exc)
+            return
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            if str(event.get("type", "")) == "end":
+                record = event.get("record")
+                self._maybe_auto_cloud_upload(record)
+
+    def _maybe_auto_cloud_upload(self, record: Any) -> None:
+        """游戏退出后按设置自动上传云存档。"""
+        if not bool(getattr(self.store.settings, "cloud_save_auto_upload", False)):
+            return
+        if not str(getattr(self.store.login, "cookie", "") or "").strip():
+            return
+        if self._cloud_save_task is not None and not self._cloud_save_task.done():
+            return
+        if self._auto_cloud_upload_task is not None and not self._auto_cloud_upload_task.done():
+            return
+        now = time.time()
+        if now - self._last_auto_cloud_upload_at < 30:
+            return
+        self._last_auto_cloud_upload_at = now
+        title = str(getattr(record, "game_title", "") or getattr(record, "game_id", "") or "game")
+
+        async def _runner() -> None:
+            try:
+                result = await self.start_cloud_save_upload(
+                    game_ids=[str(getattr(record, "game_id", "") or "").strip()]
+                )
+                config.logger.info(
+                    "auto cloud save upload after exit game=%s accepted=%s message=%s",
+                    title,
+                    bool(result.get("accepted")),
+                    str(result.get("message", "")),
+                )
+            except Exception as exc:
+                config.logger.warning("auto cloud save upload failed game=%s: %s", title, exc)
+
+        self._auto_cloud_upload_task = asyncio.create_task(
+            _runner(),
+            name="freedeckcy-auto-cloud-upload",
+        )
+
+    def _cloud_save_fingerprint(self, source_paths: Sequence[str]) -> str:
+        """计算存档内容指纹（相对路径 + 大小 + mtime），用于跳过未变化的上传。"""
+        digest = hashlib.sha256()
+        count = 0
+        for raw in list(source_paths or []):
+            root = os.path.realpath(os.path.expanduser(str(raw or "").strip()))
+            if not root or not os.path.exists(root):
+                continue
+            if os.path.isfile(root):
+                files = [root]
+                base = os.path.dirname(root)
+            else:
+                files = []
+                for dirpath, _dirnames, filenames in os.walk(root):
+                    for name in filenames:
+                        files.append(os.path.join(dirpath, name))
+                base = root
+            for file_path in sorted(files):
+                try:
+                    stat = os.stat(file_path)
+                except Exception:
+                    continue
+                rel = os.path.relpath(file_path, base).replace("\\", "/")
+                digest.update(f"{rel}|{stat.st_size}|{stat.st_mtime_ns}\n".encode("utf-8"))
+                count += 1
+                if count >= 5000:
+                    break
+            if count >= 5000:
+                break
+        return digest.hexdigest() if count > 0 else ""
+
     async def _archive_single_game_saves(
         self,
         *,
@@ -4432,7 +4561,13 @@ class TianyiService:
             except Exception:
                 pass
 
-    async def _run_cloud_save_upload_task(self, *, cookie: str, user_account: str) -> None:
+    async def _run_cloud_save_upload_task(
+        self,
+        *,
+        cookie: str,
+        user_account: str,
+        game_ids: Optional[Sequence[str]] = None,
+    ) -> None:
         """执行云存档上传任务。"""
         started_at = _now_wall_ts()
         timestamp = time.strftime(CLOUD_SAVE_DATE_FORMAT, time.localtime(started_at))
@@ -4450,6 +4585,13 @@ class TianyiService:
 
         try:
             candidates, collect_diagnostics = await self._collect_cloud_save_candidates()
+            wanted_ids = {str(game_id).strip() for game_id in (game_ids or []) if str(game_id).strip()}
+            if wanted_ids:
+                candidates = [item for item in candidates if str(item.get("game_id", "")).strip() in wanted_ids]
+                collect_diagnostics = {
+                    **collect_diagnostics,
+                    "filtered_game_ids": sorted(wanted_ids),
+                }
             total_games = len(candidates)
 
             await self._set_cloud_save_state(
@@ -4499,6 +4641,15 @@ class TianyiService:
                     current_game=game_title,
                 )
 
+                fingerprint = ""
+                if not skip_reason:
+                    try:
+                        fingerprint = await asyncio.to_thread(self._cloud_save_fingerprint, source_paths)
+                    except Exception:
+                        fingerprint = ""
+                    if fingerprint and fingerprint == str(self.store.cloud_save_fingerprints.get(game_key, "")):
+                        skip_reason = "unchanged"
+
                 if skip_reason:
                     entry["status"] = "skipped"
                     entry["reason"] = skip_reason
@@ -4543,6 +4694,8 @@ class TianyiService:
                             "upload_result": dict(upload_result),
                         }
                         uploaded += 1
+                        if fingerprint:
+                            self.store.cloud_save_fingerprints[game_key] = fingerprint
                     except asyncio.CancelledError:
                         cancelled = True
                         raise
@@ -4634,6 +4787,11 @@ class TianyiService:
                     "cancelled": cancelled,
                 },
             }
+
+            try:
+                await asyncio.to_thread(self.store.save)
+            except Exception as exc:
+                config.logger.warning("Persist cloud save fingerprints failed: %s", exc)
 
             try:
                 await asyncio.to_thread(self.store.set_cloud_save_last_result, final_payload)
@@ -4863,6 +5021,7 @@ class TianyiService:
         auto_delete_package: Optional[bool] = None,
         auto_install: Optional[bool] = None,
         proton_tool: Optional[str] = None,
+        cloud_save_auto_upload: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """更新下载设置。"""
         if download_dir is not None:

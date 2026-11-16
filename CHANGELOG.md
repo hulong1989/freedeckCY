@@ -2,6 +2,20 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.8.0
+
+### 新增
+
+- **Ludusavi 存档清单**：内置 53,549 款 PC 游戏的存档路径（MIT，`defaults/ludusavi/`），按标题/Steam ID 匹配，解析 `<base>` / `<winAppData>` / `<winLocalAppData>` / `<winDocuments>` 等占位符到 Proton 前缀，与原有目录扫描合并。
+- **gamewatch 自动同步**：后台每 8 秒扫描 `/proc/*/cmdline`（无 `/proc` 时回退 `pgrep -f`），游戏退出后**只上传该游戏**的存档；`cloud_save_auto_upload` 默认开启，QAM「云存档上传」里可关闭。
+- **存档指纹去重**：按文件相对路径/大小/mtime 计算指纹并持久化；未变化的游戏自动跳过，避免每次退出都产生新版本。
+- `make ludusavi-manifest`：从上游 YAML 重新生成清单（PyYAML 仅构建时需要）；`FREEDECKCY_LUDUSAVI_MANIFEST` 可覆盖路径。
+
+### 变更
+
+- 云存档上传任务支持 `game_ids` 过滤（手动上传仍处理全部）。
+- 测试 280 → 289。
+
 ## v0.7.0
 
 ### 新增

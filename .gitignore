@@ -24,3 +24,6 @@ dist-artifacts/
 
 # 日志
 *.log
+
+# Ludusavi 清单：只提交 gzip（避免 GitHub push protection 对 14MB JSON 的误报）
+defaults/ludusavi/manifest.json

@@ -24,7 +24,7 @@ PYTEST := $(ROOT)/.venv/bin/pytest
 REQUIREMENTS_DEV := requirements-dev.txt
 
 .DEFAULT_GOAL := help
-.PHONY: runtime emulator-runtime catalog-json package package-droiddeck test doctor validate-catalog normalize-catalog clean help
+.PHONY: runtime emulator-runtime catalog-json ludusavi-manifest package package-droiddeck test doctor validate-catalog normalize-catalog clean help
 
 help:
 	@echo "freedeckCY 构建入口"
@@ -35,6 +35,7 @@ help:
 	@echo "  runtime    下载 aria2c / 7zz / node 到 defaults/runtime/（幂等，可重复执行）"
 	@echo "  emulator-runtime  下载 mGBA AppImage（x86_64/aarch64）到 defaults/runtime/mgba/"
 	@echo "  catalog-json  导出 NewFreedeck 兼容目录 JSON 到 catalog-json/（仓库内，可直接读）"
+	@echo "  ludusavi-manifest  下载并转换 Ludusavi 存档清单到 defaults/ludusavi/"
 	@echo "  package    组装 Decky 插件 zip 到 dist-artifacts/freedeckCY-v<version>.zip"
 	@echo "  package-droiddeck  组装 aarch64 包（DroidDeck/ARM 设备）到 ...-arm64.zip"
 	@echo "  test       使用 .venv/bin/pytest 运行测试（未安装则提示安装 dev 依赖）"
@@ -66,6 +67,9 @@ emulator-runtime:
 
 catalog-json:
 	@cd "$(ROOT)" && python3 scripts/export_remote_catalog.py
+
+ludusavi-manifest:
+	@cd "$(ROOT)" && python3 scripts/fetch_ludusavi_manifest.py
 
 package:
 	@cd "$(ROOT)" && bash scripts/package.sh
