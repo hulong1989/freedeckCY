@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import os
 import platform
+import re
 import shlex
 import shutil
 import subprocess
@@ -809,7 +810,11 @@ def find_rom_file(
         playlists = [path for path in roms if path.suffix.lower() == ".m3u"]
         discs = [path for path in roms if path.suffix.lower() in {".cue", ".chd"}]
         wanted_rel = str(open_path or "").replace("\\", "/").strip("/").lower()
-        title_key = _ps1_game_key(title) if title else ""
+        title_keys = {
+            _ps1_game_key(part)
+            for part in re.split(r"[/|｜]", str(title or ""))
+            if _ps1_game_key(part)
+        }
 
         def rel_norm(path: Path) -> str:
             try:
@@ -833,14 +838,14 @@ def find_rom_file(
             groups.setdefault((rel_norm(group_dir), game_key), []).append(disc)
 
         def choose_group_by_title(candidates: List[tuple]) -> Optional[tuple]:
-            if not title_key or not candidates:
+            if not title_keys or not candidates:
                 return None
-            exact = [group_id for group_id, game_key in candidates if game_key == title_key]
+            exact = [group_id for group_id, game_key in candidates if game_key in title_keys]
             if len(exact) == 1:
                 return exact[0]
             fuzzy = [
                 group_id for group_id, game_key in candidates
-                if game_key and (title_key in game_key or game_key in title_key)
+                if game_key and any(key in game_key or game_key in key for key in title_keys)
             ]
             return fuzzy[0] if len(fuzzy) == 1 else None
 
@@ -878,7 +883,7 @@ def find_rom_file(
                     selected = choose_group_by_title([(group_id, group_id[1]) for group_id in matches])
 
         # 4) 标题唯一匹配。
-        if selected is None and title_key and groups:
+        if selected is None and title_keys and groups:
             selected = choose_group_by_title([(group_id, group_id[1]) for group_id in groups])
 
         # 5) 只有一组才可直接使用；否则明确歧义，不能注册错游戏。

@@ -60,7 +60,7 @@ from emulator_manager import (
     get_spec,
     supported_platforms,
 )
-from emulator_saves import build_restore_targets, collect_emulator_save_paths
+from emulator_saves import build_restore_targets, collect_emulator_save_paths, restore_roots
 from storage_options import detect_storage_options
 from gamewatch import GameWatcher
 from save_manifest import load_manifest, match_manifest, resolve_manifest_paths
@@ -483,6 +483,8 @@ class TianyiService:
         self._lock = asyncio.Lock()
         self._refresh_lock = asyncio.Lock()
         self._post_process_jobs: Dict[str, asyncio.Task] = {}
+        self._post_process_failures: Dict[str, Dict[str, Any]] = {}
+        self._legacy_backup_migration_done = False
         self._launcher_repair_task: Optional[asyncio.Task] = None
         self._launcher_repair_done = False
         self._baidu_device_lock = asyncio.Lock()
@@ -682,6 +684,7 @@ class TianyiService:
             scheduled = len(set(self._post_process_jobs) - jobs_before)
             self._poll_game_watch()
             self._maybe_schedule_launcher_repair()
+            legacy_backups_migrated = self._migrate_all_legacy_backups()
 
             return {
                 "ok": True,
@@ -689,6 +692,7 @@ class TianyiService:
                 "pending_post_process_before": len(pending_before),
                 "pending_post_process": len(pending),
                 "scheduled": scheduled,
+                "legacy_backups_migrated": legacy_backups_migrated,
             }
 
     def _normalize_panel_mode(self, context: Optional[Dict[str, Any]] = None) -> tuple[str, bool, bool]:
@@ -4134,6 +4138,50 @@ class TianyiService:
         )
         return games
 
+    def _migrate_legacy_backup_roots(self, roots: Sequence[str]) -> int:
+        """把旧版本留在存档树里的 .freedeckcy-bak-* 移到中央备份目录。"""
+        destination_root = Path(config.DECKY_SEND_DIR) / "backups" / "legacy"
+        moved = 0
+        for raw in roots:
+            root = os.path.realpath(os.path.expanduser(str(raw or "").strip()))
+            if not root or not os.path.isdir(root):
+                continue
+            for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+                backup_dirs = [name for name in dirnames if ".freedeckcy-bak-" in name]
+                backup_files = [name for name in filenames if ".freedeckcy-bak-" in name]
+                dirnames[:] = [name for name in dirnames if name not in backup_dirs]
+                for name in backup_dirs + backup_files:
+                    source = os.path.join(dirpath, name)
+                    if os.path.islink(source) or not os.path.exists(source):
+                        continue
+                    try:
+                        digest = hashlib.sha1(source.encode("utf-8", "replace")).hexdigest()[:12]
+                        destination_root.mkdir(parents=True, exist_ok=True)
+                        destination = destination_root / f"{digest}_{name}"
+                        if destination.exists():
+                            continue
+                        shutil.move(source, destination)
+                        moved += 1
+                    except Exception as exc:
+                        config.logger.warning("迁移旧云存档备份失败 %s: %s", source, exc)
+        return moved
+
+    def _migrate_all_legacy_backups(self) -> int:
+        if self._legacy_backup_migration_done:
+            return 0
+        self._legacy_backup_migration_done = True
+        moved = 0
+        for record in list(self.store.installed_games or []):
+            try:
+                roots = restore_roots(record)
+            except Exception:
+                continue
+            moved += self._migrate_legacy_backup_roots(roots)
+        if moved:
+            config.logger.info("已迁移旧云存档备份到中央目录: %s", moved)
+            self._prune_cloud_save_backups()
+        return moved
+
     @staticmethod
     def _prune_cloud_save_backups(keep: int = 10) -> None:
         """保留最近 N 份云存档恢复备份，避免备份目录无限增长。"""
@@ -4142,7 +4190,10 @@ class TianyiService:
             if not root.is_dir():
                 return
             dirs = sorted(
-                [item for item in root.iterdir() if item.is_dir()],
+                [
+                    item for item in root.iterdir()
+                    if item.is_dir() and item.name.startswith("cloud-save-")
+                ],
                 key=lambda item: item.stat().st_mtime,
                 reverse=True,
             )
@@ -4159,6 +4210,7 @@ class TianyiService:
             return result
 
         entries = manifest.get("entries")
+        missing_entries: List[Dict[str, Any]] = []
         if isinstance(entries, list):
             for idx, item in enumerate(entries, start=1):
                 if not isinstance(item, dict):
@@ -4168,20 +4220,54 @@ class TianyiService:
                 rel_path = str(item.get("archive_rel_path", "") or "").strip().replace("\\", "/").strip("/")
                 if not rel_path:
                     rel_path = str(item.get("relative_path", "") or "").strip().replace("\\", "/").strip("/")
-                abs_path = os.path.realpath(os.path.join(extract_root, rel_path)) if rel_path else extract_root
-                if not _is_within_dir(abs_path, extract_root):
-                    continue
-                if not os.path.exists(abs_path):
+                # 兼容旧 manifest：archive_rel_path 缺失/过旧时，尝试用条目名定位实际目录。
+                candidates = [rel_path] if rel_path else []
+                if entry_name and entry_name not in candidates:
+                    candidates.append(entry_name)
+                abs_path = ""
+                resolved_rel = rel_path
+                for candidate in candidates:
+                    if not candidate:
+                        continue
+                    possible = os.path.realpath(os.path.join(extract_root, candidate))
+                    if _is_within_dir(possible, extract_root) and os.path.exists(possible):
+                        abs_path = possible
+                        resolved_rel = candidate
+                        break
+                if not abs_path:
+                    missing_entries.append(
+                        {
+                            "entry_id": entry_id,
+                            "entry_name": entry_name,
+                            "source_path": str(item.get("source_path", "") or ""),
+                        }
+                    )
                     continue
                 result.append(
                     {
                         "entry_id": entry_id,
                         "entry_name": entry_name,
-                        "archive_rel_path": rel_path,
+                        "archive_rel_path": resolved_rel,
                         "source_path": str(item.get("source_path", "") or ""),
                     }
                 )
 
+        if not result and missing_entries:
+            # 更老的包可能把游戏目录内容直接放在归档根，manifest 只记了目录名。
+            try:
+                root_has_entries = bool(os.listdir(extract_root))
+            except Exception:
+                root_has_entries = False
+            if root_has_entries:
+                for item in missing_entries:
+                    result.append(
+                        {
+                            "entry_id": item["entry_id"],
+                            "entry_name": item["entry_name"],
+                            "archive_rel_path": "",
+                            "source_path": item["source_path"],
+                        }
+                    )
         if result:
             return result
 
@@ -6309,12 +6395,40 @@ class TianyiService:
         members.sort(key=lambda item: (int(item.created_at or 0), str(item.task_id or "")))
         return members
 
+    @staticmethod
+    def _post_process_group_key(task: TianyiTaskRecord) -> str:
+        return str(task.group_id or task.task_id or "").strip()
+
+    def _post_process_backoff_active(self, task: TianyiTaskRecord) -> bool:
+        key = self._post_process_group_key(task)
+        state = self._post_process_failures.get(key)
+        if not state:
+            return False
+        return float(state.get("next_retry_at", 0) or 0) > time.time()
+
+    def _record_post_process_failure(self, task: TianyiTaskRecord, exc: Exception) -> None:
+        key = self._post_process_group_key(task)
+        state = self._post_process_failures.get(key) or {"count": 0}
+        count = int(state.get("count", 0) or 0) + 1
+        delay = min(300.0, 8.0 * (2 ** min(count, 5)))
+        self._post_process_failures[key] = {
+            "count": count,
+            "last_error": str(exc)[:300],
+            "next_retry_at": time.time() + delay,
+        }
+        config.logger.warning("Post-process backoff group=%s count=%s next=%ss: %s", key, count, int(delay), exc)
+
+    def _clear_post_process_failure(self, task: TianyiTaskRecord) -> None:
+        self._post_process_failures.pop(self._post_process_group_key(task), None)
+
     def _maybe_schedule_group_post_process(self, task: TianyiTaskRecord) -> None:
         """组内全部文件都下完了才调度安装，避免分卷包缺文件就开始解压。"""
         members = self._install_group_members(task)
         if not members:
             return
         if all(bool(member.post_processed) for member in members):
+            return
+        if self._post_process_backoff_active(task):
             return
 
         failed = [
@@ -6635,13 +6749,14 @@ class TianyiService:
             return
         try:
             await self._post_process_completed_task(task)
+            self._clear_post_process_failure(task)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             config.logger.exception("Post-process failed for task %s: %s", task_id, exc)
-            task.post_processed = True
+            self._record_post_process_failure(task, exc)
             task.install_status = "failed"
-            task.install_message = f"安装流程异常: {exc}"
+            task.install_message = f"安装流程异常: {exc}；将稍后自动重试"
             task.updated_at = _now_wall_ts()
         finally:
             await asyncio.to_thread(self.store.save)
@@ -6700,6 +6815,7 @@ class TianyiService:
 
         self._readd_attempts.pop(task.task_id, None)
         self._task_sync_misses.pop(task.task_id, None)
+        self._clear_post_process_failure(task)
         task.post_processed = False
         task.install_status = "pending"
         task.install_message = "正在重试..."
@@ -6819,8 +6935,11 @@ class TianyiService:
             return False, "安装路径无效"
 
         home_dir = os.path.realpath(os.path.expanduser("~")).rstrip(os.sep)
-        install_root = os.path.realpath(os.path.expanduser(str(self.store.settings.install_dir or "").strip())).rstrip(os.sep)
-        download_root = os.path.realpath(os.path.expanduser(str(self.store.settings.download_dir or "").strip())).rstrip(os.sep)
+        install_raw = str(self.store.settings.install_dir or "").strip()
+        download_raw = str(self.store.settings.download_dir or "").strip()
+        # 空设置不能 realpath("") 变成进程 CWD，否则会把 CWD 误加入保护/允许集合。
+        install_root = os.path.realpath(os.path.expanduser(install_raw)).rstrip(os.sep) if install_raw else ""
+        download_root = os.path.realpath(os.path.expanduser(download_raw)).rstrip(os.sep) if download_raw else ""
 
         blocked = {"/", "/home", "/home/deck", home_dir}
         if install_root:
@@ -8073,7 +8192,7 @@ class TianyiService:
                         self._invalidate_panel_cache(installed=True)
                 message_parts.append(f"已加入 Steam（AppID {app_id}）")
             else:
-                message_parts.append("已加入 Steam")
+                message_parts.append(str(steam_result.get("message") or "已加入 Steam"))
         else:
             reason = str(steam_result.get("message", "") or "").strip() or "未知错误"
             message_parts.append(f"Steam 导入失败: {reason}")
@@ -8225,16 +8344,70 @@ class TianyiService:
             strict=True,
             title=str(task.game_title or ""),
         )
-        if not rom_path:
-            hint = "；.cia 需要先在 Azahar 中安装，不能直接当 ROM 启动" if str(platform).lower() == "3ds" else ""
+        cia_files: List[Path] = []
+        if not rom_path and str(platform).lower() == "3ds":
+            try:
+                cia_files = sorted(
+                    {path for path in Path(target_dir).rglob("*.cia") if path.is_file()},
+                    key=lambda path: (len(str(path)), str(path)),
+                )
+            except Exception:
+                cia_files = []
+        if not rom_path and not cia_files:
             return {
                 "ok": False,
-                "message": f"安装目录未找到可唯一定位的 {str(platform).upper()} ROM，请检查目录/openpath{hint}",
+                "message": f"安装目录未找到可唯一定位的 {str(platform).upper()} ROM 或 .cia，请检查目录/openpath",
             }
         try:
             command = await ensure_emulator(platform, self.plugin_dir)
         except Exception as exc:
             return {"ok": False, "message": f"模拟器不可用: {exc}"}
+
+        if cia_files:
+            setup_messages: List[str] = []
+            try:
+                setup_messages = await asyncio.to_thread(
+                    setup_emulator,
+                    platform,
+                    command,
+                    seven_zip=self.seven_zip,
+                )
+            except Exception as exc:
+                setup_messages = [f"模拟器初始化失败: {exc}"]
+            env = dict(os.environ)
+            env.setdefault("QT_QPA_PLATFORM", "xcb")
+            env.setdefault("SDL_VIDEODRIVER", "x11")
+            installed = 0
+            failures: List[str] = []
+            for cia_path in cia_files:
+                try:
+                    process = await asyncio.to_thread(
+                        subprocess.run,
+                        [*command, "--install", str(cia_path)],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        timeout=600,
+                        env=env,
+                    )
+                    if process.returncode == 0:
+                        installed += 1
+                    else:
+                        output = (process.stdout or b"").decode("utf-8", "replace").strip()
+                        failures.append(f"{cia_path.name}: {output[:160] or f'exit={process.returncode}'}")
+                except Exception as exc:
+                    failures.append(f"{cia_path.name}: {exc}")
+            if installed <= 0:
+                return {
+                    "ok": False,
+                    "message": "Azahar CIA 自动安装失败：" + "；".join(failures[:3]),
+                }
+            message = f"CIA 已自动安装到 Azahar：{installed} 个"
+            if failures:
+                message += f"（失败 {len(failures)} 个）"
+            message += "；请从 Azahar 游戏列表启动"
+            if setup_messages:
+                message += "；" + "，".join(str(item) for item in setup_messages[:3] if str(item).strip())
+            return {"ok": True, "appid_unsigned": 0, "message": message}
 
         spec = get_spec(platform)
         setup_messages: List[str] = []

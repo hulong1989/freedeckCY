@@ -952,3 +952,15 @@ def test_tar_extraction_rejects_symlink_members(tmp_path):
     assert ok is False
     assert "链接" in message or "解压失败" in message
     assert list(outside.iterdir()) == []
+
+
+def test_post_process_failure_backoff_is_group_scoped():
+    service = TianyiService.__new__(TianyiService)
+    service._post_process_failures = {}
+    task = SimpleNamespace(task_id="t1", group_id="group-1")
+    service._record_post_process_failure(task, RuntimeError("disk gone"))
+    assert service._post_process_backoff_active(task)
+    state = service._post_process_failures["group-1"]
+    assert state["count"] == 1
+    service._clear_post_process_failure(task)
+    assert not service._post_process_backoff_active(task)

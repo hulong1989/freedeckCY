@@ -250,3 +250,15 @@ def test_parse_version_compare():
     assert svc._parse_version("v0.5.0-pre") == (0, 5, 0)
     assert svc._parse_version("") == (0,)
     assert svc._parse_version("0.5.0") > svc._parse_version("0.4.9")
+
+
+@pytest.mark.asyncio
+async def test_rejects_other_localhost_port():
+    origin = "http://127.0.0.1:6000"
+    request = make_mocked_request(
+        "POST",
+        "/api/tianyi/settings",
+        headers={"Origin": origin, "Host": "127.0.0.1:59271"},
+    )
+    response = await server_manager.cors_middleware(request, _ok_handler)
+    assert response.status == 403

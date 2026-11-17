@@ -330,3 +330,76 @@ def test_gba_save_next_to_rom(tmp_path, monkeypatch):
     result = emulator_saves.collect_emulator_save_paths(_record("gba", rom_path=str(rom)))
     assert result.per_game is True
     assert str(rom.parent / "game.sav") in result.paths
+
+
+def test_legacy_manifest_uses_entry_name_when_rel_path_missing(tmp_path):
+    from tianyi_service import TianyiService
+
+    service = TianyiService.__new__(TianyiService)
+    extract = tmp_path / "extract"
+    (extract / "TITLEID01").mkdir(parents=True)
+    (extract / "TITLEID01" / "data.bin").write_bytes(b"save")
+    entries = service._normalize_cloud_restore_entries(
+        manifest={"entries": [{"entry_id": "e1", "name": "TITLEID01", "archive_rel_path": ""}]},
+        extract_dir=str(extract),
+    )
+    assert entries and entries[0]["archive_rel_path"] == "TITLEID01"
+
+
+def test_legacy_backup_migration_moves_into_central_dir(tmp_path, monkeypatch):
+    import config
+    from tianyi_service import TianyiService
+
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "freedeckcy"))
+    save_root = tmp_path / "saves"
+    save_root.mkdir()
+    (save_root / "game.sav").write_bytes(b"current")
+    (save_root / "game.sav.freedeckcy-bak-20260101_000000").write_bytes(b"old")
+    (save_root / "old.freedeckcy-bak-dir").mkdir()
+    service = TianyiService.__new__(TianyiService)
+    moved = service._migrate_legacy_backup_roots([str(save_root)])
+    assert moved == 2
+    assert (save_root / "game.sav").exists()
+    assert not (save_root / "game.sav.freedeckcy-bak-20260101_000000").exists()
+    legacy = tmp_path / "freedeckcy" / "backups" / "legacy"
+    assert len(list(legacy.iterdir())) == 2
+
+
+def test_flat_legacy_manifest_restores_into_entry_directory(tmp_path):
+    from tianyi_service import TianyiService
+
+    service = TianyiService.__new__(TianyiService)
+    extract = tmp_path / "extract"
+    extract.mkdir()
+    (extract / "data.bin").write_bytes(b"save")
+    target = tmp_path / "SAVEDATA"
+    target.mkdir()
+    entries = service._normalize_cloud_restore_entries(
+        manifest={"entries": [{"entry_id": "e1", "name": "TITLEID01", "archive_rel_path": "TITLEID01"}]},
+        extract_dir=str(extract),
+    )
+    assert entries and entries[0]["archive_rel_path"] == ""
+    plan = service._build_restore_copy_plan(
+        extract_dir=str(extract),
+        entries=entries,
+        selected_entry_ids=["e1"],
+        target_dir=str(target),
+    )
+    assert plan["copy_pairs"][0][1] == str(target / "TITLEID01" / "data.bin")
+
+
+def test_prune_keeps_legacy_backup_dir(tmp_path, monkeypatch):
+    import config
+    from tianyi_service import TianyiService
+
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path))
+    backups = tmp_path / "backups"
+    backups.mkdir()
+    for index in range(5):
+        folder = backups / f"cloud-save-{index:02d}"
+        folder.mkdir()
+        (folder / "f").write_bytes(b"x")
+    (backups / "legacy").mkdir()
+    TianyiService._prune_cloud_save_backups(keep=2)
+    assert len(list(backups.glob("cloud-save-*"))) == 2
+    assert (backups / "legacy").is_dir()

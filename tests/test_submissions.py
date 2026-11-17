@@ -139,3 +139,28 @@ def test_validate_baidu_submission_and_server(tmp_path):
     assert row["server"] == "b"
     assert row["shorturl"] == "1AbCdEf123456"
     assert row["pwd"] == "x9k2"
+
+
+def test_baidu_share_code_canonicalizes_surl_and_short_path(tmp_path):
+    catalog = _write_catalog(
+        tmp_path,
+        [
+            {
+                "game_id": "1",
+                "down_url": "https://pan.baidu.com/s/1AbCdEf123456?pwd=x9k2",
+                "shorturl": "1AbCdEf123456",
+            }
+        ],
+    )
+    rows = submission.load_catalog(catalog)
+    data = _submission(
+        name="百度重复",
+        english_name="Baidu Dup",
+        share_url="https://pan.baidu.com/share/init?surl=AbCdEf123456",
+        access_code="x9k2",
+    )
+    _normalized, errors, _warnings = submission.validate_submission(
+        data,
+        catalog_share_codes=submission.catalog_share_codes(rows),
+    )
+    assert any("已存在" in error for error in errors)

@@ -73,10 +73,10 @@ jobs:
         with:
           version: 9
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -88,3 +88,17 @@ jobs:
 
       - name: Verify build output
         run: test -f dist/index.js
+
+  runtime:
+    name: Runtime smoke (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch bundled runtime
+        run: bash scripts/fetch_runtime.sh --arch x86_64 --dest /tmp/freedeckcy-runtime
+
+      - name: Execute aria2/7z/node
+        run: bash scripts/verify_runtime.sh --dir /tmp/freedeckcy-runtime --arch x86_64

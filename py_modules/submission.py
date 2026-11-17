@@ -153,6 +153,14 @@ def _share_code(share_url: str) -> str:
         return ""
 
 
+def _canonical_share_code(share_url: str) -> str:
+    """用于去重的分享码：百度 /s/1xxxx 与 ?surl=xxxx 归一。"""
+    code = _share_code(share_url)
+    if code and _share_provider(share_url) == "baidu" and code.startswith("1"):
+        return code[1:]
+    return code
+
+
 def _with_access_code(share_url: str, access_code: str) -> str:
     if not access_code or "pwd=" in share_url:
         return share_url
@@ -223,7 +231,7 @@ def validate_submission(
     if filesize and not filesize.isdigit():
         errors.append("filesize_z 必须是非负整数（字节）")
 
-    share_code = _share_code(share_url) if share_url else ""
+    share_code = _canonical_share_code(share_url) if share_url else ""
     if share_code and catalog_share_codes and share_code in catalog_share_codes:
         errors.append(f"该分享链接已存在目录中（shareCode={share_code}）")
     if share_code and other_share_codes and share_code in other_share_codes:
@@ -256,9 +264,11 @@ def load_catalog(path: Path = CATALOG_PATH) -> List[Dict[str, str]]:
 def catalog_share_codes(rows: Iterable[Dict[str, str]]) -> set:
     codes = set()
     for row in rows:
-        code = _share_code(str(row.get("down_url", "") or ""))
+        code = _canonical_share_code(str(row.get("down_url", "") or ""))
         if not code:
             code = str(row.get("shorturl", "") or "").strip()
+            if code.startswith("1") and _share_provider(str(row.get("down_url", "") or "")) == "baidu":
+                code = code[1:]
         if code:
             codes.add(code)
     return codes
@@ -298,7 +308,7 @@ def validate_submission_files(
             other_share_codes=seen,
             filename=path.name,
         )
-        code = _share_code(normalized.get("share_url", "")) if normalized else ""
+        code = _canonical_share_code(normalized.get("share_url", "")) if normalized else ""
         if code:
             seen.add(code)
         results.append(

@@ -6,6 +6,14 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
+class _PrivateRotatingFileHandler(RotatingFileHandler):
+    """轮转日志始终用 0600 创建，避免新日志文件按 umask 变成 0644。"""
+
+    def _open(self):
+        fd = os.open(self.baseFilename, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        return os.fdopen(fd, self.mode, encoding=self.encoding)
+
+
 def setup_logger() -> logging.Logger:
     """初始化日志器（带轮转，避免 /tmp/freedeckcy.log 无限增长）。"""
     logger = logging.getLogger("freedeckcy")
@@ -18,7 +26,7 @@ def setup_logger() -> logging.Logger:
     )
     handler: logging.Handler
     try:
-        handler = RotatingFileHandler(
+        handler = _PrivateRotatingFileHandler(
             "/tmp/freedeckcy.log",
             maxBytes=5 * 1024 * 1024,
             backupCount=3,

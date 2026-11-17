@@ -288,7 +288,7 @@ class Aria2Manager:
             binary_path,
             "--enable-rpc=true",
             "--rpc-listen-all=false",
-            "--rpc-allow-origin-all=true",
+            "--rpc-allow-origin-all=false",
             "--rpc-listen-port",
             str(port),
             "--rpc-secret",

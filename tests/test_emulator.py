@@ -720,7 +720,7 @@ def _make_ps1_same_name_dirs(tmp_path):
 
 def test_ps1_same_disc_names_use_title_to_disambiguate(tmp_path):
     _make_ps1_same_name_dirs(tmp_path)
-    found = emu.find_rom_file(str(tmp_path), "Disc 1.cue", "ps1", title="GameB")
+    found = emu.find_rom_file(str(tmp_path), "Disc 1.cue", "ps1", title="中文/GameB")
     assert "GameB" in found
     content = Path(found).read_text(encoding="utf-8")
     assert "GameB/Disc 1.cue" in content or "Disc 1.cue" in content
@@ -738,3 +738,31 @@ def test_ps1_full_openpath_wins_over_same_names(tmp_path):
     content = Path(found).read_text(encoding="utf-8")
     assert "GameA" in found
     assert "GameB" not in content
+
+
+def test_3ds_cia_auto_install(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from tianyi_service import TianyiService
+
+    cia = tmp_path / "game.cia"
+    cia.write_bytes(b"CIA")
+    service = TianyiService.__new__(TianyiService)
+    service.plugin_dir = str(tmp_path)
+
+    async def _ensure(platform, plugin_dir=None, **kwargs):
+        assert platform == "3ds"
+        return ["/usr/bin/azahar"]
+
+    calls = []
+
+    def _run(args, **kwargs):
+        calls.append(args)
+        return SimpleNamespace(returncode=0, stdout=b"installed")
+
+    monkeypatch.setattr("tianyi_service.ensure_emulator", _ensure)
+    monkeypatch.setattr("tianyi_service.subprocess.run", _run)
+    task = SimpleNamespace(platform="3ds", openpath="", game_title="Game")
+    result = asyncio.run(service._auto_register_emulator_to_steam(task=task, target_dir=str(tmp_path), platform="3ds"))
+    assert result["ok"] is True
+    assert "CIA 已自动安装" in result["message"]
+    assert calls and calls[0][-1] == str(cia)

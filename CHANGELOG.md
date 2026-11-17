@@ -2,6 +2,34 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.1
+
+### 新增
+
+- **3DS `.cia` 自动安装**：没有可启动 ROM 时，先部署 system files，再调用 Azahar
+  `--install <cia>`；成功提示从 Azahar 列表启动，失败返回具体输出。不再只提示用户手动安装。
+- **旧云存档备份迁移**：后台维护把存档树里的旧 `.freedeckcy-bak-*` 移到
+  `~/.local/share/freedeckCY/backups/legacy/`，中央备份保留最近 10 份；
+  `cloud-save-*` 清理不会误删 `legacy/`。
+- **旧 manifest 完全无目录结构兼容**：`archive_rel_path` 缺失时按 `entry_name`
+  或在归档根内容上重建条目目录层，避免旧包恢复丢条目。
+- **运行时 Linux 冒烟**：新增 `scripts/verify_runtime.sh` 与 CI job，实际执行
+  `7zz i` / `aria2c --version` / `node --version`。
+
+### 修复
+
+- **PS1 同名歧义**：标题支持 `中文/English` 多段匹配；完整 openpath、目录、标题三级判定；
+  多个 m3u/分组仍不唯一时明确失败，不再注册错游戏。
+- **后处理退避**：安装收尾失败按组退避（最长 5 分钟），不再每 8 秒重试刷日志。
+- **安全**：日志轮转后仍 0600；Origin 只允许本插件监听端口；aria2 RPC 关闭
+  `--rpc-allow-origin-all`；空目录不再 realpath 成 CWD。
+- **提交校验**：百度 `/s/1...` 与 `?surl=...` 分享码归一，修复重复提交绕过。
+
+### 变更
+
+- CI UI 构建升级 Node 24；新增 Python 编译/shell 语法检查与运行时冒烟 job。
+- 测试 377 → 385。
+
 ## v0.26.0
 
 ### 安全与稳定性

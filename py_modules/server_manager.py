@@ -17,6 +17,7 @@ import utils
 
 # 本地服务只服务本机页面：Host 必须是回环地址，跨站写请求直接拒绝。
 _ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"}
+_ALLOWED_ORIGIN_PORTS = {int(config.DEFAULT_SERVER_PORT)}
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
@@ -31,14 +32,20 @@ def _host_only(value: str) -> str:
 
 
 def _origin_allowed(origin: str) -> bool:
-    """只允许来自本机回环地址页面的跨域请求。"""
+    """只允许来自本服务端口的本机页面（不再信任任意 localhost 端口）。"""
     try:
         parsed = urlparse(str(origin or "").strip())
     except Exception:
         return False
     if parsed.scheme not in {"http", "https"}:
         return False
-    return str(parsed.hostname or "").strip().lower() in _ALLOWED_HOSTS
+    host = str(parsed.hostname or "").strip().lower()
+    if host not in _ALLOWED_HOSTS:
+        return False
+    port = parsed.port
+    if port is None:
+        port = 443 if parsed.scheme == "https" else 80
+    return int(port) in _ALLOWED_ORIGIN_PORTS
 
 
 def _forbidden(message: str) -> web.Response:
@@ -165,6 +172,7 @@ async def start_server(plugin: Any, port: int = config.DEFAULT_SERVER_PORT) -> d
 
     try:
         plugin.server_port = target_port
+        _ALLOWED_ORIGIN_PORTS.add(int(target_port))
         plugin.app = web.Application(
             middlewares=[cors_middleware],
             # 本地 API 只需要传路径/ID/小 JSON，不需要 1GB 上限。
