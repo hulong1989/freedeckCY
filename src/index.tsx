@@ -30,7 +30,7 @@ import { FaCloudDownloadAlt } from "react-icons/fa";
 type ApiStatus = "success" | "error";
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.3";
+const PLUGIN_UI_BUILD = "0.26.11";
 
 interface ApiResponse<T> {
   status: ApiStatus;
@@ -434,6 +434,8 @@ interface LibraryGameTimeStatsData {
 }
 
 const getTianyiPanelState = callable<[Record<string, unknown>?], ApiResponse<PanelState>>("get_tianyi_panel_state");
+const restartSteamBackend = callable<[], ApiResponse<Record<string, unknown>>>("restart_steam");
+const clearSteamRestartPending = callable<[], ApiResponse<Record<string, unknown>>>("clear_steam_restart_pending");
 const getTianyiStorageOptions = callable<[], ApiResponse<StorageOptionsState>>("get_tianyi_storage_options");
 const listTianyiCatalog = callable<[Record<string, unknown>], ApiResponse<CatalogPage>>("list_tianyi_catalog");
 const prepareTianyiInstall = callable<[Record<string, unknown>], ApiResponse<InstallPlanData>>("prepare_tianyi_install");
@@ -3253,17 +3255,22 @@ function tryRestartSteamViaClient(): boolean {
   return false;
 }
 
+function steamRestartKey(pending?: SteamRestartState): string {
+  if (!pending) return "";
+  return `${String(pending.game_id || "")}:${String(pending.app_id || "")}:${String(pending.title || "")}`;
+}
+
 function Content() {
   const [loading, setLoading] = useState<boolean>(true);
   const [state, setState] = useState<PanelState>(EMPTY_STATE);
   const [openingLogin, setOpeningLogin] = useState<boolean>(false);
   const [uninstallingKey, setUninstallingKey] = useState<string>("");
   const [taskActionKey, setTaskActionKey] = useState<string>("");
+  const [restartingSteam, setRestartingSteam] = useState<boolean>(false);
   const [previewingKey, setPreviewingKey] = useState<string>("");
   const syncingRef = useRef<boolean>(false);
   const latestStateRef = useRef<PanelState>(EMPTY_STATE);
-  const restartPromptOpenRef = useRef<boolean>(false);
-  const restartPromptShownRef = useRef<Set<string>>(new Set());
+  const dismissedSteamRestartRef = useRef<Set<string>>(new Set());
 
   const syncState = useCallback(async (pollMode: PanelPollMode = PANEL_POLL_MODE_IDLE) => {
     if (syncingRef.current) return;
@@ -3291,64 +3298,18 @@ function Content() {
         power_diagnostics: next.power_diagnostics || {},
         steam_restart: next.steam_restart || { pending: false },
       };
+      if (normalized.steam_restart?.pending) {
+        const key = steamRestartKey(normalized.steam_restart);
+        if (key && dismissedSteamRestartRef.current.has(key)) {
+          normalized.steam_restart = { pending: false };
+        }
+      }
       latestStateRef.current = normalized;
       setState(normalized);
     } finally {
       syncingRef.current = false;
     }
   }, []);
-
-  useEffect(() => {
-    const pending = state.steam_restart;
-    if (!pending?.pending) return;
-    if (restartPromptOpenRef.current) return;
-    const title = String(pending.title || "游戏").trim() || "游戏";
-    const key = `${String(pending.game_id || "")}:${String(pending.app_id || "")}:${title}`;
-    if (restartPromptShownRef.current.has(key)) return;
-    restartPromptShownRef.current.add(key);
-    restartPromptOpenRef.current = true;
-
-    let modal: { Close: () => void } | null = null;
-    try {
-      modal = showModal(
-        <ConfirmModal
-          strTitle="重启 Steam"
-          strDescription={`「${title}」已安装并写入 Steam 快捷方式。\n\n现在重启 Steam 会立即出现在库中；也可以选择稍后手动重启。`}
-          strOKButtonText="现在重启"
-          strCancelButtonText="稍后"
-          onOK={() => {
-            try {
-              modal?.Close();
-            } catch {
-              // 忽略关闭失败。
-            }
-            if (tryRestartSteamViaClient()) {
-              toaster.toast({ title: "freedeckCY", body: "正在重启 Steam..." });
-            } else {
-              toaster.toast({ title: "freedeckCY", body: "无法自动重启，请手动重启 Steam 后查看游戏" });
-            }
-          }}
-          onCancel={() => {
-            try {
-              modal?.Close();
-            } catch {
-              // 忽略关闭失败。
-            }
-          }}
-        />,
-        undefined,
-        {
-          strTitle: "重启 Steam",
-          bNeverPopOut: true,
-          fnOnClose: () => {
-            restartPromptOpenRef.current = false;
-          },
-        },
-      );
-    } catch {
-      restartPromptOpenRef.current = false;
-    }
-  }, [state.steam_restart]);
 
   useEffect(() => {
     let alive = true;
@@ -3497,6 +3458,7 @@ function Content() {
   const visibleTasks = useMemo(
     () =>
       (state.tasks || []).filter((task) => {
+        if (String(task.status || "").trim().toLowerCase() === "removed") return false;
         if (isTaskAlreadyInstalled(task)) return false;
         const gameId = String(task.game_id || "").trim();
         if (gameId && installedGameIds.has(gameId)) return false;
@@ -3705,6 +3667,51 @@ function Content() {
     [performTaskAction, taskActionKey],
   );
 
+  const dismissSteamRestart = useCallback(async (): Promise<boolean> => {
+    const pending = state.steam_restart;
+    const key = steamRestartKey(pending);
+    try {
+      const result = await withTimeout(clearSteamRestartPending(), 15000, "清除重启提示超时");
+      if (result.status !== "success") {
+        throw new Error(result.message || "清除重启提示失败");
+      }
+    } catch (error) {
+      toaster.toast({ title: "freedeckCY", body: `稍后处理失败：${errorText(error)}` });
+      return false;
+    }
+    if (key) dismissedSteamRestartRef.current.add(key);
+    setState((prev) => ({ ...prev, steam_restart: { pending: false } }));
+    return true;
+  }, [state.steam_restart]);
+
+  const restartSteamNow = useCallback(async () => {
+    if (restartingSteam) return;
+    setRestartingSteam(true);
+    try {
+      const result = await withTimeout(restartSteamBackend(), 70000, "重启 Steam 超时");
+      if (result.status !== "success" || result.data?.ok === false) {
+        throw new Error(String(result.message || result.data?.message || "重启 Steam 失败"));
+      }
+      const key = steamRestartKey(state.steam_restart);
+      if (key) dismissedSteamRestartRef.current.add(key);
+      setState((prev) => ({ ...prev, steam_restart: { pending: false } }));
+      void clearSteamRestartPending().catch(() => undefined);
+      toaster.toast({ title: "freedeckCY", body: "已请求重启 Steam" });
+    } catch (error) {
+      if (tryRestartSteamViaClient()) {
+        toaster.toast({ title: "freedeckCY", body: "已通过 Steam 客户端请求重启" });
+      } else {
+        toaster.toast({
+          title: "freedeckCY",
+          body: `自动重启失败：${errorText(error)}；请手动重启 Steam`,
+          duration: 6000,
+        });
+      }
+    } finally {
+      setRestartingSteam(false);
+    }
+  }, [restartingSteam, state.steam_restart]);
+
   if (loading) {
     return (
       <PanelSection>
@@ -3745,6 +3752,30 @@ function Content() {
         </PanelSectionRow>
       </PanelSection>
 
+      {state.steam_restart?.pending && (
+        <PanelSection title="Steam 快捷方式已写入">
+          <PanelSectionRow>
+            <div style={{ fontSize: "12px", lineHeight: 1.45 }}>
+              {`「${state.steam_restart.title || "游戏"}」已安装并写入 Steam 快捷方式。重启 Steam 后才会显示在库中。`}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <Focusable style={{ display: "flex", gap: "8px", width: "100%" }}>
+              <DialogButton
+                onClick={() => void restartSteamNow()}
+                disabled={restartingSteam}
+                style={{ flex: 1 }}
+              >{restartingSteam ? "正在重启..." : "现在重启"}</DialogButton>
+              <DialogButton
+                onClick={() => void dismissSteamRestart()}
+                disabled={restartingSteam}
+                style={{ flex: 1 }}
+              >稍后</DialogButton>
+            </Focusable>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+
       {visibleTasks.length > 0 && (
         <PanelSection title={`下载列表（${visibleTasks.length}）`}>
           {visibleTasks.slice(0, 20).map((task) => {
@@ -3752,7 +3783,10 @@ function Content() {
             const status = String(task.status || "");
             const canPause = status === "active" || status === "waiting";
             const canResume = status === "paused";
-            const canRetry = status === "error" || String(task.install_status || "") === "failed";
+            const canRetry =
+              status === "error" ||
+              String(task.install_status || "") === "failed" ||
+              String(task.install_status || "") === "gave_up";
             const busy = Boolean(taskActionKey) && taskActionKey.endsWith(taskId);
             const buttonStyle = {
               minWidth: "76px",
@@ -4398,15 +4432,14 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
       />
       <div
         style={{
-          position: "sticky",
-          top: "64px",
+          position: "relative",
           zIndex: 20,
           display: "flex",
           justifyContent: "space-between",
           gap: "8px",
           padding: "8px 0",
+          boxSizing: "border-box",
           background: "#0e1116",
-          backdropFilter: "blur(8px)",
         }}
       >
         <Focusable onCancel={handleClose} style={{ display: "flex", gap: "6px" }}>
@@ -4427,7 +4460,6 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
               <div style={{ fontSize: "11px", opacity: 0.65 }}>{`原生 UI · v${PLUGIN_UI_BUILD}`}</div>
             </div>
             <Focusable style={{ display: "flex", gap: "6px" }}>
-              <DialogButton onClick={handleClose} style={{ padding: "6px 12px" }}>返回</DialogButton>
               <DialogButton
                 onClick={() => setTab("catalog")}
                 style={{ padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }}
@@ -4436,11 +4468,6 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
                 onClick={() => setTab("installed")}
                 style={{ padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }}
               >已安装{installed.total ? `(${installed.total})` : ""}</DialogButton>
-              <DialogButton
-                onClick={() => { if (tab === "catalog") void loadCatalog(page); else void loadInstalled(); }}
-                disabled={loadingCatalog || loadingInstalled}
-                style={{ padding: "6px 12px" }}
-              >{loadingCatalog || loadingInstalled ? "刷新中..." : "刷新"}</DialogButton>
             </Focusable>
           </div>
         </PanelSectionRow>

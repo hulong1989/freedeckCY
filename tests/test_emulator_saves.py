@@ -462,13 +462,29 @@ def test_gba_nested_rom_folder_is_not_uploaded_as_save(tmp_path, monkeypatch):
 
 
 def _synthetic_cia(path, program_id: int = 0x0004000000033600):
+    # 按 3dbrew 真实布局生成：cert/ticket/TMD 段不是 64 对齐尺寸，content 需逐段 align64。
     header = bytearray(0x2020)
     header[0x00:0x04] = (0x2020).to_bytes(4, "little")
+    cert_size, ticket_size, tmd_size, meta_size = 0x30, 0x24, 0x7C, 0x30
+    header[0x08:0x0C] = cert_size.to_bytes(4, "little")
+    header[0x0C:0x10] = ticket_size.to_bytes(4, "little")
+    header[0x10:0x14] = tmd_size.to_bytes(4, "little")
+    header[0x14:0x18] = meta_size.to_bytes(4, "little")
+
+    def _align64(value: int) -> int:
+        return (value + 63) & ~63
+
+    content_offset = _align64(
+        _align64(_align64(0x2020 + cert_size) + ticket_size) + tmd_size
+    )
+    blob = bytearray(content_offset)
+    blob[:0x2020] = header
     ncch = bytearray(0x120)
     ncch[0x100:0x104] = b"NCCH"
     ncch[0x118:0x120] = program_id.to_bytes(8, "little")
+    blob.extend(ncch)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(bytes(header) + bytes(ncch))
+    path.write_bytes(bytes(blob))
 
 
 def test_3ds_reads_title_id_from_cia(tmp_path):
@@ -600,3 +616,13 @@ def test_restore_targets_untrusted_source_falls_back_to_known_root(tmp_path, mon
         [{"entry_id": "e1", "entry_name": "passwd", "source_path": "/etc/passwd", "archive_rel_path": ""}],
     )
     assert targets["e1"] == str(savedata)
+
+
+def test_restore_roots_never_prefers_game_install_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    install = tmp_path / "Games" / "Game"
+    install.mkdir(parents=True)
+    roots = emulator_saves.restore_roots(_record("ps1", install_path=str(install)))
+    expected = os.path.realpath(str(tmp_path / "home" / ".local" / "share" / "duckstation" / "memcards"))
+    assert os.path.realpath(roots[0]) == expected
+    assert not any(os.path.realpath(root).startswith(os.path.realpath(str(install)) + os.sep) for root in roots)

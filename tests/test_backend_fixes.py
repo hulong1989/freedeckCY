@@ -194,7 +194,7 @@ def test_post_process_gives_up_after_max_attempts(service, tmp_path, monkeypatch
         for _ in range(POST_PROCESS_MAX_ATTEMPTS):
             await service._run_post_process_task(task.task_id)
         assert task.post_processed is True
-        assert task.install_status == "failed"
+        assert task.install_status == "gave_up"
         assert "停止自动重试" in task.install_message
         assert "请检查安装目录" in task.install_message
         assert service._post_process_failures == {}
@@ -696,3 +696,40 @@ def test_quarantine_stale_aria2_sidecar(tmp_path):
     assert payload.is_file()
     assert not sidecar.exists()
     assert list(tmp_path.glob("30XX.zip.aria2.stale-*"))
+
+
+def test_remove_task_immediately_drops_removed_record(tmp_path):
+    from tianyi_store import TianyiStateStore, TianyiTaskRecord
+
+    service = TianyiService.__new__(TianyiService)
+    service.store = TianyiStateStore(str(tmp_path / "state.json"))
+    service._invalidate_panel_cache = lambda **kwargs: None
+
+    class _Aria:
+        removed = []
+
+        async def remove(self, gid):
+            self.removed.append(gid)
+
+    service.aria2 = _Aria()
+    task = TianyiTaskRecord(
+        task_id="remove-me",
+        gid="g-remove",
+        game_id="g1",
+        game_title="Demo",
+        share_code="code",
+        share_id="share",
+        file_id="file",
+        file_name="Demo.zip",
+        speed=0,
+        download_dir=str(tmp_path),
+        local_path=str(tmp_path / "Demo.zip"),
+        status="error",
+        progress=0.0,
+    )
+    service.store.upsert_tasks([task])
+
+    asyncio.run(service.remove_task("remove-me"))
+
+    assert service.store.tasks == []
+    assert service.aria2.removed == ["g-remove"]

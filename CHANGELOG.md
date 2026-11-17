@@ -2,6 +2,96 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.11
+
+### 修复
+
+- **下载列表无法移除**：`remove_task` 把任务标 `removed` 后，`_cleanup_tasks`
+  仍按 7 天保留，导致列表永远不消失；现在立即从本地任务列表删除。
+- `aria2.remove` 加 3 秒超时，RPC/DNS 异常也不会阻塞移除。
+- 前端额外过滤 `removed` 任务，避免旧缓存残留。
+
+## v0.26.10
+
+### 审计修复
+
+- **重启 Steam**：runuser 成功后立即返回，不再继续执行 sudo 造成双重启；
+  root/非 root 路径统一总超时；前端超时 70s，避免后端 15s×2 被误判失败。
+- **重复安装**：`complete` 但尚未安装完成的任务也视为活动安装，防止安装窗口内
+  再建一份相同下载、误隔离 `.aria2`。
+- **放弃重试**：`_give_up_post_process` 使用 `install_status=gave_up`，启动恢复
+  只迁移旧版 `failed/pending`，不会每次重启重新解压。
+- **换机恢复根**：`restore_roots` 不再把游戏安装/ROM/launcher 目录拼成存档根，
+  标准模拟器目录优先；portable 子目录只用于模拟器 AppDir。
+- **3DS CIA**：按 3dbrew 规范逐段 64 字节对齐，meta 在 content 之后，
+  NCCH magic 在 +0x100；修正测试 fixture。
+- **CIA 安装**：改用 `QT_QPA_PLATFORM=offscreen`，避免 Decky 后端无 DISPLAY 时 Qt 退出。
+- **重启提示**：「稍后」等待后端清除成功再隐藏；过滤旧轮询响应回弹；请求失败保留横幅。
+- **入口冒烟**：新增 `tests/test_plugin_import.py`，防止 runtime_user 等模块漏提交/漏打包。
+
+### 验证
+
+- 526 passed；QAM 构建通过。
+
+## v0.26.9
+
+### 修复
+
+- **自动重启 Steam**：Decky 后端常以 root 运行，原 `systemctl --user` 连到 root bus
+  必然失败。新增 `runtime_user` 解析真实桌面用户；root 时通过 `runuser -u deck`
+  （或 `sudo -u deck`）带 `XDG_RUNTIME_DIR`/`DBUS_SESSION_BUS_ADDRESS` 重启
+  `steam-launcher.service`，失败再回退 `SteamClient.User.StartRestart`。
+- **QAM 渲染崩溃**：v0.26.8 已修复 hooks 顺序；本版继续保留。
+- 返回栏固定为普通内容行，重启提示为内联横幅。
+
+## v0.26.8
+
+### 修复
+
+- **QAM 打开报错 “An error occurred while rendering”**：`dismissSteamRestart` /
+  `restartSteamNow` 两个 useCallback 原本放在 `if (loading) return` 之后，
+  加载完成后 hooks 数量变化导致 React 崩溃；已移到 early return 之前。
+- 返回栏改为普通内容行（v0.26.7）；重启提示为内联横幅（v0.26.6）。
+
+## v0.26.7
+
+### 修复
+
+- **返回栏位置**：彻底取消 sticky/fixed 浮动，返回 / Steam 库 / 刷新改为页面内容顶部
+  的普通行，随内容滚动；不会再停在卡片中间。
+- 去掉下方重复的返回/刷新按钮，只保留「游戏库 / 已安装」页签。
+- 顶部/底部遮罩与 72px 安全区保留。
+
+## v0.26.6
+
+### 修复
+
+- **重启提示改为 QAM 内联横幅**：不再用阻塞式 ConfirmModal，避免弹窗关不掉时
+  无法进入设置；横幅提供「现在重启 / 稍后」，稍后立即清除后端 pending。
+- **自动重启**：后端优先 `systemctl --user restart steam-launcher.service`，
+  失败再回退 `SteamClient.User.StartRestart`，都失败才提示手动重启。
+- 返回栏固定 `top: 64px`。
+
+## v0.26.5
+
+### 修复
+
+- **安装完成重启 Steam**：优先调用后端 `systemctl --user restart steam-launcher.service`
+  （SteamOS 用户会话），失败再回退 `SteamClient.User.StartRestart`；不再出现“点了没反应”。
+- **「稍后」一直弹窗**：「现在重启 / 稍后 / 关闭」都会调用 `clear_steam_restart_pending`
+  清除后端 pending，弹窗只出现一次；关闭按钮也生效。
+- 返回栏固定 `top: 64px`，不随滚动跑到卡片中间。
+
+## v0.26.4
+
+### 修复
+
+- **返回栏位置**：全屏库页工具栏从 `sticky` 改为 `position: fixed; top: 64px`，
+  不再随滚动停在卡片中间；顶部 60px/底部 72px 遮罩继续挡住 Steam 状态栏/菜单栏。
+
+- 其余同 v0.26.3：自动解压入库、.aria2 残留隔离/自动重试、安装完成重启提示、
+  0.6 风格卡片、B 键 onCancel、诊断任务详情、aarch64 QEMU CI。
+
 ## v0.26.3（2026-11-17）
 
 ### 修复

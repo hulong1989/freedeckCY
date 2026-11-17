@@ -4,11 +4,15 @@
 
 import asyncio
 import os
+import shutil
+import subprocess
+from typing import Any, Dict, List
 
 import decky
 
 import config
 import server_manager
+from runtime_user import resolve_runtime_user
 from tianyi_service import LocalWebNotReadyError, TianyiService
 
 
@@ -82,6 +86,118 @@ class Plugin:
             except Exception as exc:
                 decky.logger.error("freedeckCY maintenance tick failed: %s", exc)
                 config.logger.exception("Maintenance tick failed: %s", exc)
+
+    async def restart_steam(self) -> dict:
+        """重启 Steam 客户端（优先 Steam 客户端 API 不可用时的后端兜底）。"""
+        try:
+            data = await asyncio.to_thread(self._restart_steam_best_effort)
+            return {"status": "success", "data": data}
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            config.logger.warning("restart_steam failed: %s", exc)
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def clear_steam_restart_pending(self) -> dict:
+        """清除「安装完成，重启 Steam」提示。"""
+        try:
+            service = self._get_tianyi_service()
+            data = service.clear_steam_restart_pending()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    def _restart_steam_best_effort(self) -> dict:
+        """重启 SteamOS 的 steam-launcher.service，必要时切到桌面用户会话。"""
+        target = resolve_runtime_user()
+        target_user = str(target.get("name", "") or "deck").strip() or "deck"
+        target_uid = max(0, int(target.get("uid", os.getuid()) or os.getuid()))
+        target_home = str(target.get("home", "") or os.path.expanduser("~")).strip() or os.path.expanduser("~")
+        current_uid = os.geteuid() if hasattr(os, "geteuid") else os.getuid()
+        systemctl = shutil.which("systemctl") or "/usr/bin/systemctl"
+        if not os.path.isfile(systemctl):
+            raise RuntimeError("找不到 systemctl，无法自动重启 Steam")
+
+        user_env = os.environ.copy()
+        user_env.update(
+            {
+                "HOME": target_home,
+                "USER": target_user,
+                "LOGNAME": target_user,
+                "XDG_RUNTIME_DIR": f"/run/user/{target_uid}",
+                "DBUS_SESSION_BUS_ADDRESS": f"unix:path=/run/user/{target_uid}/bus",
+                "PATH": user_env.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
+            }
+        )
+        attempts: List[Dict[str, Any]] = []
+
+        def _run(command: List[str], env: Dict[str, str], label: str) -> bool:
+            try:
+                completed = subprocess.run(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    timeout=15,
+                    env=env,
+                    text=True,
+                )
+            except Exception as exc:
+                attempts.append({"method": label, "command": command, "error": str(exc)})
+                return False
+            output = str(completed.stdout or "").strip()
+            if completed.returncode == 0:
+                return True
+            attempts.append(
+                {
+                    "method": label,
+                    "command": command,
+                    "error": output[:300] or f"exit={completed.returncode}",
+                }
+            )
+            return False
+
+        if current_uid == target_uid or current_uid != 0:
+            if _run(
+                [systemctl, "--user", "restart", "steam-launcher.service"],
+                user_env,
+                "systemctl-user",
+            ):
+                return {"ok": True, "method": "systemctl-user", "user": target_user, "uid": target_uid}
+        else:
+            env_command = [
+                "env",
+                f"HOME={target_home}",
+                f"USER={target_user}",
+                f"LOGNAME={target_user}",
+                f"XDG_RUNTIME_DIR=/run/user/{target_uid}",
+                f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{target_uid}/bus",
+                f"PATH={user_env.get('PATH', '/usr/local/bin:/usr/bin:/bin')}",
+                systemctl,
+                "--user",
+                "restart",
+                "steam-launcher.service",
+            ]
+            runuser = shutil.which("runuser") or "/usr/sbin/runuser"
+            if os.path.isfile(runuser) and _run(
+                [runuser, "-u", target_user, "--", *env_command],
+                os.environ.copy(),
+                "runuser-systemctl-user",
+            ):
+                return {"ok": True, "method": "runuser", "user": target_user, "uid": target_uid}
+            sudo = shutil.which("sudo") or "/usr/bin/sudo"
+            if os.path.isfile(sudo) and _run(
+                [sudo, "-u", target_user, *env_command],
+                os.environ.copy(),
+                "sudo-systemctl-user",
+            ):
+                return {"ok": True, "method": "sudo", "user": target_user, "uid": target_uid}
+
+        if not attempts:
+            raise RuntimeError("没有可用的重启方式：runuser/sudo/systemctl 均不可用")
+        detail = "；".join(
+            f"{item.get('method')}: {item.get('error')}" for item in attempts[-3:]
+        )
+        raise RuntimeError(f"重启 Steam 失败（{detail}）")
 
     async def _unload(self):
         """插件卸载时清理服务。"""

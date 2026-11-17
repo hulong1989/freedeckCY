@@ -191,6 +191,24 @@ def _portable_roots(record: Any) -> List[str]:
     return result
 
 
+def _emulator_app_roots(record: Any) -> List[str]:
+    """只返回模拟器自身 AppDir（用于 portable 存档子目录），不包含游戏安装/ROM 目录。"""
+    spec = get_spec(str(getattr(record, "platform", "") or ""))
+    if spec is None:
+        return []
+    try:
+        command = installed_command(spec)
+    except Exception:
+        return []
+    if not command:
+        return []
+    try:
+        root = os.path.dirname(os.path.realpath(os.path.expanduser(command)))
+    except Exception:
+        return []
+    return [root] if root and os.path.isdir(root) else []
+
+
 def _dir_contains_path(directory: str, target: str) -> bool:
     """target（已 realpath）是否位于 directory 之内。"""
     try:
@@ -286,14 +304,25 @@ def _read_cia_title_id(path: str) -> str:
             meta_size = int.from_bytes(header[0x14:0x18], "little")
             if header_size < 0x20 or header_size > 0x10000:
                 return ""
-            content_offset = header_size + cert_size + ticket_size + tmd_size + meta_size
-            fh.seek(content_offset + 0x100)
-            ncch = fh.read(0x20)
+
+            def _align64(value: int) -> int:
+                return (value + 63) & ~63
+
+            # 3dbrew CIA：cert/ticket/TMD 段各自 64 字节对齐，content 在 TMD 后，
+            # meta 位于 content 之后，不能把 meta 加进 content 偏移。
+            cert_offset = header_size
+            ticket_offset = _align64(cert_offset + cert_size)
+            tmd_offset = _align64(ticket_offset + ticket_size)
+            content_offset = _align64(tmd_offset + tmd_size)
+            # meta_size 仅用于校验/未来扩展，不参与 content 定位。
+            _ = meta_size
+            fh.seek(content_offset)
+            ncch = fh.read(0x200)
     except Exception:
         return ""
-    if len(ncch) < 0x20 or ncch[:4] != b"NCCH":
+    if len(ncch) < 0x120 or ncch[0x100:0x104] != b"NCCH":
         return ""
-    program_id = int.from_bytes(ncch[0x18:0x20], "little")
+    program_id = int.from_bytes(ncch[0x118:0x120], "little")
     if program_id <= 0:
         return ""
     return f"{program_id:016x}"
@@ -531,28 +560,31 @@ def _relative_restore_parent(platform: str, source_path: str, roots: Sequence[st
 
 
 def restore_roots(record: Any) -> List[str]:
-    """恢复时可写入的模拟器存档根目录（存在优先，返回绝对路径）。"""
+    """恢复时可写入的模拟器存档根目录。
+
+    标准目录始终优先；portable 子目录只拼到模拟器 AppDir，不能把游戏安装目录
+    或 ROM 目录误当成存档根（换机恢复时会把存档写进游戏目录）。
+    """
     platform = str(getattr(record, "platform", "") or "pc").strip().lower()
-    roots: List[str] = []
+    standard: List[str] = []
     for raw in STANDARD_SAVE_DIRS.get(platform, ()):
         path = os.path.realpath(os.path.expanduser(raw))
-        if path and path not in roots:
-            roots.append(path)
+        if path and path not in standard:
+            standard.append(path)
+
+    portable: List[str] = []
     if platform == "gba":
-        for root in _portable_roots(record):
-            path = os.path.realpath(os.path.expanduser(root))
-            if path and path not in roots:
-                roots.append(path)
-    for root in _portable_roots(record):
+        # GBA 存档常与 ROM 同目录，保留安装/ROM/launcher 目录。
+        portable.extend(_portable_roots(record))
+    for root in _emulator_app_roots(record):
         for sub in PORTABLE_SUBDIRS.get(platform, ()):
             path = os.path.realpath(os.path.join(root, sub))
-            if path and path not in roots:
-                roots.append(path)
+            if path and path not in standard and path not in portable:
+                portable.append(path)
+
     if platform == "ps3":
-        # RPCS3 的存档实际在 .../dev_hdd0/home/<user>/savedata/，发现已有用户目录后
-        # 把它放到默认根目录（否则跨设备/旧 manifest 会少了 <user>/savedata 两层）。
         discovered: List[str] = []
-        for raw in list(roots):
+        for raw in list(standard):
             base = os.path.realpath(os.path.expanduser(raw))
             if not os.path.isdir(base):
                 continue
@@ -563,18 +595,19 @@ def restore_roots(record: Any) -> List[str]:
                 continue
             for user in users:
                 savedata = os.path.join(base, user.name, "savedata")
-                if os.path.isdir(savedata) and savedata not in roots and savedata not in discovered:
+                if os.path.isdir(savedata) and savedata not in standard and savedata not in discovered:
                     discovered.append(savedata)
         if discovered:
-            roots = discovered + roots
-    # 存在的目录优先，方便 UI 默认选择；PS3 savedata 层优先于 dev_hdd0/home。
-    def root_order(path: str) -> Tuple[int, int, int]:
-        existing = 0 if os.path.isdir(path) else 1
-        preferred = 0 if (platform == "ps3" and path.rstrip(os.sep).endswith(os.sep + "savedata")) else 1
-        return (existing, preferred, len(path))
+            standard = discovered + standard
 
-    roots.sort(key=root_order)
-    return roots
+    tagged: List[Tuple[str, int]] = []
+    for index, path in enumerate(standard):
+        tagged.append((path, index))
+    for index, path in enumerate(portable):
+        tagged.append((path, 1000 + index))
+    # 存在的优先；同类中标准目录优先；最后按长度稳定排序。
+    tagged.sort(key=lambda item: (0 if os.path.isdir(item[0]) else 1, item[1], len(item[0])))
+    return [path for path, _index in tagged]
 
 
 def build_restore_targets(

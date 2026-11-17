@@ -5969,7 +5969,14 @@ class TianyiService:
                 active_existing = [
                     task for task in list(self.store.tasks)
                     if str(task.game_id or "").strip() == plan_game_id
-                    and not _is_terminal(task.status)
+                    and (
+                        not _is_terminal(task.status)
+                        # 下载完成但还没安装完的任务仍是“活动安装”，不能再建一份下载。
+                        or (
+                            str(task.status or "") == "complete"
+                            and not bool(task.post_processed)
+                        )
+                    )
                 ]
                 if active_existing:
                     # 双击/双入口重复安装：复用正在下载的任务，避免两个 aria2 写同一文件。
@@ -6442,6 +6449,11 @@ class TianyiService:
             )
         return True, ""
 
+    def clear_steam_restart_pending(self) -> Dict[str, Any]:
+        """清除安装完成后的重启提示状态。"""
+        self._steam_restart_pending = {}
+        return {"ok": True, "pending": False}
+
     def _recover_unfinished_install_tasks(self) -> int:
         """恢复旧版本留下的“已下载完成但安装失败”任务。
 
@@ -6545,7 +6557,7 @@ class TianyiService:
             if bool(member.post_processed) and str(member.install_status or "") == "installed":
                 continue
             member.post_processed = True
-            member.install_status = "failed"
+            member.install_status = "gave_up"
             member.install_message = (
                 f"安装收尾连续失败 {int(attempt)} 次，已停止自动重试：{reason}；"
                 "请检查安装目录/磁盘空间后点击重试"
@@ -6936,13 +6948,14 @@ class TianyiService:
         if task is None:
             raise ValueError("任务不存在")
         try:
-            await self.aria2.remove(task.gid)
-        except Aria2Error as exc:
-            # aria2 未运行或 gid 已消失时，仍允许移除本地记录。
-            config.logger.warning("aria2 remove failed for task %s: %s", task_id, exc)
+            await asyncio.wait_for(self.aria2.remove(task.gid), timeout=3.0)
+        except Exception as exc:
+            # aria2 未运行、RPC 挂起或 gid 已消失时，仍允许移除本地记录。
+            config.logger.warning("aria2 remove failed for task %s: %s", task_id, _describe_exception(exc))
         task.status = "removed"
         task.updated_at = _now_wall_ts()
-        self._cleanup_tasks(self.store.tasks)
+        # removed 任务不应再保留到 7 天过期列表里；从本地任务列表立即删除。
+        self.store.tasks = [item for item in self.store.tasks if item.task_id != task_id]
         self.store.save()
         self._invalidate_panel_cache(tasks=True)
         return _task_to_view(task)
@@ -7014,6 +7027,8 @@ class TianyiService:
         }
         filtered: List[TianyiTaskRecord] = []
         for task in tasks:
+            if str(task.status or "") == "removed":
+                continue
             if not _is_terminal(task.status):
                 filtered.append(task)
                 continue
@@ -8669,8 +8684,10 @@ class TianyiService:
             except Exception as exc:
                 setup_messages = [f"模拟器初始化失败: {exc}"]
             env = dict(os.environ)
-            env.setdefault("QT_QPA_PLATFORM", "xcb")
-            env.setdefault("SDL_VIDEODRIVER", "x11")
+            # Azahar --install 在 Qt 前端内执行；Decky 后端无 DISPLAY，
+            # 必须用 offscreen，否则 QApplication 初始化就会退出。
+            env["QT_QPA_PLATFORM"] = "offscreen"
+            env["SDL_VIDEODRIVER"] = "dummy"
             installed = 0
             failures: List[str] = []
             for cia_path in cia_files:
