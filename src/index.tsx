@@ -24,13 +24,13 @@ import {
   routerHook,
   toaster,
 } from "@decky/api";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FaCloudDownloadAlt } from "react-icons/fa";
 
 type ApiStatus = "success" | "error";
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.2";
+const PLUGIN_UI_BUILD = "0.26.3";
 
 interface ApiResponse<T> {
   status: ApiStatus;
@@ -116,6 +116,13 @@ interface BaiduOpenApiLoginState {
   message: string;
 }
 
+interface SteamRestartState {
+  pending: boolean;
+  game_id?: string;
+  title?: string;
+  app_id?: number;
+}
+
 interface PanelState {
   login: LoginState;
   baidu_login?: BaiduWebLoginState;
@@ -125,6 +132,7 @@ interface PanelState {
   settings: SettingsState;
   library_url: string;
   power_diagnostics?: Record<string, unknown>;
+  steam_restart?: SteamRestartState;
 }
 
 interface SettingsPayload {
@@ -202,6 +210,9 @@ interface InstalledItem {
   playtime_text?: string;
   playtime_active?: boolean;
   exists?: boolean;
+  cover_url?: string;
+  cover_portrait_url?: string;
+  categories?: string;
 }
 
 interface InstalledList {
@@ -596,6 +607,7 @@ const EMPTY_STATE: PanelState = {
   tasks: [],
   settings: EMPTY_SETTINGS,
   library_url: "",
+  steam_restart: { pending: false },
 };
 
 interface GamepadTabClassMap {
@@ -3219,6 +3231,28 @@ function SettingsPage() {
   );
 }
 
+function tryRestartSteamViaClient(): boolean {
+  try {
+    const host = window as unknown as {
+      SteamClient?: { User?: { StartRestart?: (forceShutdown: boolean) => void } };
+      top?: unknown;
+      parent?: unknown;
+    };
+    const top = host.top as typeof host | null;
+    const parent = host.parent as typeof host | null;
+    for (const candidate of [host.SteamClient, top?.SteamClient, parent?.SteamClient]) {
+      const restart = candidate?.User?.StartRestart;
+      if (typeof restart === "function") {
+        restart(false);
+        return true;
+      }
+    }
+  } catch {
+    // 忽略客户端重启 API 不可用。
+  }
+  return false;
+}
+
 function Content() {
   const [loading, setLoading] = useState<boolean>(true);
   const [state, setState] = useState<PanelState>(EMPTY_STATE);
@@ -3228,6 +3262,8 @@ function Content() {
   const [previewingKey, setPreviewingKey] = useState<string>("");
   const syncingRef = useRef<boolean>(false);
   const latestStateRef = useRef<PanelState>(EMPTY_STATE);
+  const restartPromptOpenRef = useRef<boolean>(false);
+  const restartPromptShownRef = useRef<Set<string>>(new Set());
 
   const syncState = useCallback(async (pollMode: PanelPollMode = PANEL_POLL_MODE_IDLE) => {
     if (syncingRef.current) return;
@@ -3253,6 +3289,7 @@ function Content() {
         settings: Object.assign({}, EMPTY_SETTINGS, next.settings || {}),
         library_url: next.library_url || "",
         power_diagnostics: next.power_diagnostics || {},
+        steam_restart: next.steam_restart || { pending: false },
       };
       latestStateRef.current = normalized;
       setState(normalized);
@@ -3260,6 +3297,58 @@ function Content() {
       syncingRef.current = false;
     }
   }, []);
+
+  useEffect(() => {
+    const pending = state.steam_restart;
+    if (!pending?.pending) return;
+    if (restartPromptOpenRef.current) return;
+    const title = String(pending.title || "游戏").trim() || "游戏";
+    const key = `${String(pending.game_id || "")}:${String(pending.app_id || "")}:${title}`;
+    if (restartPromptShownRef.current.has(key)) return;
+    restartPromptShownRef.current.add(key);
+    restartPromptOpenRef.current = true;
+
+    let modal: { Close: () => void } | null = null;
+    try {
+      modal = showModal(
+        <ConfirmModal
+          strTitle="重启 Steam"
+          strDescription={`「${title}」已安装并写入 Steam 快捷方式。\n\n现在重启 Steam 会立即出现在库中；也可以选择稍后手动重启。`}
+          strOKButtonText="现在重启"
+          strCancelButtonText="稍后"
+          onOK={() => {
+            try {
+              modal?.Close();
+            } catch {
+              // 忽略关闭失败。
+            }
+            if (tryRestartSteamViaClient()) {
+              toaster.toast({ title: "freedeckCY", body: "正在重启 Steam..." });
+            } else {
+              toaster.toast({ title: "freedeckCY", body: "无法自动重启，请手动重启 Steam 后查看游戏" });
+            }
+          }}
+          onCancel={() => {
+            try {
+              modal?.Close();
+            } catch {
+              // 忽略关闭失败。
+            }
+          }}
+        />,
+        undefined,
+        {
+          strTitle: "重启 Steam",
+          bNeverPopOut: true,
+          fnOnClose: () => {
+            restartPromptOpenRef.current = false;
+          },
+        },
+      );
+    } catch {
+      restartPromptOpenRef.current = false;
+    }
+  }, [state.steam_restart]);
 
   useEffect(() => {
     let alive = true;
@@ -3807,6 +3896,160 @@ function Content() {
 }
 
 
+const LIBRARY_CARD_WIDTH = 133;
+const LIBRARY_CARD_HEIGHT = 200;
+
+function libraryCoverGradient(platform: string): string {
+  const key = String(platform || "pc").toLowerCase();
+  const colors: Record<string, [string, string]> = {
+    pc: ["#1d3b53", "#0d1620"],
+    fc: ["#5a2d1f", "#1a0f0a"],
+    md: ["#233f2b", "#0b160f"],
+    gba: ["#3d2b52", "#140d1d"],
+    nds: ["#3a3f46", "#111418"],
+    psp: ["#243b5a", "#0c1420"],
+    ps1: ["#4b3a23", "#17110a"],
+    ps2: ["#2f3157", "#0e0f1d"],
+    ps3: ["#3c3c3c", "#111111"],
+    switch: ["#5a1f24", "#1b090b"],
+    "3ds": ["#4a2530", "#170b0f"],
+  };
+  const pair = colors[key] || colors.pc;
+  return `linear-gradient(145deg, ${pair[0]}, ${pair[1]})`;
+}
+
+interface LibraryCoverCardProps {
+  title: string;
+  platform: string;
+  meta?: string;
+  coverUrl?: string;
+  installed?: boolean;
+  busyLabel?: string;
+  disabled?: boolean;
+  onPress: () => void;
+  actions?: ReactNode;
+}
+
+function LibraryCoverCard(props: LibraryCoverCardProps) {
+  const [imageFailed, setImageFailed] = useState<boolean>(false);
+  const coverUrl = imageFailed ? "" : String(props.coverUrl || "").trim();
+  const title = props.title || "未命名游戏";
+  return (
+    <div style={{ width: `${LIBRARY_CARD_WIDTH}px`, display: "flex", flexDirection: "column", gap: "6px" }}>
+      <DialogButton
+        onClick={props.onPress}
+        disabled={Boolean(props.disabled)}
+        style={{
+          position: "relative",
+          width: `${LIBRARY_CARD_WIDTH}px`,
+          height: `${LIBRARY_CARD_HEIGHT}px`,
+          padding: 0,
+          border: "1px solid rgba(255,255,255,0.10)",
+          borderRadius: "0",
+          overflow: "hidden",
+          display: "block",
+          background: libraryCoverGradient(props.platform),
+          boxShadow: "0 12px 28px rgba(0,0,0,0.36)",
+        }}
+      >
+        {coverUrl ? (
+          <img
+            src={coverUrl}
+            alt={title}
+            referrerPolicy="no-referrer"
+            decoding="async"
+            onError={() => setImageFailed(true)}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        ) : (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "14px",
+              textAlign: "center",
+              fontSize: "14px",
+              lineHeight: 1.35,
+              fontWeight: 700,
+              color: "rgba(242,246,251,0.88)",
+              textShadow: "0 2px 10px rgba(0,0,0,0.45)",
+            }}
+          >{title}</div>
+        )}
+        {props.installed ? (
+          <div
+            style={{
+              position: "absolute",
+              top: "7px",
+              right: "7px",
+              zIndex: 3,
+              padding: "2px 6px",
+              fontSize: "10px",
+              lineHeight: 1.2,
+              fontWeight: 700,
+              color: "#dff7e4",
+              background: "rgba(20,105,56,0.92)",
+              border: "1px solid rgba(160,255,190,0.45)",
+            }}
+          >已安装</div>
+        ) : null}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 2,
+            padding: "28px 9px 9px",
+            background: "linear-gradient(to top, rgba(8,10,14,0.96), rgba(8,10,14,0.72) 55%, rgba(8,10,14,0))",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "12px",
+              lineHeight: 1.3,
+              fontWeight: 700,
+              color: "#f2f6fb",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              wordBreak: "break-word",
+            }}
+          >{title}</div>
+          <div style={{ marginTop: "3px", fontSize: "10px", lineHeight: 1.25, color: "rgba(220,230,240,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {String(props.platform || "pc").toUpperCase()}{props.meta ? ` · ${props.meta}` : ""}
+          </div>
+        </div>
+        {props.busyLabel ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 4,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(7,10,14,0.70)",
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "#fff",
+            }}
+          >{props.busyLabel}</div>
+        ) : null}
+      </DialogButton>
+      {props.actions ? (
+        <Focusable style={{ display: "flex", gap: "4px", width: `${LIBRARY_CARD_WIDTH}px` }}>
+          {props.actions}
+        </Focusable>
+      ) : null}
+    </div>
+  );
+}
+
 function LibraryPage({ onClose }: { onClose?: () => void }) {
   const [tab, setTab] = useState<"catalog" | "installed">("catalog");
   const [query, setQuery] = useState<string>("");
@@ -3824,7 +4067,7 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
   const catalogRequestRef = useRef<number>(0);
   const installedRequestRef = useRef<number>(0);
   const busyRef = useRef<string>("");
-  const pageSize = 20;
+  const pageSize = 30;
 
   // 用 ref 做同步锁：state 更新有延迟，快速连点会绕过 busyKey 判断导致重复请求/互相清 busy。
   const beginBusy = useCallback((key: string): boolean => {
@@ -4066,10 +4309,10 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
     if (onClose) {
       try {
         onClose();
+        return;
       } catch {
-        // 忽略关闭回调失败。
+        // onClose 失效时继续走路由返回兜底。
       }
-      return;
     }
     try {
       Navigation.NavigateBack();
@@ -4113,28 +4356,67 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
   const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
 
   return (
-    <div style={{ height: "100%", overflowY: "auto", padding: "0 8px 32px" }}>
+    <Focusable
+      noFocusRing
+      onCancel={handleClose}
+      style={{
+        height: "100%",
+        overflowY: "auto",
+        boxSizing: "border-box",
+        // SteamOS Game Mode 的库页无论是 showModal 还是路由都是全屏，
+        // 都会被 Steam 顶栏/底栏覆盖：顶部固定让出状态栏，底部留出 Steam 菜单。
+        padding: "72px 8px 160px",
+        background: "#0e1116",
+        color: "#f2f6fb",
+      }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "60px",
+          background: "#0e1116",
+          zIndex: 15,
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: "72px",
+          background: "#0e1116",
+          zIndex: 15,
+          pointerEvents: "none",
+        }}
+      />
       <div
         style={{
           position: "sticky",
-          top: 0,
+          top: "64px",
           zIndex: 20,
           display: "flex",
           justifyContent: "space-between",
           gap: "8px",
           padding: "8px 0",
-          background: "rgba(14, 17, 22, 0.94)",
+          background: "#0e1116",
           backdropFilter: "blur(8px)",
         }}
       >
-        <div style={{ display: "flex", gap: "6px" }}>
-          <DialogButton onClick={handleClose} style={{ padding: "6px 12px" }}>返回</DialogButton>
-          <DialogButton onClick={handleSteamLibrary} style={{ padding: "6px 12px" }}>Steam 库</DialogButton>
-        </div>
+        <Focusable onCancel={handleClose} style={{ display: "flex", gap: "6px" }}>
+          <DialogButton onClick={handleClose} style={{ width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "78px" }}>返回</DialogButton>
+          <DialogButton onClick={handleSteamLibrary} style={{ width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "92px" }}>Steam 库</DialogButton>
+        </Focusable>
         <DialogButton
           onClick={() => { if (tab === "catalog") void loadCatalog(page); else void loadInstalled(); }}
           disabled={loadingCatalog || loadingInstalled}
-          style={{ padding: "6px 12px" }}
+          style={{ width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "76px" }}
         >{loadingCatalog || loadingInstalled ? "刷新中..." : "刷新"}</DialogButton>
       </div>
       <PanelSection>
@@ -4223,25 +4505,36 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
             ) : catalog.items.length === 0 ? (
               <PanelSectionRow><div style={{ fontSize: "12px" }}>没有匹配游戏</div></PanelSectionRow>
             ) : (
-              catalog.items.map((item) => (
-                <PanelSectionRow key={item.game_id}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title || "未命名游戏"}</div>
-                      <div style={{ fontSize: "12px", opacity: 0.8 }}>
-                        {`${String(item.platform || "pc").toUpperCase()} · ${item.size_text || "-"}${item.categories ? ` · ${item.categories}` : ""}`}
-                      </div>
-                    </div>
-                    <Focusable style={{ flex: "0 0 auto" }}>
-                      <DialogButton
-                        onClick={() => void onPrepareInstall(item)}
-                        disabled={Boolean(busyKey)}
-                        style={{ minWidth: "72px", padding: "6px 12px" }}
-                      >{busyKey === item.game_id ? "处理中..." : "安装"}</DialogButton>
-                    </Focusable>
-                  </div>
-                </PanelSectionRow>
-              ))
+              <PanelSectionRow>
+                <Focusable
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: `repeat(5, ${LIBRARY_CARD_WIDTH}px)`,
+                    columnGap: "33px",
+                    rowGap: "37px",
+                    justifyContent: "center",
+                    justifyItems: "center",
+                    width: "100%",
+                    maxWidth: "806px",
+                    margin: "0 auto",
+                    padding: "6px 0 20px",
+                    overflowX: "auto",
+                  }}
+                >
+                  {catalog.items.map((item) => (
+                    <LibraryCoverCard
+                      key={item.game_id}
+                      title={item.title || "未命名游戏"}
+                      platform={item.platform}
+                      meta={item.size_text || "-"}
+                      coverUrl={item.cover_portrait_url || item.cover_url}
+                      busyLabel={busyKey === item.game_id ? "处理中..." : ""}
+                      disabled={Boolean(busyKey)}
+                      onPress={() => void onPrepareInstall(item)}
+                    />
+                  ))}
+                </Focusable>
+              </PanelSectionRow>
             )}
             <PanelSectionRow>
               <Focusable style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", width: "100%" }}>
@@ -4268,42 +4561,54 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
           {installed.items.length === 0 ? (
             <PanelSectionRow><div style={{ fontSize: "12px" }}>还没有已安装游戏</div></PanelSectionRow>
           ) : (
-            installed.items.map((item) => (
-              <PanelSectionRow key={item.game_id}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title || "未命名游戏"}</div>
-                    <div style={{ fontSize: "12px", opacity: 0.8 }}>
-                      {`${String(item.platform || "pc").toUpperCase()} · ${item.size_text || "-"}${item.playtime_text ? ` · ${item.playtime_text}` : ""}`}
-                    </div>
-                    <div style={{ fontSize: "11px", opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={item.install_path}>
-                      {item.install_path || "-"}
-                    </div>
-                  </div>
-                  <Focusable style={{ display: "flex", gap: "6px", flex: "0 0 auto" }}>
-                    <DialogButton
-                      onClick={() => void onLaunchInstalled(item)}
-                      disabled={Boolean(busyKey)}
-                      style={{ padding: "6px 10px" }}
-                    >启动</DialogButton>
-                    <DialogButton
-                      onClick={() => void onOpenFolder(item)}
-                      disabled={Boolean(busyKey)}
-                      style={{ padding: "6px 10px" }}
-                    >目录</DialogButton>
-                    <DialogButton
-                      onClick={() => onUninstall(item)}
-                      disabled={Boolean(busyKey)}
-                      style={{ padding: "6px 10px", background: "rgba(255,106,106,0.22)" }}
-                    >卸载</DialogButton>
-                  </Focusable>
-                </div>
-              </PanelSectionRow>
-            ))
+            <PanelSectionRow>
+              <Focusable
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(5, ${LIBRARY_CARD_WIDTH}px)`,
+                  columnGap: "33px",
+                  rowGap: "37px",
+                  justifyContent: "center",
+                  justifyItems: "center",
+                  width: "100%",
+                  maxWidth: "806px",
+                  margin: "0 auto",
+                  padding: "6px 0 20px",
+                  overflowX: "auto",
+                }}
+              >
+                {installed.items.map((item) => (
+                  <LibraryCoverCard
+                    key={item.game_id}
+                    title={item.title || "未命名游戏"}
+                    platform={item.platform}
+                    meta={item.playtime_text ? `${item.size_text || "-"} · ${item.playtime_text}` : (item.size_text || "-")}
+                    coverUrl={item.cover_portrait_url || item.cover_url}
+                    installed
+                    disabled={Boolean(busyKey)}
+                    onPress={() => void onLaunchInstalled(item)}
+                    actions={
+                      <>
+                        <DialogButton
+                          onClick={() => void onOpenFolder(item)}
+                          disabled={Boolean(busyKey)}
+                          style={{ flex: 1, minWidth: 0, padding: "4px 2px", fontSize: "11px" }}
+                        >目录</DialogButton>
+                        <DialogButton
+                          onClick={() => onUninstall(item)}
+                          disabled={Boolean(busyKey)}
+                          style={{ flex: 1, minWidth: 0, padding: "4px 2px", fontSize: "11px", background: "rgba(255,106,106,0.22)" }}
+                        >卸载</DialogButton>
+                      </>
+                    }
+                  />
+                ))}
+              </Focusable>
+            </PanelSectionRow>
           )}
         </PanelSection>
       )}
-    </div>
+    </Focusable>
   );
 }
 

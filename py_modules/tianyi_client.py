@@ -845,9 +845,10 @@ def _headers(cookie: str) -> Dict[str, str]:
 def _build_tls_context() -> ssl.SSLContext:
     """构建统一 TLS 上下文，兼容 SteamOS 证书链差异。"""
     candidates: List[str] = []
-    env_cert_file = str(os.environ.get("SSL_CERT_FILE", "") or "").strip()
-    if env_cert_file:
-        candidates.append(env_cert_file)
+    for env_var in ("FREEDECKCY_TLS_CA_FILE", "SSL_CERT_FILE"):
+        env_cert_file = str(os.environ.get(env_var, "") or "").strip()
+        if env_cert_file:
+            candidates.append(env_cert_file)
     candidates.extend(list(TLS_CA_CANDIDATE_FILES))
 
     try:
@@ -884,6 +885,11 @@ def _build_tls_context() -> ssl.SSLContext:
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
     return context
+
+
+def build_tls_context() -> ssl.SSLContext:
+    """公开的 TLS 上下文入口，诊断与下载共用同一 CA 选择逻辑。"""
+    return _build_tls_context()
 
 
 def _create_session(*, timeout: aiohttp.ClientTimeout) -> aiohttp.ClientSession:

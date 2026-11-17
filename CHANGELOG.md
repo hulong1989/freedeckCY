@@ -2,6 +2,34 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.3（2026-11-17）
+
+### 修复
+
+- **下载完成不自动解压入库**：后台维护在 aria2 同步超时/失败时不再提前 return；
+  继续扫描 complete 任务并调度后处理，文件大小已匹配时直接判定完成；
+  启动时恢复旧版本“post_processed=True 但安装失败”的卡死任务。
+- **返回/Steam 库/刷新按钮不灵敏**：全屏库页顶部固定 72px、底部 160px；
+  sticky 顶栏停在 64px，避开 Steam 顶栏/底栏；加大按钮点击区、包 Focusable、
+  onClose 失败时回退 Navigation.NavigateBack。
+- **诊断 TLS**：自检复用 tianyi_client 的 build_tls_context，支持
+  FREEDECKCY_TLS_CA_FILE/SSL_CERT_FILE；日志空异常至少记录类型。
+- **安装诊断**：诊断包增加最近任务详情；自检把“安装失败/待安装”单独标 warn；
+  安装失败写入日志，便于定位 SD 路径/解压/空间问题。
+- **B 键返回**：库页根 Focusable 绑定 onCancel，B 键可关闭全屏库弹层。
+- **安装完成重启提示**：Steam 快捷方式写入后，QAM 弹出「重启 Steam / 稍后」；
+  现在重启调用 `SteamClient.User.StartRestart(false)`，不可用时提示手动重启。
+- **下载完成调度**：维护 tick 在 aria2 同步前就先调度已完成的安装。
+- **残留 .aria2 控制文件**：等待释放从 8s 提高到 30s；文件大小已完整时隔离残留
+  `.aria2` 后继续安装；仍不完整则自动退避重试，不再直接判失败。
+- **面板刷新锁**：刷新锁被安装准备占用时直接使用缓存，不再每 3 秒 TimeoutError。
+- **游戏库展示**：原生库改为 0.6 风格 133×200 封面卡片、5 列、每页 30。
+- **arm64 CI**：新增 QEMU aarch64 runtime smoke。
+
+### 验证
+
+- 522 passed；QAM 构建通过。
+
 ## v0.26.2
 
 ### 多智能体集中修复

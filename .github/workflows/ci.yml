@@ -141,3 +141,32 @@ jobs:
       - name: Execute aria2/7z/node
         # 实际执行并校验 aria2 1.37.0 / 7-Zip 26.06 / Node 24.22.3 版本一致
         run: bash scripts/verify_runtime.sh --dir /tmp/freedeckcy-runtime --arch x86_64
+
+  runtime-arm64:
+    name: Runtime smoke (Linux aarch64 via QEMU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install QEMU and arm64 sysroot
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static gcc-aarch64-linux-gnu libstdc++6-arm64-cross libgcc-s1-arm64-cross
+
+      - name: Fetch aarch64 runtime
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/fetch_runtime.sh --arch aarch64 --dest /tmp/freedeckcy-runtime-arm64
+
+      - name: Verify runtime integrity (SHA256 + manifest)
+        run: bash scripts/fetch_runtime.sh --verify-only --arch aarch64 --dest /tmp/freedeckcy-runtime-arm64
+
+      - name: Execute aarch64 aria2/7z/node via QEMU
+        run: |
+          bash scripts/verify_runtime.sh \
+            --dir /tmp/freedeckcy-runtime-arm64 \
+            --arch aarch64 \
+            --runner qemu-aarch64-static \
+            --sysroot /usr/aarch64-linux-gnu

@@ -89,7 +89,7 @@ function FaCloudDownloadAlt (props) {
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.2";
+const PLUGIN_UI_BUILD = "0.26.3";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const getTianyiStorageOptions = callable("get_tianyi_storage_options");
 const listTianyiCatalog = callable("list_tianyi_catalog");
@@ -226,6 +226,7 @@ const EMPTY_STATE = {
     tasks: [],
     settings: EMPTY_SETTINGS,
     library_url: "",
+    steam_restart: { pending: false },
 };
 function getGamepadTabClassMap() {
     const map = DFL.gamepadTabbedPageClasses;
@@ -2287,6 +2288,24 @@ function SettingsPage() {
             overflowX: "hidden",
         }, children: [SP_JSX.jsx("style", { children: tabStabilityCss }), SP_JSX.jsx(DFL.Tabs, { tabs: tabs, activeTab: activeTab, onShowTab: onShowSettingsTab, autoFocusContents: false })] }));
 }
+function tryRestartSteamViaClient() {
+    try {
+        const host = window;
+        const top = host.top;
+        const parent = host.parent;
+        for (const candidate of [host.SteamClient, top?.SteamClient, parent?.SteamClient]) {
+            const restart = candidate?.User?.StartRestart;
+            if (typeof restart === "function") {
+                restart(false);
+                return true;
+            }
+        }
+    }
+    catch {
+        // 忽略客户端重启 API 不可用。
+    }
+    return false;
+}
 function Content() {
     const [loading, setLoading] = SP_REACT.useState(true);
     const [state, setState] = SP_REACT.useState(EMPTY_STATE);
@@ -2296,6 +2315,8 @@ function Content() {
     const [previewingKey, setPreviewingKey] = SP_REACT.useState("");
     const syncingRef = SP_REACT.useRef(false);
     const latestStateRef = SP_REACT.useRef(EMPTY_STATE);
+    const restartPromptOpenRef = SP_REACT.useRef(false);
+    const restartPromptShownRef = SP_REACT.useRef(new Set());
     const syncState = SP_REACT.useCallback(async (pollMode = PANEL_POLL_MODE_IDLE) => {
         if (syncingRef.current)
             return;
@@ -2317,6 +2338,7 @@ function Content() {
                 settings: Object.assign({}, EMPTY_SETTINGS, next.settings || {}),
                 library_url: next.library_url || "",
                 power_diagnostics: next.power_diagnostics || {},
+                steam_restart: next.steam_restart || { pending: false },
             };
             latestStateRef.current = normalized;
             setState(normalized);
@@ -2325,6 +2347,52 @@ function Content() {
             syncingRef.current = false;
         }
     }, []);
+    SP_REACT.useEffect(() => {
+        const pending = state.steam_restart;
+        if (!pending?.pending)
+            return;
+        if (restartPromptOpenRef.current)
+            return;
+        const title = String(pending.title || "游戏").trim() || "游戏";
+        const key = `${String(pending.game_id || "")}:${String(pending.app_id || "")}:${title}`;
+        if (restartPromptShownRef.current.has(key))
+            return;
+        restartPromptShownRef.current.add(key);
+        restartPromptOpenRef.current = true;
+        let modal = null;
+        try {
+            modal = DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u91CD\u542F Steam", strDescription: `「${title}」已安装并写入 Steam 快捷方式。\n\n现在重启 Steam 会立即出现在库中；也可以选择稍后手动重启。`, strOKButtonText: "\u73B0\u5728\u91CD\u542F", strCancelButtonText: "\u7A0D\u540E", onOK: () => {
+                    try {
+                        modal?.Close();
+                    }
+                    catch {
+                        // 忽略关闭失败。
+                    }
+                    if (tryRestartSteamViaClient()) {
+                        toaster.toast({ title: "freedeckCY", body: "正在重启 Steam..." });
+                    }
+                    else {
+                        toaster.toast({ title: "freedeckCY", body: "无法自动重启，请手动重启 Steam 后查看游戏" });
+                    }
+                }, onCancel: () => {
+                    try {
+                        modal?.Close();
+                    }
+                    catch {
+                        // 忽略关闭失败。
+                    }
+                } }), undefined, {
+                strTitle: "重启 Steam",
+                bNeverPopOut: true,
+                fnOnClose: () => {
+                    restartPromptOpenRef.current = false;
+                },
+            });
+        }
+        catch {
+            restartPromptOpenRef.current = false;
+        }
+    }, [state.steam_restart]);
     SP_REACT.useEffect(() => {
         let alive = true;
         let firstRun = true;
@@ -2689,6 +2757,97 @@ function Content() {
                                         }, children: uninstalling ? "卸载中..." : "卸载" }) })] }) }, `${item.game_id || item.title || "game"}_${index}`));
                 }) }))] }));
 }
+const LIBRARY_CARD_WIDTH = 133;
+const LIBRARY_CARD_HEIGHT = 200;
+function libraryCoverGradient(platform) {
+    const key = String(platform || "pc").toLowerCase();
+    const colors = {
+        pc: ["#1d3b53", "#0d1620"],
+        fc: ["#5a2d1f", "#1a0f0a"],
+        md: ["#233f2b", "#0b160f"],
+        gba: ["#3d2b52", "#140d1d"],
+        nds: ["#3a3f46", "#111418"],
+        psp: ["#243b5a", "#0c1420"],
+        ps1: ["#4b3a23", "#17110a"],
+        ps2: ["#2f3157", "#0e0f1d"],
+        ps3: ["#3c3c3c", "#111111"],
+        switch: ["#5a1f24", "#1b090b"],
+        "3ds": ["#4a2530", "#170b0f"],
+    };
+    const pair = colors[key] || colors.pc;
+    return `linear-gradient(145deg, ${pair[0]}, ${pair[1]})`;
+}
+function LibraryCoverCard(props) {
+    const [imageFailed, setImageFailed] = SP_REACT.useState(false);
+    const coverUrl = imageFailed ? "" : String(props.coverUrl || "").trim();
+    const title = props.title || "未命名游戏";
+    return (SP_JSX.jsxs("div", { style: { width: `${LIBRARY_CARD_WIDTH}px`, display: "flex", flexDirection: "column", gap: "6px" }, children: [SP_JSX.jsxs(DFL.DialogButton, { onClick: props.onPress, disabled: Boolean(props.disabled), style: {
+                    position: "relative",
+                    width: `${LIBRARY_CARD_WIDTH}px`,
+                    height: `${LIBRARY_CARD_HEIGHT}px`,
+                    padding: 0,
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    borderRadius: "0",
+                    overflow: "hidden",
+                    display: "block",
+                    background: libraryCoverGradient(props.platform),
+                    boxShadow: "0 12px 28px rgba(0,0,0,0.36)",
+                }, children: [coverUrl ? (SP_JSX.jsx("img", { src: coverUrl, alt: title, referrerPolicy: "no-referrer", decoding: "async", onError: () => setImageFailed(true), style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" } })) : (SP_JSX.jsx("div", { style: {
+                            position: "absolute",
+                            inset: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: "14px",
+                            textAlign: "center",
+                            fontSize: "14px",
+                            lineHeight: 1.35,
+                            fontWeight: 700,
+                            color: "rgba(242,246,251,0.88)",
+                            textShadow: "0 2px 10px rgba(0,0,0,0.45)",
+                        }, children: title })), props.installed ? (SP_JSX.jsx("div", { style: {
+                            position: "absolute",
+                            top: "7px",
+                            right: "7px",
+                            zIndex: 3,
+                            padding: "2px 6px",
+                            fontSize: "10px",
+                            lineHeight: 1.2,
+                            fontWeight: 700,
+                            color: "#dff7e4",
+                            background: "rgba(20,105,56,0.92)",
+                            border: "1px solid rgba(160,255,190,0.45)",
+                        }, children: "\u5DF2\u5B89\u88C5" })) : null, SP_JSX.jsxs("div", { style: {
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            zIndex: 2,
+                            padding: "28px 9px 9px",
+                            background: "linear-gradient(to top, rgba(8,10,14,0.96), rgba(8,10,14,0.72) 55%, rgba(8,10,14,0))",
+                        }, children: [SP_JSX.jsx("div", { style: {
+                                    fontSize: "12px",
+                                    lineHeight: 1.3,
+                                    fontWeight: 700,
+                                    color: "#f2f6fb",
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                    wordBreak: "break-word",
+                                }, children: title }), SP_JSX.jsxs("div", { style: { marginTop: "3px", fontSize: "10px", lineHeight: 1.25, color: "rgba(220,230,240,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: [String(props.platform || "pc").toUpperCase(), props.meta ? ` · ${props.meta}` : ""] })] }), props.busyLabel ? (SP_JSX.jsx("div", { style: {
+                            position: "absolute",
+                            inset: 0,
+                            zIndex: 4,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "rgba(7,10,14,0.70)",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#fff",
+                        }, children: props.busyLabel })) : null] }), props.actions ? (SP_JSX.jsx(DFL.Focusable, { style: { display: "flex", gap: "4px", width: `${LIBRARY_CARD_WIDTH}px` }, children: props.actions })) : null] }));
+}
 function LibraryPage({ onClose }) {
     const [tab, setTab] = SP_REACT.useState("catalog");
     const [query, setQuery] = SP_REACT.useState("");
@@ -2706,7 +2865,7 @@ function LibraryPage({ onClose }) {
     const catalogRequestRef = SP_REACT.useRef(0);
     const installedRequestRef = SP_REACT.useRef(0);
     const busyRef = SP_REACT.useRef("");
-    const pageSize = 20;
+    const pageSize = 30;
     // 用 ref 做同步锁：state 更新有延迟，快速连点会绕过 busyKey 判断导致重复请求/互相清 busy。
     const beginBusy = SP_REACT.useCallback((key) => {
         if (busyRef.current)
@@ -2920,11 +3079,11 @@ function LibraryPage({ onClose }) {
         if (onClose) {
             try {
                 onClose();
+                return;
             }
             catch {
-                // 忽略关闭回调失败。
+                // onClose 失效时继续走路由返回兜底。
             }
-            return;
         }
         try {
             DFL.Navigation.NavigateBack();
@@ -2970,27 +3129,78 @@ function LibraryPage({ onClose }) {
         }
     }, [onClose]);
     const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
-    return (SP_JSX.jsxs("div", { style: { height: "100%", overflowY: "auto", padding: "0 8px 32px" }, children: [SP_JSX.jsxs("div", { style: {
-                    position: "sticky",
+    return (SP_JSX.jsxs(DFL.Focusable, { noFocusRing: true, onCancel: handleClose, style: {
+            height: "100%",
+            overflowY: "auto",
+            boxSizing: "border-box",
+            // SteamOS Game Mode 的库页无论是 showModal 还是路由都是全屏，
+            // 都会被 Steam 顶栏/底栏覆盖：顶部固定让出状态栏，底部留出 Steam 菜单。
+            padding: "72px 8px 160px",
+            background: "#0e1116",
+            color: "#f2f6fb",
+        }, children: [SP_JSX.jsx("div", { "aria-hidden": "true", style: {
+                    position: "fixed",
                     top: 0,
+                    left: 0,
+                    right: 0,
+                    height: "60px",
+                    background: "#0e1116",
+                    zIndex: 15,
+                    pointerEvents: "none",
+                } }), SP_JSX.jsx("div", { "aria-hidden": "true", style: {
+                    position: "fixed",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: "72px",
+                    background: "#0e1116",
+                    zIndex: 15,
+                    pointerEvents: "none",
+                } }), SP_JSX.jsxs("div", { style: {
+                    position: "sticky",
+                    top: "64px",
                     zIndex: 20,
                     display: "flex",
                     justifyContent: "space-between",
                     gap: "8px",
                     padding: "8px 0",
-                    background: "rgba(14, 17, 22, 0.94)",
+                    background: "#0e1116",
                     backdropFilter: "blur(8px)",
-                }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { padding: "6px 12px" }, children: "\u8FD4\u56DE" }), SP_JSX.jsx(DFL.DialogButton, { onClick: handleSteamLibrary, style: { padding: "6px 12px" }, children: "Steam \u5E93" })] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
+                }, children: [SP_JSX.jsxs(DFL.Focusable, { onCancel: handleClose, style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "78px" }, children: "\u8FD4\u56DE" }), SP_JSX.jsx(DFL.DialogButton, { onClick: handleSteamLibrary, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "92px" }, children: "Steam \u5E93" })] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
                             void loadCatalog(page);
                         else
-                            void loadInstalled(); }, disabled: loadingCatalog || loadingInstalled, style: { padding: "6px 12px" }, children: loadingCatalog || loadingInstalled ? "刷新中..." : "刷新" })] }), SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column" }, children: [SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65 }, children: `原生 UI · v${PLUGIN_UI_BUILD}` })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { padding: "6px 12px" }, children: "\u8FD4\u56DE" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
+                            void loadInstalled(); }, disabled: loadingCatalog || loadingInstalled, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "76px" }, children: loadingCatalog || loadingInstalled ? "刷新中..." : "刷新" })] }), SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column" }, children: [SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65 }, children: `原生 UI · v${PLUGIN_UI_BUILD}` })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { padding: "6px 12px" }, children: "\u8FD4\u56DE" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
                                             void loadCatalog(page);
                                         else
                                             void loadInstalled(); }, disabled: loadingCatalog || loadingInstalled, style: { padding: "6px 12px" }, children: loadingCatalog || loadingInstalled ? "刷新中..." : "刷新" })] })] }) }) }), tab === "catalog" ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u641C\u7D22\u4E0E\u7B5B\u9009", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u641C\u7D22\u6E38\u620F", value: query, onChange: (event) => setQuery(getTextFieldValue(event)), onKeyDown: (event) => {
                                         if (event.key === "Enter") {
                                             submitSearch();
                                         }
-                                    } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: submitSearch, style: { padding: "6px 12px" }, children: "\u641C\u7D22" }), SP_JSX.jsx(DFL.DialogButton, { onClick: resetSearch, style: { padding: "6px 12px" }, children: "\u91CD\u7F6E" })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5E73\u53F0", rgOptions: platformOptions, selectedOption: platform, onChange: (option) => { setPlatform(String(option?.data || "")); setPage(1); } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5206\u7C7B", rgOptions: categoryOptions, selectedOption: category, onChange: (option) => { setCategory(String(option?.data || "")); setPage(1); } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u6392\u5E8F", rgOptions: sortOptions, selectedOption: sort, onChange: (option) => { setSort(String(option?.data || "")); setPage(1); } }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: `游戏列表（${catalog.total}）`, children: [loadingCatalog ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) })) : catalog.items.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u6CA1\u6709\u5339\u914D\u6E38\u620F" }) })) : (catalog.items.map((item) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0, flex: 1 }, children: [SP_JSX.jsx("div", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: item.title || "未命名游戏" }), SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: `${String(item.platform || "pc").toUpperCase()} · ${item.size_text || "-"}${item.categories ? ` · ${item.categories}` : ""}` })] }), SP_JSX.jsx(DFL.Focusable, { style: { flex: "0 0 auto" }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onPrepareInstall(item), disabled: Boolean(busyKey), style: { minWidth: "72px", padding: "6px 12px" }, children: busyKey === item.game_id ? "处理中..." : "安装" }) })] }) }, item.game_id)))), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void loadCatalog(page - 1), disabled: loadingCatalog || page <= 1, style: { padding: "6px 12px" }, children: "\u4E0A\u4E00\u9875" }), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: `${page} / ${totalPages}` }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void loadCatalog(page + 1), disabled: loadingCatalog || page >= totalPages, style: { padding: "6px 12px" }, children: "\u4E0B\u4E00\u9875" })] }) })] })] })) : (SP_JSX.jsxs(DFL.PanelSection, { title: `已安装（${installed.total}）`, children: [loadingInstalled ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) })) : null, installed.items.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u8FD8\u6CA1\u6709\u5DF2\u5B89\u88C5\u6E38\u620F" }) })) : (installed.items.map((item) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0, flex: 1 }, children: [SP_JSX.jsx("div", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: item.title || "未命名游戏" }), SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: `${String(item.platform || "pc").toUpperCase()} · ${item.size_text || "-"}${item.playtime_text ? ` · ${item.playtime_text}` : ""}` }), SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: item.install_path, children: item.install_path || "-" })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px", flex: "0 0 auto" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onLaunchInstalled(item), disabled: Boolean(busyKey), style: { padding: "6px 10px" }, children: "\u542F\u52A8" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onOpenFolder(item), disabled: Boolean(busyKey), style: { padding: "6px 10px" }, children: "\u76EE\u5F55" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstall(item), disabled: Boolean(busyKey), style: { padding: "6px 10px", background: "rgba(255,106,106,0.22)" }, children: "\u5378\u8F7D" })] })] }) }, item.game_id))))] }))] }));
+                                    } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: submitSearch, style: { padding: "6px 12px" }, children: "\u641C\u7D22" }), SP_JSX.jsx(DFL.DialogButton, { onClick: resetSearch, style: { padding: "6px 12px" }, children: "\u91CD\u7F6E" })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5E73\u53F0", rgOptions: platformOptions, selectedOption: platform, onChange: (option) => { setPlatform(String(option?.data || "")); setPage(1); } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5206\u7C7B", rgOptions: categoryOptions, selectedOption: category, onChange: (option) => { setCategory(String(option?.data || "")); setPage(1); } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u6392\u5E8F", rgOptions: sortOptions, selectedOption: sort, onChange: (option) => { setSort(String(option?.data || "")); setPage(1); } }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: `游戏列表（${catalog.total}）`, children: [loadingCatalog ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) })) : catalog.items.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u6CA1\u6709\u5339\u914D\u6E38\u620F" }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Focusable, { style: {
+                                        display: "grid",
+                                        gridTemplateColumns: `repeat(5, ${LIBRARY_CARD_WIDTH}px)`,
+                                        columnGap: "33px",
+                                        rowGap: "37px",
+                                        justifyContent: "center",
+                                        justifyItems: "center",
+                                        width: "100%",
+                                        maxWidth: "806px",
+                                        margin: "0 auto",
+                                        padding: "6px 0 20px",
+                                        overflowX: "auto",
+                                    }, children: catalog.items.map((item) => (SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.size_text || "-", coverUrl: item.cover_portrait_url || item.cover_url, busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), onPress: () => void onPrepareInstall(item) }, item.game_id))) }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void loadCatalog(page - 1), disabled: loadingCatalog || page <= 1, style: { padding: "6px 12px" }, children: "\u4E0A\u4E00\u9875" }), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: `${page} / ${totalPages}` }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void loadCatalog(page + 1), disabled: loadingCatalog || page >= totalPages, style: { padding: "6px 12px" }, children: "\u4E0B\u4E00\u9875" })] }) })] })] })) : (SP_JSX.jsxs(DFL.PanelSection, { title: `已安装（${installed.total}）`, children: [loadingInstalled ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) })) : null, installed.items.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u8FD8\u6CA1\u6709\u5DF2\u5B89\u88C5\u6E38\u620F" }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Focusable, { style: {
+                                display: "grid",
+                                gridTemplateColumns: `repeat(5, ${LIBRARY_CARD_WIDTH}px)`,
+                                columnGap: "33px",
+                                rowGap: "37px",
+                                justifyContent: "center",
+                                justifyItems: "center",
+                                width: "100%",
+                                maxWidth: "806px",
+                                margin: "0 auto",
+                                padding: "6px 0 20px",
+                                overflowX: "auto",
+                            }, children: installed.items.map((item) => (SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.playtime_text ? `${item.size_text || "-"} · ${item.playtime_text}` : (item.size_text || "-"), coverUrl: item.cover_portrait_url || item.cover_url, installed: true, disabled: Boolean(busyKey), onPress: () => void onLaunchInstalled(item), actions: SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onOpenFolder(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "4px 2px", fontSize: "11px" }, children: "\u76EE\u5F55" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstall(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "4px 2px", fontSize: "11px", background: "rgba(255,106,106,0.22)" }, children: "\u5378\u8F7D" })] }) }, item.game_id))) }) }))] }))] }));
 }
 var index = definePlugin(() => {
     routerHook.addRoute(SETTINGS_ROUTE, SettingsPage);

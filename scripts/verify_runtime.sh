@@ -11,6 +11,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
 RUNTIME_DIR="${REPO_ROOT}/defaults/runtime"
 MANIFEST_NAME="runtime-manifest.txt"
 ARCH=""
+RUNNER=""
+SYSROOT=""
 SELF_TEST=0
 TMP_BASE="${TMPDIR:-/tmp}"
 TMP_BASE="${TMP_BASE%/}"
@@ -25,8 +27,11 @@ trap cleanup EXIT INT TERM
 
 usage() {
     cat <<'EOF'
-用法: bash scripts/verify_runtime.sh [--dir <runtime目录>] [--arch <x86_64|aarch64>] [--self-test]
+用法: bash scripts/verify_runtime.sh [--dir <runtime目录>] [--arch <x86_64|aarch64>]
+       [--runner <qemu-aarch64-static>] [--sysroot <路径>] [--self-test]
 默认目录 <repo>/defaults/runtime，架构按 uname -m。
+  --runner     用 qemu 等模拟器执行目标架构二进制（默认直接执行）
+  --sysroot    传给 qemu 的 -L 根目录（如 /usr/aarch64-linux-gnu）
   --self-test  用假二进制自检本脚本的版本一致性校验逻辑（不需要真实运行时）
 EOF
 }
@@ -41,6 +46,16 @@ while [[ $# -gt 0 ]]; do
         --arch)
             [[ $# -ge 2 ]] || { echo "--arch 需要 x86_64|aarch64" >&2; exit 2; }
             ARCH="$2"
+            shift 2
+            ;;
+        --runner)
+            [[ $# -ge 2 ]] || { echo "--runner 需要一个可执行命令" >&2; exit 2; }
+            RUNNER="$2"
+            shift 2
+            ;;
+        --sysroot)
+            [[ $# -ge 2 ]] || { echo "--sysroot 需要一个目录" >&2; exit 2; }
+            SYSROOT="$2"
             shift 2
             ;;
         --self-test)
@@ -100,7 +115,13 @@ check_bin() { # path label args...
         fail=1
         return
     fi
-    if ! "$path" "$@" >"${VERIFY_OUT}" 2>&1; then
+    local -a cmd=("${path}")
+    if [[ -n "${RUNNER}" ]]; then
+        cmd=("${RUNNER}")
+        [[ -n "${SYSROOT}" ]] && cmd+=(-L "${SYSROOT}")
+        cmd+=("${path}")
+    fi
+    if ! "${cmd[@]}" "$@" >"${VERIFY_OUT}" 2>&1; then
         echo "[runtime-fail] ${label} 执行失败: $(head -c 300 "${VERIFY_OUT}")" >&2
         fail=1
         return

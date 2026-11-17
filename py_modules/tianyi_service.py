@@ -84,6 +84,7 @@ from steam_shortcuts import (
 )
 from tianyi_client import (
     TianyiApiError,
+    build_tls_context,
     download_cloud_archive,
     fetch_access_token,
     fetch_download_url,
@@ -93,6 +94,13 @@ from tianyi_client import (
     upload_archive_to_cloud,
 )
 from tianyi_store import TianyiInstalledGame, TianyiStateStore, TianyiTaskRecord
+
+
+def _describe_exception(exc: BaseException) -> str:
+    """异常文本为空（如 TimeoutError）时至少记录类型，避免日志只有冒号。"""
+    name = type(exc).__name__
+    text = str(exc).strip()
+    return f"{name}: {text}" if text else name
 
 
 TASK_RETENTION_SECONDS = 7 * 24 * 3600
@@ -258,6 +266,10 @@ class ArchiveRepairScheduled(RuntimeError):
     """归档校验失败后已安排重新下载，调用方不应把任务标记为已处理。"""
 
 
+class InstallRetryable(RuntimeError):
+    """下载文件仍在收尾：保持任务未处理，稍后自动重试安装。"""
+
+
 def _dir_size_bytes(path: str) -> int:
     """递归统计目录大小（符号链接不跟随），失败时返回已统计部分。"""
     root = str(path or "").strip()
@@ -366,6 +378,7 @@ def _task_to_view(task: TianyiTaskRecord) -> Dict[str, Any]:
         "install_status": task.install_status,
         "install_message": task.install_message,
         "installed_path": task.installed_path,
+        "post_processed": bool(task.post_processed),
         "platform": str(getattr(task, "platform", "pc") or "pc"),
         "updated_at": task.updated_at,
     }
@@ -488,6 +501,7 @@ class TianyiService:
         self._post_process_jobs: Dict[str, asyncio.Task] = {}
         self._post_process_failures: Dict[str, Dict[str, Any]] = {}
         self._legacy_backup_migration_done = False
+        self._steam_restart_pending: Dict[str, Any] = {}
         self._launcher_repair_task: Optional[asyncio.Task] = None
         self._launcher_repair_done = False
         self._baidu_device_lock = asyncio.Lock()
@@ -612,6 +626,8 @@ class TianyiService:
         self._cloud_save_state["last_result"] = dict(self.store.cloud_save_last_result or {})
         self._cloud_save_restore_state["last_result"] = dict(self.store.cloud_save_restore_last_result or {})
         await self._recover_playtime_sessions_from_store()
+        if self._recover_unfinished_install_tasks():
+            await asyncio.to_thread(self.store.save)
 
     async def shutdown(self) -> None:
         """关闭后台资源。"""
@@ -668,20 +684,45 @@ class TianyiService:
                 task for task in list(self.store.tasks)
                 if str(task.status) == "complete" and not bool(task.post_processed)
             ]
+            jobs_before = set(self._post_process_jobs)
+            # 先调度已完成的安装，再同步 aria2：即使 RPC 卡住/超时，
+            # 已下载完的游戏也能立即进入解压入库，不必等 refresh 超时。
+            for task in pending_before:
+                self._maybe_schedule_group_post_process(task)
+            refresh_error = ""
             try:
+                if self._refresh_lock.locked():
+                    # 另一个安装准备/同步正在持锁：不要排队等超时，直接做本地兜底。
+                    tasks = [_task_to_view(task) for task in self.store.tasks]
+                    raise TimeoutError("refresh lock busy")
                 tasks = await asyncio.wait_for(
                     self.refresh_tasks(sync_aria2=True),
                     timeout=MAINTENANCE_SYNC_TIMEOUT_SECONDS,
                 )
             except Exception as exc:
-                config.logger.warning("Maintenance refresh failed: %s", exc)
-                return {"ok": False, "message": str(exc)}
+                # aria2 同步失败/超时不能阻断安装收尾：下载文件可能已经完整，
+                # 只是 RPC 暂时不可用。先做文件大小兜底，再照常调度后处理。
+                refresh_error = _describe_exception(exc)
+                config.logger.warning("Maintenance refresh failed (continue post-process): %s", refresh_error)
+                for task in list(self.store.tasks):
+                    if _is_terminal(task.status):
+                        continue
+                    if self._file_matches_expected_size(task):
+                        task.status = "complete"
+                        task.progress = 100.0
+                        task.speed = 0
+                        task.error_reason = ""
+                        task.updated_at = _now_wall_ts()
+                try:
+                    await asyncio.to_thread(self.store.save)
+                except Exception as save_exc:
+                    config.logger.warning("Maintenance fallback save failed: %s", _describe_exception(save_exc))
+                tasks = [_task_to_view(task) for task in self.store.tasks]
 
             pending = [
                 task for task in list(self.store.tasks)
                 if str(task.status) == "complete" and not bool(task.post_processed)
             ]
-            jobs_before = set(self._post_process_jobs)
             for task in pending:
                 self._maybe_schedule_group_post_process(task)
             scheduled = len(set(self._post_process_jobs) - jobs_before)
@@ -689,14 +730,17 @@ class TianyiService:
             self._maybe_schedule_launcher_repair()
             legacy_backups_migrated = self._migrate_all_legacy_backups()
 
-            return {
-                "ok": True,
+            result = {
+                "ok": not bool(refresh_error),
                 "tasks": len(tasks),
                 "pending_post_process_before": len(pending_before),
                 "pending_post_process": len(pending),
                 "scheduled": scheduled,
                 "legacy_backups_migrated": legacy_backups_migrated,
             }
+            if refresh_error:
+                result["message"] = refresh_error
+            return result
 
     def _normalize_panel_mode(self, context: Optional[Dict[str, Any]] = None) -> tuple[str, bool, bool]:
         """规范化面板轮询模式。"""
@@ -767,7 +811,9 @@ class TianyiService:
             installed_refreshed = False
 
             tasks = cached_tasks
-            if now - float(self._panel_tasks_cache_at or 0.0) >= float(task_window):
+            if self._refresh_lock.locked():
+                tasks = list(self._panel_tasks_cache) if self._panel_tasks_cache else list(cached_tasks)
+            elif now - float(self._panel_tasks_cache_at or 0.0) >= float(task_window):
                 try:
                     tasks = await asyncio.wait_for(
                         self.refresh_tasks(sync_aria2=True, persist=False),
@@ -777,7 +823,7 @@ class TianyiService:
                     self._panel_tasks_cache_at = now
                     tasks_refreshed = True
                 except Exception as exc:
-                    config.logger.warning("Panel tasks refresh fallback to cache: %s", exc)
+                    config.logger.warning("Panel tasks refresh fallback to cache: %s", _describe_exception(exc))
                     tasks = list(self._panel_tasks_cache) if self._panel_tasks_cache else list(cached_tasks)
 
             active_tasks = self._count_active_tasks(tasks)
@@ -878,6 +924,7 @@ class TianyiService:
             },
             "baidu_openapi_login": self._baidu_openapi_payload(),
             "power_diagnostics": power_diagnostics,
+            "steam_restart": dict(self._steam_restart_pending or {"pending": False}),
         }
 
     def get_cloud_login_url(self) -> str:
@@ -6395,6 +6442,38 @@ class TianyiService:
             )
         return True, ""
 
+    def _recover_unfinished_install_tasks(self) -> int:
+        """恢复旧版本留下的“已下载完成但安装失败”任务。
+
+        v0.26.1 及更早版本在安装收尾异常时会把 ``post_processed=True``，
+        但并没有真正完成安装；升级后这些任务会永远不再调度。
+        """
+        installed_games = {
+            str(record.game_id or "").strip()
+            for record in list(self.store.installed_games)
+            if str(record.game_id or "").strip()
+        }
+        recovered = 0
+        for task in list(self.store.tasks):
+            if str(task.status or "") != "complete" or not bool(task.post_processed):
+                continue
+            if str(task.install_status or "pending") not in {"failed", "pending"}:
+                continue
+            game_id = str(task.game_id or "").strip()
+            installed_path = str(task.installed_path or "").strip()
+            if game_id and game_id in installed_games:
+                continue
+            if installed_path and os.path.isdir(installed_path):
+                continue
+            task.post_processed = False
+            task.install_status = "pending"
+            task.install_message = "检测到上次安装未完成，已重新排队"
+            task.updated_at = _now_wall_ts()
+            recovered += 1
+        if recovered:
+            config.logger.info("恢复 %s 个未完成安装任务", recovered)
+        return recovered
+
     def _install_group_members(self, task: TianyiTaskRecord) -> List[TianyiTaskRecord]:
         """同一安装计划（分卷/多包）的全部任务；无分组时只有自己。"""
         group_id = str(getattr(task, "group_id", "") or "").strip()
@@ -7531,6 +7610,17 @@ class TianyiService:
         except Exception:
             steam_root = ""
 
+        shortcut_titles: List[str] = []
+        try:
+            shortcut_info = await asyncio.to_thread(list_all_shortcuts_sync)
+            shortcut_titles = [
+                _redact_text(str(row.get("app_name", "") or ""))[:120]
+                for row in list(shortcut_info.get("rows") or [])[:50]
+                if str(row.get("app_name", "") or "").strip()
+            ]
+        except Exception:
+            shortcut_titles = []
+
         settings: Dict[str, Any] = {}
         for key, value in asdict(self.store.settings).items():
             settings[key] = _redact_text(value) if isinstance(value, str) else value
@@ -7552,6 +7642,7 @@ class TianyiService:
                 "root_exists": bool(steam_root and os.path.isdir(steam_root)),
                 "proton_tool": detect_proton_tool(steam_root),
                 "droiddeck": is_droiddeck(steam_root),
+                "shortcut_titles": shortcut_titles,
             },
             "catalog": {
                 "source": str(getattr(self.catalog, "source", "csv")),
@@ -7563,7 +7654,21 @@ class TianyiService:
                     1 for entry in self.catalog.entries if entry.cover_url or entry.cover_portrait_url
                 ),
             },
-            "tasks": {"counts": task_counts, "total": len(self.store.tasks)},
+            "tasks": {
+                "counts": task_counts,
+                "total": len(self.store.tasks),
+                "recent": [
+                    {
+                        key: (_redact_text(value) if isinstance(value, str) else value)
+                        for key, value in _task_to_view(task).items()
+                    }
+                    for task in sorted(
+                        self.store.tasks,
+                        key=lambda item: int(getattr(item, "updated_at", 0) or 0),
+                        reverse=True,
+                    )[:10]
+                ],
+            },
             "installed": {
                 "total": len(self.store.installed_games),
                 "bytes": installed_bytes,
@@ -7703,7 +7808,19 @@ class TianyiService:
                 rows = shortcut_info.get("rows") if isinstance(shortcut_info, dict) else []
                 count = len(rows or [])
                 if shortcut_info.get("ok"):
-                    add("steam", "Steam 快捷方式", "ok", f"{_redact_text(steam_root)}；{count} 个快捷方式", "")
+                    titles = [
+                        str(row.get("app_name", "") or "").strip()
+                        for row in list(rows or [])[:5]
+                        if str(row.get("app_name", "") or "").strip()
+                    ]
+                    title_text = f"（{'、'.join(_redact_text(title) for title in titles)}）" if titles else ""
+                    add(
+                        "steam",
+                        "Steam 快捷方式",
+                        "ok",
+                        f"{_redact_text(steam_root)}；{count} 个快捷方式{title_text}",
+                        "",
+                    )
                 else:
                     add(
                         "steam",
@@ -7728,7 +7845,8 @@ class TianyiService:
         if include_network:
             try:
                 timeout = aiohttp.ClientTimeout(total=8, connect=5)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
+                connector = aiohttp.TCPConnector(ssl=build_tls_context())
+                async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
                     async with session.get("https://cloud.189.cn/") as response:
                         add(
                             "network_tianyi",
@@ -7738,7 +7856,13 @@ class TianyiService:
                             "检查网络/DNS/代理",
                         )
             except Exception as exc:
-                add("network_tianyi", "天翼云网络", "warn", f"{type(exc).__name__}: {exc}", "检查网络/DNS/代理")
+                add(
+                    "network_tianyi",
+                    "天翼云网络",
+                    "warn",
+                    f"{type(exc).__name__}: {exc}",
+                    "检查网络/DNS/代理；如证书链失败，设置 SSL_CERT_FILE 或 FREEDECKCY_TLS_CA_FILE 指向系统 CA",
+                )
 
             try:
                 qr = await asyncio.wait_for(request_qr(), timeout=12)
@@ -7756,12 +7880,33 @@ class TianyiService:
 
         # 任务/已安装
         failed_tasks = sum(1 for task in self.store.tasks if str(getattr(task, "status", "")).lower() in {"failed", "error"})
+        failed_installs = [
+            task for task in self.store.tasks
+            if str(getattr(task, "status", "") or "") == "complete"
+            and str(getattr(task, "install_status", "") or "") == "failed"
+        ]
+        pending_installs = [
+            task for task in self.store.tasks
+            if str(getattr(task, "status", "") or "") == "complete"
+            and not bool(getattr(task, "post_processed", False))
+        ]
+        task_status = "warn" if (failed_tasks or failed_installs or pending_installs) else "ok"
+        task_detail = (
+            f"{len(self.store.tasks)} 个任务（失败 {failed_tasks}，"
+            f"安装失败 {len(failed_installs)}，待安装 {len(pending_installs)}），"
+            f"{len(self.store.installed_games)} 个已安装"
+        )
+        if failed_installs:
+            task_detail += "；" + "；".join(
+                _redact_text(str(getattr(task, "install_message", "") or ""))[:160]
+                for task in failed_installs[:2]
+            )
         add(
             "tasks",
             "任务与已安装",
-            "warn" if failed_tasks else "ok",
-            f"{len(self.store.tasks)} 个任务（失败 {failed_tasks}），{len(self.store.installed_games)} 个已安装",
-            "查看主页失败任务/日志" if failed_tasks else "",
+            task_status,
+            task_detail,
+            "查看主页任务安装失败原因/日志" if task_status == "warn" else "",
         )
 
         # 日志
@@ -7958,6 +8103,12 @@ class TianyiService:
                     member.updated_at = _now_wall_ts()
                     if not ok:
                         failed += 1
+                        config.logger.warning(
+                            "Install member failed task=%s file=%s: %s",
+                            member.task_id,
+                            member.file_name,
+                            _redact_text(str(message or ""))[:300],
+                        )
 
                 lead = self._group_install_lead(all_members or members)
                 if failed == 0 and not repaired_members:
@@ -7991,6 +8142,12 @@ class TianyiService:
                                 continue
                             member.install_message = f"「{title}」有文件安装失败，已跳过 Steam 注册"
                 finished = True
+                config.logger.info(
+                    "Post-process finished task=%s status=%s message=%s",
+                    lead.task_id,
+                    lead.install_status,
+                    _redact_text(str(lead.install_message or ""))[:300],
+                )
             except asyncio.CancelledError:
                 # 插件卸载/取消时不要把任务标记成已完成，重启后还能继续。
                 cancelled = True
@@ -8029,12 +8186,30 @@ class TianyiService:
             except Exception as exc:
                 config.logger.warning("清理百度转存文件失败 task=%s: %s", member.task_id, exc)
 
+    def _quarantine_stale_aria2_sidecars(self, paths: Sequence[str]) -> bool:
+        """把已完成文件旁残留的 .aria2 控制文件改名隔离，返回是否处理过。"""
+        moved = 0
+        for raw in paths:
+            path = str(raw or "").strip()
+            if not path:
+                continue
+            sidecar = f"{path}.aria2"
+            if not os.path.isfile(sidecar):
+                continue
+            target = f"{sidecar}.stale-{_now_wall_ts()}"
+            try:
+                os.replace(sidecar, target)
+                moved += 1
+            except Exception as exc:
+                config.logger.warning("隔离残留 aria2 控制文件失败 %s: %s", sidecar, exc)
+        return moved > 0
+
     async def _wait_payload_settled(
         self,
         paths: Sequence[str],
         *,
-        timeout_seconds: float = 8.0,
-        poll_seconds: float = 0.25,
+        timeout_seconds: float = 30.0,
+        poll_seconds: float = 0.5,
         stable_required: int = 2,
     ) -> Tuple[bool, str]:
         """等待 aria2 释放控制文件、且文件大小连续两次不变，再开始解压。
@@ -8138,7 +8313,19 @@ class TianyiService:
 
         settled, settle_message = await self._wait_payload_settled(part_paths)
         if not settled:
-            return False, settle_message
+            # 大文件在 SD 卡上可能已经完整，但 aria2 的 .aria2 控制文件
+            # 还没释放；文件大小已匹配时把它隔离，避免用户看到一次假失败。
+            if self._file_matches_expected_size(task):
+                if self._quarantine_stale_aria2_sidecars(part_paths):
+                    settled = True
+                    settled_message_note = "已清理残留的 aria2 控制文件"
+                    config.logger.info(
+                        "清理残留 aria2 控制文件 task=%s: %s",
+                        task.task_id,
+                        settled_message_note,
+                    )
+            if not settled:
+                raise InstallRetryable(settle_message)
 
         task.install_status = "installing"
         task.install_message = "正在安装..."
@@ -8285,7 +8472,17 @@ class TianyiService:
                         installed_record.updated_at = _now_wall_ts()
                         await asyncio.to_thread(self.store.save)
                         self._invalidate_panel_cache(installed=True)
-                message_parts.append(f"已加入 Steam（AppID {app_id}）")
+                self._steam_restart_pending = {
+                    "pending": True,
+                    "game_id": game_id,
+                    "title": game_title,
+                    "app_id": app_id,
+                    "updated_at": _now_wall_ts(),
+                }
+                message_parts.append(
+                    f"已写入 Steam 快捷方式（AppID {app_id}）；"
+                    "Steam 运行中不会立即刷新，请重启 Steam 后在库中查看"
+                )
             else:
                 message_parts.append(str(steam_result.get("message") or "已加入 Steam"))
         else:

@@ -601,3 +601,98 @@ def test_service_initializes_with_corrupt_state(tmp_path, monkeypatch):
     assert stat.S_IMODE(backups[0].stat().st_mode) == 0o600
     assert (state_dir / "state.json").is_file()
     assert stat.S_IMODE((state_dir / "state.json").stat().st_mode) == 0o600
+
+
+def test_maintenance_still_schedules_completed_task_when_refresh_fails(tmp_path, monkeypatch):
+    """aria2 同步超时不能让已完成任务永远卡在“下载完成未安装”。"""
+    from tianyi_store import TianyiStateStore, TianyiTaskRecord
+
+    service = TianyiService.__new__(TianyiService)
+    service.store = TianyiStateStore(str(tmp_path / "state.json"))
+    service._maintenance_lock = asyncio.Lock()
+    service._refresh_lock = asyncio.Lock()
+    service._post_process_jobs = {}
+    service._migrate_all_legacy_backups = lambda: 0
+    service._poll_game_watch = lambda: None
+    service._maybe_schedule_launcher_repair = lambda: None
+    task = TianyiTaskRecord(
+        task_id="done-1",
+        gid="g1",
+        game_id="g1",
+        game_title="Demo",
+        share_code="code",
+        share_id="share",
+        file_id="file",
+        file_name="Demo.zip",
+        speed=0,
+        download_dir=str(tmp_path),
+        local_path=str(tmp_path / "Demo.zip"),
+        status="complete",
+        progress=100.0,
+        post_processed=False,
+    )
+    service.store.upsert_tasks([task])
+    scheduled = []
+
+    async def _timeout(**kwargs):
+        raise asyncio.TimeoutError()
+
+    monkeypatch.setattr(service, "refresh_tasks", _timeout)
+    def _schedule_once(item):
+        if item.task_id not in scheduled:
+            scheduled.append(item.task_id)
+
+    monkeypatch.setattr(service, "_maybe_schedule_group_post_process", _schedule_once)
+
+    result = asyncio.run(service.maintenance_tick())
+
+    assert scheduled == ["done-1"]
+    assert result["ok"] is False
+    assert "TimeoutError" in result["message"]
+
+
+def test_recover_unfinished_install_task_resets_post_processed(tmp_path):
+    """旧版本把失败任务标成 post_processed，升级后必须重新排队安装。"""
+    from tianyi_store import TianyiStateStore, TianyiTaskRecord
+
+    service = TianyiService.__new__(TianyiService)
+    service.store = TianyiStateStore(str(tmp_path / "state.json"))
+    task = TianyiTaskRecord(
+        task_id="stuck-1",
+        gid="g1",
+        game_id="stuck-game",
+        game_title="Stuck",
+        share_code="code",
+        share_id="share",
+        file_id="file",
+        file_name="Stuck.zip",
+        speed=0,
+        download_dir=str(tmp_path),
+        local_path=str(tmp_path / "Stuck.zip"),
+        status="complete",
+        progress=100.0,
+        post_processed=True,
+        install_status="failed",
+        install_message="安装流程异常",
+    )
+    service.store.upsert_tasks([task])
+
+    assert service._recover_unfinished_install_tasks() == 1
+    assert task.post_processed is False
+    assert task.install_status == "pending"
+    assert "重新排队" in task.install_message
+
+
+def test_quarantine_stale_aria2_sidecar(tmp_path):
+    from tianyi_service import TianyiService
+
+    payload = tmp_path / "30XX.zip"
+    payload.write_bytes(b"PK\x03\x04data")
+    sidecar = tmp_path / "30XX.zip.aria2"
+    sidecar.write_bytes(b"stale-control")
+    service = TianyiService.__new__(TianyiService)
+
+    assert service._quarantine_stale_aria2_sidecars([str(payload)]) is True
+    assert payload.is_file()
+    assert not sidecar.exists()
+    assert list(tmp_path.glob("30XX.zip.aria2.stale-*"))

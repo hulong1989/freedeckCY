@@ -133,3 +133,10 @@ def test_installed_game_from_dict_roundtrip_keeps_emulator_fields():
     assert restored.emulator == "azahar"
     assert restored.rom_path == "/games/demo/rom.3ds"
     assert restored.launcher_path == "/games/demo/launch.sh"
+
+
+def test_describe_exception_keeps_empty_timeout_readable():
+    from tianyi_service import _describe_exception
+
+    assert _describe_exception(asyncio.TimeoutError()) == "TimeoutError"
+    assert "boom" in _describe_exception(RuntimeError("boom"))
