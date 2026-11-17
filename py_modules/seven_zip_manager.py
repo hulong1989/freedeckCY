@@ -180,6 +180,7 @@ class SevenZipManager:
         source_paths: Sequence[str],
         working_dir: str = "",
         progress_cb: Optional[Callable[[float], None]] = None,
+        excludes: Optional[Sequence[str]] = None,
     ) -> None:
         """执行压缩流程。"""
         archive = os.path.realpath(os.path.expanduser((archive_path or "").strip()))
@@ -233,6 +234,7 @@ class SevenZipManager:
             "-y",
             archive,
             *rel_sources,
+            *[f"-xr!{pattern}" for pattern in list(excludes or []) if str(pattern).strip()],
             "-bsp1",
         ]
 

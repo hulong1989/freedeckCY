@@ -401,6 +401,16 @@ class Aria2Manager:
                         self._runtime = None
                 if runtime.owned:
                     self._clear_runtime_meta()
+                    proc = runtime.process
+                    if _is_alive(proc):
+                        try:
+                            proc.terminate()  # type: ignore[union-attr]
+                            proc.wait(timeout=2.0)  # type: ignore[union-attr]
+                        except Exception:
+                            try:
+                                proc.kill()  # type: ignore[union-attr]
+                            except Exception:
+                                pass
 
         # 插件重载后：旧进程可能仍然活着，直接复用。
         attached = await self._attach_existing()
@@ -447,6 +457,16 @@ class Aria2Manager:
                 await _sleep_short()
 
         self._release_owner_lock()
+        proc = runtime.process
+        if _is_alive(proc):
+            try:
+                proc.terminate()  # type: ignore[union-attr]
+                proc.wait(timeout=2.0)  # type: ignore[union-attr]
+            except Exception:
+                try:
+                    proc.kill()  # type: ignore[union-attr]
+                except Exception:
+                    pass
         raise Aria2Error(f"下载组件不可用，aria2 启动失败: {last_error}")
 
     async def add_uri(

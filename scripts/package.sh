@@ -274,6 +274,33 @@ if [[ "$PACKAGE_ARCH" != "all" && -d "$PLUGIN_ROOT/defaults/runtime" ]]; then
     log "已裁剪运行时到 ${PACKAGE_ARCH}"
 fi
 
+# 运行时架构自检：有二进制时必须与目标架构一致，避免 ARM 包装进 x86 二进制。
+if command -v file >/dev/null 2>&1; then
+    _verify_arches=()
+    if [[ "$PACKAGE_ARCH" == "all" ]]; then
+        _verify_arches=(x86_64 aarch64)
+    else
+        _verify_arches=("$PACKAGE_ARCH")
+    fi
+    for _arch in "${_verify_arches[@]}"; do
+        case "$_arch" in
+            x86_64) _elf_pattern="x86-64" ;;
+            aarch64) _elf_pattern="aarch64" ;;
+            *) continue ;;
+        esac
+        for _rel in "aria2/aria2c" "7z/7zz" "node/bin/node"; do
+            _bin="$PLUGIN_ROOT/defaults/runtime/${_rel%%/*}/${_arch}/${_rel#*/}"
+            [[ -f "$_bin" ]] || continue
+            if ! file "$_bin" | grep -q "$_elf_pattern"; then
+                die "运行时架构不匹配: ${_bin} 不是 ${_arch}"
+            fi
+        done
+    done
+    log "运行时架构校验通过（${_verify_arches[*]}）"
+else
+    warn "未找到 file 命令，跳过运行时架构校验"
+fi
+
 # ---- 校验暂存内容 -----------------------------------------------------------
 for _f in main.py plugin.json package.json dist/index.js; do
     [[ -f "$PLUGIN_ROOT/$_f" ]] || die "打包暂存目录缺少 ${_f}"
@@ -305,6 +332,7 @@ log "生成 ${OUT_ZIP}"
         '*/.github/*' '.github/*' \
         '*/docs/*' 'docs/*' \
         '*/gl/*' 'gl/*' \
+        '*/dist/*.map' 'dist/*.map' \
         '*/dist-artifacts/*' 'dist-artifacts/*'
 )
 [[ -f "$OUT_ZIP" ]] || die "zip 生成失败: ${OUT_ZIP}"

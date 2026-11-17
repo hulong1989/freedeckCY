@@ -916,3 +916,39 @@ def test_scan_installed_games_adds_missing_steam_shortcut(tmp_path, monkeypatch)
     assert calls and calls[0]["exe_path"].endswith("MyGame.exe")
     assert service.store.installed_games[0].steam_app_id == 12345
     assert result["added_games"][0]["steam_added"] is True
+
+
+def test_tar_extraction_rejects_path_traversal(tmp_path):
+    archive = tmp_path / "evil.tar.gz"
+    payload = tmp_path / "payload.txt"
+    payload.write_text("pwned", encoding="utf-8")
+    import tarfile
+    with tarfile.open(archive, "w:gz") as tf:
+        tf.add(payload, arcname="../../freedeckcy_escape.txt")
+    service = TianyiService.__new__(TianyiService)
+    target = tmp_path / "install" / "Demo"
+    ok, message = service._extract_archive_to_dir(str(archive), str(target))
+    assert ok is False
+    assert "越界" in message or "解压失败" in message
+    assert not (tmp_path / "freedeckcy_escape.txt").exists()
+
+
+def test_tar_extraction_rejects_symlink_members(tmp_path):
+    archive = tmp_path / "linked.tar.gz"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    import tarfile
+    with tarfile.open(archive, "w:gz") as tf:
+        link = tarfile.TarInfo("DemoGame")
+        link.type = tarfile.SYMTYPE
+        link.linkname = str(outside)
+        tf.addfile(link)
+        child = tarfile.TarInfo("DemoGame/save.dat")
+        child.size = 4
+        tf.addfile(child, io.BytesIO(b"data"))
+    service = TianyiService.__new__(TianyiService)
+    target = tmp_path / "install" / "DemoGame"
+    ok, message = service._extract_archive_to_dir(str(archive), str(target))
+    assert ok is False
+    assert "链接" in message or "解压失败" in message
+    assert list(outside.iterdir()) == []

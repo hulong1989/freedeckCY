@@ -651,3 +651,90 @@ def test_ps1_prefers_existing_m3u(tmp_path):
 def test_ps1_single_cue_returns_cue(tmp_path):
     (tmp_path / "game.cue").write_text("x", encoding="utf-8")
     assert emu.find_rom_file(str(tmp_path), "game.cue", "ps1").endswith("game.cue")
+
+
+def test_ps1_nested_disc_directories_sort_naturally(tmp_path):
+    for label in ("Disc 1", "Disc 2", "Disc 10"):
+        disc_dir = tmp_path / label
+        disc_dir.mkdir()
+        (disc_dir / "game.cue").write_text('FILE "game.bin" BINARY\n', encoding="utf-8")
+    found = emu.find_rom_file(str(tmp_path), "Disc 1/game.cue", "ps1")
+    content = Path(found).read_text(encoding="utf-8")
+    assert content.index("Disc 1/game.cue") < content.index("Disc 2/game.cue") < content.index("Disc 10/game.cue")
+
+
+def test_ps1_same_disc_cue_and_chd_not_duplicated(tmp_path):
+    (tmp_path / "Disc 1.cue").write_text('FILE "Disc 1.bin" BINARY\n', encoding="utf-8")
+    (tmp_path / "Disc 1.chd").write_bytes(b"chd")
+    (tmp_path / "Disc 2.cue").write_text('FILE "Disc 2.bin" BINARY\n', encoding="utf-8")
+    found = emu.find_rom_file(str(tmp_path), "Disc 1.cue", "ps1")
+    content = Path(found).read_text(encoding="utf-8")
+    assert "Disc 1.cue" in content
+    assert "Disc 1.chd" not in content
+
+
+def test_copy_tree_missing_preserves_directories_and_skips_existing(tmp_path):
+    from emulator_setup import _copy_tree_missing
+
+    source = tmp_path / "sysdata"
+    (source / "nand" / "data").mkdir(parents=True)
+    (source / "nand" / "data" / "file.bin").write_bytes(b"new")
+    (source / "root.bin").write_bytes(b"new-root")
+    target = tmp_path / "target"
+    (target / "nand" / "data").mkdir(parents=True)
+    (target / "nand" / "data" / "file.bin").write_bytes(b"old")
+    copied = _copy_tree_missing(source, target)
+    assert copied == 1
+    assert (target / "nand" / "data" / "file.bin").read_bytes() == b"old"
+    assert (target / "root.bin").read_bytes() == b"new-root"
+
+
+def test_ps1_flat_directory_groups_games_by_disc_prefix(tmp_path):
+    for name in ("GameA Disc 1.cue", "GameA Disc 2.cue", "GameB Disc 1.cue", "GameB Disc 2.cue"):
+        (tmp_path / name).write_text('FILE "x.bin" BINARY\n', encoding="utf-8")
+    found_a = emu.find_rom_file(str(tmp_path), "GameA Disc 1.cue", "ps1")
+    found_b = emu.find_rom_file(str(tmp_path), "GameB Disc 1.cue", "ps1")
+    assert found_a != found_b
+    content_a = Path(found_a).read_text(encoding="utf-8")
+    content_b = Path(found_b).read_text(encoding="utf-8")
+    assert "GameA Disc 1.cue" in content_a and "GameA Disc 2.cue" in content_a
+    assert "GameB" not in content_a
+    assert "GameB Disc 1.cue" in content_b and "GameB Disc 2.cue" in content_b
+    assert "GameA" not in content_b
+
+
+def test_find_rom_file_strict_rejects_ambiguous_candidates(tmp_path):
+    (tmp_path / "alpha.gba").write_bytes(b"a")
+    (tmp_path / "beta.gba").write_bytes(b"b")
+    assert emu.find_rom_file(str(tmp_path), "missing.zip", "gba", strict=True) == ""
+    assert emu.find_rom_file(str(tmp_path), "missing.zip", "gba", strict=False)
+
+
+def _make_ps1_same_name_dirs(tmp_path):
+    for game in ("GameA", "GameB"):
+        for disc in ("Disc 1", "Disc 2"):
+            folder = tmp_path / game
+            folder.mkdir(exist_ok=True)
+            (folder / f"{disc}.cue").write_text('FILE "x.bin" BINARY\n', encoding="utf-8")
+
+
+def test_ps1_same_disc_names_use_title_to_disambiguate(tmp_path):
+    _make_ps1_same_name_dirs(tmp_path)
+    found = emu.find_rom_file(str(tmp_path), "Disc 1.cue", "ps1", title="GameB")
+    assert "GameB" in found
+    content = Path(found).read_text(encoding="utf-8")
+    assert "GameB/Disc 1.cue" in content or "Disc 1.cue" in content
+    assert "GameA" not in content
+
+
+def test_ps1_same_disc_names_without_title_are_ambiguous(tmp_path):
+    _make_ps1_same_name_dirs(tmp_path)
+    assert emu.find_rom_file(str(tmp_path), "Disc 1.cue", "ps1") == ""
+
+
+def test_ps1_full_openpath_wins_over_same_names(tmp_path):
+    _make_ps1_same_name_dirs(tmp_path)
+    found = emu.find_rom_file(str(tmp_path), "GameA/Disc 1.cue", "ps1")
+    content = Path(found).read_text(encoding="utf-8")
+    assert "GameA" in found
+    assert "GameB" not in content

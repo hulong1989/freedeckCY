@@ -359,25 +359,120 @@ def _install_rpcs3_firmware(root: str, command: Sequence[str], files: Sequence[s
         return [f"PS3 固件安装失败：{exc}"]
 
 
-def _deploy_3ds(files: Sequence[str]) -> List[str]:
+def _copy_tree_missing(source: Path, target: Path) -> int:
+    """把 source 目录内容按相对路径复制到 target；已存在文件不覆盖。"""
+    copied = 0
+    source = Path(source)
+    target = Path(target)
+    if not source.is_dir():
+        return 0
+    for dirpath, _dirnames, filenames in os.walk(source):
+        relative = os.path.relpath(dirpath, source)
+        destination_dir = target if relative == "." else target / relative
+        try:
+            destination_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            config.logger.warning("创建 3DS sysdata 目录失败 %s: %s", destination_dir, exc)
+            continue
+        for name in filenames:
+            source_file = Path(dirpath) / name
+            destination_file = destination_dir / name
+            if destination_file.exists():
+                continue
+            try:
+                shutil.copy2(source_file, destination_file)
+                copied += 1
+            except Exception as exc:
+                config.logger.warning("复制 3DS sysdata 失败 %s -> %s: %s", source_file, destination_file, exc)
+    return copied
+
+
+def _find_sysdata_tree(root: Path) -> Optional[Path]:
+    """在解压目录里找 sysdata 子树（兼容 sysdata/ 或 sysdata.zip 解压后的单层目录）。"""
+    direct = root / "sysdata"
+    if direct.is_dir():
+        return direct
+    try:
+        children = [path for path in root.iterdir() if path.is_dir()]
+    except Exception:
+        return None
+    if len(children) == 1:
+        only = children[0]
+        nested = only / "sysdata"
+        if nested.is_dir():
+            return nested
+        if only.name.lower() == "sysdata":
+            return only
+    return None
+
+
+def _deploy_3ds(files: Sequence[str], *, seven_zip: Any = None) -> List[str]:
+    """部署 3DS system files：保留目录树，且不覆盖用户已有 sysdata。"""
     targets = [
         _AZAHAR_DATA / "sysdata",
         Path.home() / ".local" / "share" / "citra" / "sysdata",
         Path.home() / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar" / "sysdata",
         Path.home() / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar-emu" / "sysdata",
     ]
-    copied = _copy_files(files, targets)
-    source_tree = bios_dir("3ds") / "sysdata"
+    base = bios_dir("3ds")
+    copied = 0
+    deployed_roots: List[Path] = []
+
+    # 1) 已解压的 bios/3ds/sysdata 目录：复制内容（不创建 sysdata/sysdata）。
+    source_tree = base / "sysdata"
     if source_tree.is_dir():
+        deployed_roots.append(source_tree)
+
+    # 2) sysdata.zip/7z：解压到临时目录后找 sysdata 子树，保留完整层级。
+    archive_files = _find_named(str(base), ARCHIVE_SUFFIXES) if base.is_dir() else []
+    if archive_files and seven_zip is not None:
+        temp_root = tempfile.mkdtemp(prefix="freedeckcy_3ds_sysdata_")
+        try:
+            for index, archive in enumerate(archive_files):
+                extract_dir = Path(temp_root) / f"extract_{index}"
+                try:
+                    seven_zip.extract_archive(archive, str(extract_dir))
+                except Exception as exc:
+                    config.logger.warning("解压 3DS sysdata 失败 %s: %s", archive, exc)
+                    continue
+                tree = _find_sysdata_tree(extract_dir) or extract_dir
+                if tree.is_dir():
+                    deployed_roots.append(tree)
+        finally:
+            shutil.rmtree(temp_root, ignore_errors=True)
+
+    for source in deployed_roots:
+        for target in targets:
+            copied += _copy_tree_missing(source, target)
+
+    # 3) 散落的 sysdata 文件（非 sysdata/ 或压缩包）：保持旧兼容，按文件名放根。
+    archive_names = {os.path.realpath(str(path)) for path in archive_files}
+    for raw in list(files or []):
+        path = os.path.realpath(str(raw or ""))
+        if not path or not os.path.isfile(path):
+            continue
+        if path in archive_names:
+            continue
+        if f"{os.sep}_extracted{os.sep}" in path or path.endswith(f"{os.sep}_extracted"):
+            continue
+        if source_tree.is_dir() and (path == str(source_tree) or path.startswith(str(source_tree) + os.sep)):
+            continue
+        if os.path.splitext(path)[1].lower() in ARCHIVE_SUFFIXES:
+            continue
         for target in targets:
             try:
-                shutil.copytree(source_tree, target, dirs_exist_ok=True)
+                target.mkdir(parents=True, exist_ok=True)
+                destination = target / os.path.basename(path)
+                if destination.exists():
+                    continue
+                shutil.copy2(path, destination)
                 copied += 1
             except Exception as exc:
-                config.logger.warning("复制 3DS sysdata 失败 %s: %s", source_tree, exc)
+                config.logger.warning("复制 3DS 文件失败 %s: %s", path, exc)
+
     if copied:
-        return [f"3DS system files 已部署：{copied} 项"]
-    return ["未找到 3DS system files（sysdata 文件/目录放到 bios/3ds/）"]
+        return [f"3DS system files 已部署：{copied} 个文件（保留目录树，未覆盖已有文件）"]
+    return ["未找到 3DS system files（sysdata 文件/目录/zip 放到 bios/3ds/）"]
 
 
 def setup_emulator(
@@ -411,7 +506,7 @@ def setup_emulator(
     elif platform == "ps3":
         messages.extend(_install_rpcs3_firmware(root, command, files))
     elif platform == "3ds":
-        messages.extend(_deploy_3ds(files))
+        messages.extend(_deploy_3ds(files, seven_zip=seven_zip))
     elif platform == "gba":
         messages.extend(_write_mgba_config(root))
     elif platform == "psp":

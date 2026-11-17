@@ -646,7 +646,13 @@ def _resolve_node_binary() -> str:
     """
     env_path = str(os.getenv("FREEDECKCY_NODE_BIN") or "").strip()
     if env_path and os.path.isfile(env_path):
-        return env_path
+        try:
+            if not os.access(env_path, os.X_OK):
+                os.chmod(env_path, 0o755)
+        except Exception:
+            pass
+        if os.access(env_path, os.X_OK):
+            return env_path
 
     root = _plugin_root()
     arch = _runtime_arch()
@@ -658,7 +664,10 @@ def _resolve_node_binary() -> str:
     for candidate in candidates:
         try:
             if candidate.is_file():
-                return str(candidate)
+                if not os.access(str(candidate), os.X_OK):
+                    os.chmod(str(candidate), 0o755)
+                if os.access(str(candidate), os.X_OK):
+                    return str(candidate)
         except Exception:
             continue
 
@@ -685,7 +694,10 @@ def _get_js_share_resolver_path() -> str:
     for candidate in candidates:
         try:
             if candidate.is_file():
-                return str(candidate)
+                if not os.access(str(candidate), os.X_OK):
+                    os.chmod(str(candidate), 0o755)
+                if os.access(str(candidate), os.X_OK):
+                    return str(candidate)
         except Exception:
             continue
     return ""
@@ -1758,7 +1770,10 @@ def _get_js_cloud_upload_path() -> str:
     for candidate in candidates:
         try:
             if candidate.is_file():
-                return str(candidate)
+                if not os.access(str(candidate), os.X_OK):
+                    os.chmod(str(candidate), 0o755)
+                if os.access(str(candidate), os.X_OK):
+                    return str(candidate)
         except Exception:
             continue
     return ""

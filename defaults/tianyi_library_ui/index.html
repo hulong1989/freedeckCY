@@ -191,7 +191,10 @@
 
     <section class="modal-mask" v-if="installDialog.visible">
       <div class="modal-card">
-        <div class="modal-loading" v-if="installDialog.loading">正在读取安装信息...</div>
+        <div class="modal-loading" v-if="installDialog.loading">
+          正在读取安装信息...
+          <button class="toolbar-btn" tabindex="-1" style="margin-top:12px" @click="closeInstallDialog(true)">取消</button>
+        </div>
 
         <template v-else-if="installDialog.plan">
           <div class="install-layout">

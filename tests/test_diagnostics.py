@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict
 from types import SimpleNamespace
 
 from tianyi_service import TianyiService
-from tianyi_store import TianyiSettings, TianyiStateStore
+from tianyi_store import TianyiInstalledGame, TianyiSettings, TianyiStateStore
 
 
 def test_run_diagnostics_returns_checks_without_network(tmp_path, monkeypatch):
@@ -47,3 +48,88 @@ def test_library_time_stats_unmanaged_games_get_no_hltb(tmp_path, monkeypatch):
     assert result["managed"] is False
     assert called == []
     assert result["main_story_hours"] == 0.0
+
+
+def test_update_settings_forwards_cloud_and_proton_flags(tmp_path):
+    service = TianyiService.__new__(TianyiService)
+    service.store = TianyiStateStore(str(tmp_path / "state.json"))
+    service._invalidate_panel_cache = lambda **kwargs: None
+
+    class _Plugin:
+        downloads_dir = str(tmp_path / "downloads")
+
+        async def set_download_dir(self, path):
+            self.downloads_dir = path
+
+    service.plugin = _Plugin()
+    asyncio.run(
+        service.update_settings(
+            download_dir=str(tmp_path / "downloads"),
+            install_dir=str(tmp_path / "installed"),
+            proton_tool="proton_experimental",
+            cloud_save_auto_upload=False,
+            cloud_save_include_emulators=False,
+        )
+    )
+    assert service.store.settings.proton_tool == "proton_experimental"
+    assert service.store.settings.cloud_save_auto_upload is False
+    assert service.store.settings.cloud_save_include_emulators is False
+
+
+def test_update_settings_rejects_empty_directory(tmp_path):
+    service = TianyiService.__new__(TianyiService)
+    service.store = TianyiStateStore(str(tmp_path / "state.json"))
+    service._invalidate_panel_cache = lambda **kwargs: None
+
+    class _Plugin:
+        downloads_dir = ""
+
+        async def set_download_dir(self, path):
+            pass
+
+    service.plugin = _Plugin()
+    try:
+        asyncio.run(service.update_settings(download_dir="   "))
+    except ValueError as exc:
+        assert "不能为空" in str(exc)
+    else:
+        raise AssertionError("empty download_dir must be rejected")
+
+
+def test_installed_game_upsert_preserves_emulator_fields(tmp_path):
+    store = TianyiStateStore(str(tmp_path / "state.json"))
+    store.upsert_installed_game(
+        TianyiInstalledGame(
+            game_id="gba-1",
+            game_title="Demo GBA",
+            install_path=str(tmp_path / "Demo GBA"),
+            source_path=str(tmp_path / "Demo GBA"),
+            platform="gba",
+            emulator="mgba",
+            rom_path="/roms/demo.gba",
+            launcher_path="/roms/launch.sh",
+        )
+    )
+    record = store.installed_games[0]
+    assert record.platform == "gba"
+    assert record.emulator == "mgba"
+    assert record.rom_path == "/roms/demo.gba"
+    assert record.launcher_path == "/roms/launch.sh"
+
+
+def test_installed_game_from_dict_roundtrip_keeps_emulator_fields():
+    record = TianyiInstalledGame(
+        game_id="3ds-1",
+        game_title="Demo 3DS",
+        install_path="/games/demo",
+        source_path="/games/demo",
+        platform="3ds",
+        emulator="azahar",
+        rom_path="/games/demo/rom.3ds",
+        launcher_path="/games/demo/launch.sh",
+    )
+    restored = TianyiInstalledGame.from_dict(asdict(record))
+    assert restored.platform == "3ds"
+    assert restored.emulator == "azahar"
+    assert restored.rom_path == "/games/demo/rom.3ds"
+    assert restored.launcher_path == "/games/demo/launch.sh"

@@ -37,6 +37,15 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
+      - name: Python compile check
+        run: python -m compileall -q main.py py_modules tests
+
+      - name: Shell syntax check
+        run: |
+          for script in scripts/*.sh; do
+            bash -n "$script"
+          done
+
       - name: Run pytest
         # 测试全部离线（conftest 注入假 decky），不依赖 Steam / 网络 / Decky 运行时
         run: python -m pytest -q

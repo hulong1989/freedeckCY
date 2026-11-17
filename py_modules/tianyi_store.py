@@ -220,6 +220,10 @@ class TianyiInstalledGame:
             playtime_last_played_at=max(0, _to_int(data.get("playtime_last_played_at", 0), 0)),
             playtime_active_started_at=max(0, _to_int(data.get("playtime_active_started_at", 0), 0)),
             playtime_active_app_id=max(0, _to_int(data.get("playtime_active_app_id", 0), 0)),
+            platform=str(data.get("platform", "pc") or "pc").strip().lower() or "pc",
+            emulator=str(data.get("emulator", "") or "").strip(),
+            rom_path=str(data.get("rom_path", "") or "").strip(),
+            launcher_path=str(data.get("launcher_path", "") or "").strip(),
             created_at=_to_int(data.get("created_at", _now_ts()), _now_ts()),
             updated_at=_to_int(data.get("updated_at", _now_ts()), _now_ts()),
         )
@@ -252,8 +256,21 @@ class TianyiStateStore:
         with self._lock:
             if not os.path.exists(self._state_file):
                 return
-            with open(self._state_file, "r", encoding="utf-8") as f:
-                raw = json.load(f)
+            try:
+                with open(self._state_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+            except Exception as exc:
+                # 坏状态不阻断插件启动：备份为 0600 后重新开始。
+                backup = f"{self._state_file}.corrupt-{_now_ts()}"
+                try:
+                    os.replace(self._state_file, backup)
+                    _chmod_private(backup)
+                except Exception:
+                    pass
+                print(f"[freedeckCY] state.json 损坏，已备份到 {backup}: {exc}", flush=True)
+                return
+            if not isinstance(raw, dict):
+                return
 
             login_raw = raw.get("login") if isinstance(raw, dict) else {}
             baidu_raw = raw.get("baidu_openapi") if isinstance(raw, dict) else {}
@@ -369,15 +386,20 @@ class TianyiStateStore:
             replace_error: Optional[BaseException] = None
 
             try:
-                with open(tmp_path, "w", encoding="utf-8") as f:
+                # 用 0600 创建临时文件，避免先按 umask 落盘再 chmod 的窗口。
+                fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
                     json.dump(payload, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
                 _chmod_private(tmp_path)
-            except Exception:
-                # 临时文件写入失败时直接回退到目标文件写入。
-                with open(self._state_file, "w", encoding="utf-8") as f:
-                    json.dump(payload, f, ensure_ascii=False, indent=2)
-                _chmod_private(self._state_file)
-                return
+            except Exception as exc:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+                # 不回退为直写目标文件：避免中途崩溃留下截断的 state.json。
+                raise RuntimeError(f"写入状态文件失败: {exc}") from exc
 
             for attempt in range(2):
                 try:
@@ -500,6 +522,10 @@ class TianyiStateStore:
                         0,
                         int(record.playtime_active_app_id or current.playtime_active_app_id or 0),
                     ),
+                    platform=str(record.platform or current.platform or "pc"),
+                    emulator=str(record.emulator or current.emulator or ""),
+                    rom_path=str(record.rom_path or current.rom_path or ""),
+                    launcher_path=str(record.launcher_path or current.launcher_path or ""),
                     created_at=current.created_at or now,
                     updated_at=now,
                 )
@@ -520,6 +546,10 @@ class TianyiStateStore:
                 playtime_last_played_at=max(0, int(record.playtime_last_played_at or 0)),
                 playtime_active_started_at=max(0, int(record.playtime_active_started_at or 0)),
                 playtime_active_app_id=max(0, int(record.playtime_active_app_id or 0)),
+                platform=str(record.platform or "pc"),
+                emulator=str(record.emulator or ""),
+                rom_path=str(record.rom_path or ""),
+                launcher_path=str(record.launcher_path or ""),
                 created_at=now,
                 updated_at=now,
             )

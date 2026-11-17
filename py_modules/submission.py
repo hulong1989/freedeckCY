@@ -188,7 +188,8 @@ def validate_submission(
     platform = normalize_platform(normalized.get("platform", ""))
     share_url = _normalize_share_url(normalized.get("share_url", ""))
     access_code = normalized.get("access_code", "")
-    openpath = normalized.get("openpath", "").replace("\\", "/").lstrip("/")
+    raw_openpath = normalized.get("openpath", "")
+    openpath = raw_openpath.replace("\\", "/").lstrip("/")
 
     if not name:
         errors.append("缺少 name（游戏名称）")
@@ -210,8 +211,12 @@ def validate_submission(
                 warnings.append("未填写 access_code，且链接里没有 pwd，下载时可能需要提取码")
     if not openpath:
         errors.append("缺少 openpath（网盘内游戏文件/目录的相对路径）")
-    elif ".." in openpath.split("/"):
-        errors.append("openpath 不能包含 ..")
+    elif raw_openpath.replace("\\", "/").startswith("/") or ".." in openpath.split("/"):
+        errors.append("openpath 必须是分享内相对路径，不能以 / 开头或包含 ..")
+    for field, label in (("name", "name"), ("english_name", "english_name"), ("categories", "categories"), ("notes", "notes")):
+        value = str(normalized.get(field, "") or "").lstrip()
+        if value.startswith(("=", "+", "@", "\t", "\r")):
+            errors.append(f"{label} 不能以 = + @ 或制表符开头（CSV 公式注入）")
     if normalized.get("executable_name") and platform != "pc":
         warnings.append("executable_name 仅 PC 游戏需要，模拟器游戏可留空")
     filesize = normalized.get("filesize_z", "")
@@ -323,6 +328,13 @@ def _next_game_id(rows: Sequence[Dict[str, str]]) -> str:
     return str(maximum + 1)
 
 
+def _csv_safe(value: str) -> str:
+    text = str(value or "")
+    if text.lstrip().startswith(("=", "+", "@", "\t", "\r")):
+        return "'" + text
+    return text
+
+
 def build_catalog_row(data: Dict[str, Any], game_id: str) -> Dict[str, str]:
     name = _normalize_text(data.get("name"))
     english = _normalize_text(data.get("english_name"))
@@ -340,9 +352,9 @@ def build_catalog_row(data: Dict[str, Any], game_id: str) -> Dict[str, str]:
     row.update(
         {
             "game_id": str(game_id),
-            "title": title,
+            "title": _csv_safe(title),
             "category_parent": _normalize_text(data.get("category_parent")) or "5",
-            "categories": normalize_categories(data.get("categories", ""), platform) or "未分类",
+            "categories": _csv_safe(normalize_categories(data.get("categories", ""), platform) or "未分类"),
             "package_name": "",
             "server": "b" if _share_provider(share_url) == "baidu" else "t",
             "down_url": share_url,

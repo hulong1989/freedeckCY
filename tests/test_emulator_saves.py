@@ -271,4 +271,62 @@ def test_3ds_save_split_by_title_id(tmp_path, monkeypatch):
         SimpleNamespace(platform="3ds", game_title="Game", rom_path=str(rom), install_path="", launcher_path="")
     )
     assert result.per_game is True
-    assert result.paths == [str(title)]
+    assert result.paths == [str(title / "data")]
+
+
+def test_restore_plan_rebuilds_per_game_directory_layer(tmp_path):
+    from tianyi_service import TianyiService
+
+    service = TianyiService.__new__(TianyiService)
+    extract_root = tmp_path / "extract"
+    entry_dir = extract_root / "TITLEID01"
+    entry_dir.mkdir(parents=True)
+    (entry_dir / "data.bin").write_bytes(b"save")
+    target_root = tmp_path / "SAVEDATA"
+    target_root.mkdir()
+    plan = service._build_restore_copy_plan(
+        extract_dir=str(extract_root),
+        entries=[{"entry_id": "e1", "entry_name": "TITLEID01", "archive_rel_path": "TITLEID01"}],
+        selected_entry_ids=["e1"],
+        target_dir=str(target_root),
+    )
+    assert plan["copy_pairs"][0][1] == str(target_root / "TITLEID01" / "data.bin")
+
+
+def test_restore_plan_shared_root_writes_contents_to_root(tmp_path):
+    from tianyi_service import TianyiService
+
+    service = TianyiService.__new__(TianyiService)
+    extract_root = tmp_path / "extract"
+    entry_dir = extract_root / "memcards"
+    entry_dir.mkdir(parents=True)
+    (entry_dir / "card1.mcr").write_bytes(b"save")
+    target_root = tmp_path / "memcards"
+    target_root.mkdir()
+    plan = service._build_restore_copy_plan(
+        extract_dir=str(extract_root),
+        entries=[{"entry_id": "e1", "entry_name": "memcards", "archive_rel_path": "memcards"}],
+        selected_entry_ids=["e1"],
+        target_dir=str(target_root),
+    )
+    assert plan["copy_pairs"][0][1] == str(target_root / "card1.mcr")
+
+
+def test_single_directory_working_dir_is_parent(tmp_path):
+    from tianyi_service import TianyiService
+
+    service = TianyiService.__new__(TianyiService)
+    source = tmp_path / "SAVEDATA" / "TITLEID01"
+    source.mkdir(parents=True)
+    assert service._compute_common_working_dir([str(source)]) == str(source.parent)
+
+
+def test_gba_save_next_to_rom(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    rom = tmp_path / "roms" / "game.gba"
+    rom.parent.mkdir(parents=True)
+    rom.write_bytes(b"rom")
+    (rom.parent / "game.sav").write_bytes(b"save")
+    result = emulator_saves.collect_emulator_save_paths(_record("gba", rom_path=str(rom)))
+    assert result.per_game is True
+    assert str(rom.parent / "game.sav") in result.paths

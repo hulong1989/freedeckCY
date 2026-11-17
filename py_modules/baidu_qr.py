@@ -37,7 +37,8 @@ def _ssl_context():
     try:
         return ssl.create_default_context()
     except Exception:
-        return False
+        # None 表示使用 aiohttp/urllib 默认上下文，而不是静默关闭校验。
+        return None
 
 
 def _parse_jsonish(text: str) -> Dict[str, Any]:
@@ -68,33 +69,50 @@ def _urllib_qr(url: str, params: Dict[str, Any]) -> str:
         with urllib.request.urlopen(request, timeout=15, context=context) as response:
             return response.read().decode("utf-8", "replace")
     except Exception as exc:
-        if context is not False:
-            try:
-                with urllib.request.urlopen(request, timeout=15, context=ssl._create_unverified_context()) as response:
-                    return response.read().decode("utf-8", "replace")
-            except Exception:
-                pass
-        raise exc
+        if not _is_cert_failure(exc):
+            raise
+        try:
+            with urllib.request.urlopen(request, timeout=15, context=ssl._create_unverified_context()) as response:
+                return response.read().decode("utf-8", "replace")
+        except Exception:
+            raise exc
+
+
+def _is_cert_failure(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return (
+        isinstance(exc, ssl.SSLCertVerificationError)
+        or "certificate verify failed" in text
+        or "certificate_verify_failed" in text
+        or "unable to get local issuer" in text
+    )
 
 
 async def request_qr() -> Dict[str, Any]:
     params = {"lp": "pc", "qrloginfrom": "pc"}
     text = ""
     last_error = ""
-    # 1) aiohttp 主路径；证书/连接错误时重试不校验证书。
-    for verify in (True, False):
+    cookies: Dict[str, str] = {}
+    attempts = [True]
+    for verify in attempts:
         try:
-            connector = aiohttp.TCPConnector(ssl=_ssl_context() if verify else False)
             jar = aiohttp.CookieJar(unsafe=True)
-            async with aiohttp.ClientSession(timeout=_timeout(15), cookie_jar=jar, connector=connector) as session:
+            connector = aiohttp.TCPConnector(ssl=_ssl_context() if verify else False)
+            async with aiohttp.ClientSession(timeout=_timeout(10), cookie_jar=jar, connector=connector) as session:
                 async with session.get(QRCODE_URL, params=params, headers=HEADERS) as response:
                     text = await response.text()
                     if response.status == 200 and text.strip():
+                        cookies = {cookie.key: cookie.value for cookie in jar}
                         break
                     last_error = f"HTTP {response.status}: {text[:200]}"
+                    break
         except Exception as exc:
             last_error = f"{type(exc).__name__}: {exc}"
-    # 2) urllib 回退（部分 Decky/SteamOS 环境的 aiohttp TLS 不可用）。
+            # 只在证书链失败时降级；HTTP/连接错误绝不跳过校验。
+            if verify and _is_cert_failure(exc):
+                attempts.append(False)
+                continue
+            break
     if not text.strip():
         try:
             text = await asyncio.to_thread(_urllib_qr, QRCODE_URL, params)
@@ -116,7 +134,7 @@ async def request_qr() -> Dict[str, Any]:
         "sign": sign,
         "imgurl": imgurl,
         "prompt": str(data.get("prompt", "") or ""),
-        "cookies": {},
+        "cookies": cookies,
     }
 
 
@@ -126,18 +144,48 @@ async def fetch_qr_image(imgurl: str) -> bytes:
         return b""
     try:
         connector = aiohttp.TCPConnector(ssl=_ssl_context())
-        async with aiohttp.ClientSession(timeout=_timeout(15), connector=connector) as session:
+        async with aiohttp.ClientSession(timeout=_timeout(12), connector=connector) as session:
             async with session.get(url, headers=HEADERS) as response:
                 if response.status != 200:
                     return b""
                 return await response.read()
-    except Exception:
+    except Exception as exc:
+        if not _is_cert_failure(exc):
+            return b""
         try:
             request = urllib.request.Request(url, headers=HEADERS)
-            with urllib.request.urlopen(request, timeout=15, context=ssl._create_unverified_context()) as response:
+            with urllib.request.urlopen(request, timeout=12, context=ssl._create_unverified_context()) as response:
                 return response.read()
         except Exception:
             return b""
+
+
+def parse_qr_poll_payload(text: str) -> Dict[str, Any]:
+    """解析 unicast 轮询响应（独立出来便于单测）。"""
+    data = _parse_jsonish(text)
+    if not data:
+        return {"status": "error", "error": f"响应不是 JSON: {str(text or '')[:120]}"}
+    try:
+        errno = int(data.get("errno", 0) or 0)
+    except Exception:
+        errno = -1
+    if errno == 1:
+        return {"status": "waiting"}
+    if errno != 0:
+        return {"status": "expired", "error": str(data.get("prompt") or f"errno={errno}")}
+    channel_v = data.get("channel_v")
+    try:
+        payload = json.loads(channel_v) if isinstance(channel_v, str) else (channel_v or {})
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    value = str(payload.get("v", "") or "").strip()
+    if value:
+        return {"status": "confirmed", "v": value}
+    if int(payload.get("status", -1) or 0) == 1:
+        return {"status": "scanned"}
+    return {"status": "waiting"}
 
 
 async def poll_qr(
@@ -146,12 +194,13 @@ async def poll_qr(
     timeout: float = 8.0,
     cookies: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """单次轮询；百度是长轮询，超时视为仍在等待。"""
+    """单次轮询；百度长轮询超时/空 body 视为仍在等待。"""
     params = {"channel_id": str(sign or "").strip(), "tpl": "pp", "tt": str(int(time.time() * 1000))}
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
     text = ""
     last_error = ""
-    for verify in (True, False):
+    attempts = [True]
+    for verify in attempts:
         try:
             jar = aiohttp.CookieJar(unsafe=True)
             if cookies:
@@ -165,44 +214,24 @@ async def poll_qr(
                     if response.status >= 400:
                         last_error = f"HTTP {response.status}"
                         text = ""
-                        continue
-                    if text.strip():
                         break
+                    if not text.strip():
+                        return {"status": "waiting"}
+                    break
         except asyncio.TimeoutError:
             return {"status": "waiting"}
         except Exception as exc:
             last_error = f"{type(exc).__name__}: {exc}"
             if "timeout" in str(exc).lower():
                 return {"status": "waiting"}
+            if verify and _is_cert_failure(exc):
+                attempts.append(False)
+                continue
+            return {"status": "error", "error": last_error[:300]}
     if not text.strip():
         return {"status": "error", "error": (last_error or "empty response")[:300]}
-    if not text.strip():
-        return {"status": "waiting"}
-    try:
-        data = json.loads(text)
-    except Exception:
-        match = re.search(r"\{.*\}", text, re.S)
-        try:
-            data = json.loads(match.group(0)) if match else {}
-        except Exception:
-            data = {}
-    if int(data.get("errno", -1) or 0) == 1:
-        return {"status": "waiting"}
-    if int(data.get("errno", -1) or 0) != 0:
-        return {"status": "waiting"}
-    channel_v = data.get("channel_v")
-    try:
-        payload = json.loads(channel_v) if isinstance(channel_v, str) else (channel_v or {})
-    except Exception:
-        payload = {}
-    if not isinstance(payload, dict):
-        payload = {}
-    v = str(payload.get("v", "") or "").strip()
-    if v:
-        return {"status": "confirmed", "v": v}
-    if int(payload.get("status", -1) or 0) == 1:
-        return {"status": "scanned"}
-    return {"status": "waiting"}
+
+    return parse_qr_poll_payload(text)
 
 
 def _parse_login_payload(text: str) -> Dict[str, Any]:
@@ -239,24 +268,29 @@ async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) ->
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
     text = ""
     last_error = ""
-    for verify in (True, False):
+    attempts = [True]
+    for verify in attempts:
         try:
             jar = aiohttp.CookieJar(unsafe=True)
             if cookies:
                 jar.update_cookies(cookies)
             connector = aiohttp.TCPConnector(ssl=_ssl_context() if verify else False)
             async with aiohttp.ClientSession(
-                timeout=_timeout(20), cookie_jar=jar, connector=connector
+                timeout=_timeout(16), cookie_jar=jar, connector=connector
             ) as session:
                 async with session.get(QR_LOGIN_URL, params=params, headers=headers) as response:
                     text = await response.text()
                     if response.status != 200:
                         last_error = f"HTTP {response.status}: {text[:200]}"
                         text = ""
-                        continue
+                        break
                     break
         except Exception as exc:
             last_error = f"{type(exc).__name__}: {exc}"
+            if verify and _is_cert_failure(exc):
+                attempts.append(False)
+                continue
+            break
     if not text.strip():
         raise BaiduQrError(f"百度登录网络错误: {last_error or 'empty response'}")
     data = _parse_login_payload(text)

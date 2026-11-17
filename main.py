@@ -374,6 +374,8 @@ class Plugin:
             if isinstance(payload, dict):
                 game_id = str(payload.get("game_id", game_id) or "")
                 share_url = str(payload.get("share_url", share_url) or "")
+                if isinstance(payload.get("file_ids"), list):
+                    file_ids = payload.get("file_ids")
             data = await self._get_tianyi_service().prepare_install(
                 game_id=game_id,
                 share_url=share_url,
@@ -389,6 +391,8 @@ class Plugin:
             if isinstance(payload, dict):
                 game_id = str(payload.get("game_id", game_id) or "")
                 share_url = str(payload.get("share_url", share_url) or "")
+                if isinstance(payload.get("file_ids"), list):
+                    file_ids = payload.get("file_ids")
             data = await self._get_tianyi_service().start_install(
                 game_id=game_id,
                 share_url=share_url,
@@ -556,6 +560,10 @@ class Plugin:
             )
             return {"status": "success", "data": data}
         except Exception as exc:
+            try:
+                await self._get_tianyi_service().mark_cloud_save_restore_failed(f"读取存档项失败：{exc}")
+            except Exception:
+                pass
             return {"status": "error", "message": str(exc), "data": {}}
 
     async def plan_tianyi_cloud_save_restore(

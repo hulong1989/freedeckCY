@@ -183,12 +183,15 @@ def _per_game_entries(root: str, stem: str) -> List[str]:
         return []
     for entry in entries:
         name = entry.name.lower()
-        if key in name or name.startswith(key):
-            try:
-                if entry.is_dir() or entry.name.lower().endswith(SAVE_SUFFIXES):
-                    matches.append(entry.path)
-            except Exception:
-                continue
+        stem, suffix = os.path.splitext(name)
+        exact = stem == key or name == key
+        if not exact:
+            continue
+        try:
+            if entry.is_dir() or name.endswith(SAVE_SUFFIXES):
+                matches.append(entry.path)
+        except Exception:
+            continue
     return matches
 
 
@@ -220,20 +223,25 @@ def _read_3ds_title_id(rom_path: str) -> str:
     path = str(rom_path or "").strip()
     if not path or not os.path.isfile(path):
         return ""
-    if os.path.splitext(path)[1].lower() not in {".3ds", ".cci", ".cxi"}:
+    if os.path.splitext(path)[1].lower() not in {".3ds", ".cci", ".cxi", ".app"}:
         return ""
     try:
         with open(path, "rb") as fh:
             fh.seek(0x100)
-            header = fh.read(0x10)
+            header = fh.read(0x20)
     except Exception:
         return ""
-    if len(header) < 0x10 or header[:4] != b"NCSD":
+    if len(header) < 0x20:
         return ""
     try:
-        return f"{int.from_bytes(header[8:16], 'little'):016x}"
+        if header[:4] == b"NCSD":
+            return f"{int.from_bytes(header[8:16], 'little'):016x}"
+        if header[:4] == b"NCCH":
+            # NCCH（.cxi/.app）Program ID 在 0x118（相对 0x100 的 0x18）。
+            return f"{int.from_bytes(header[0x18:0x20], 'little'):016x}"
     except Exception:
         return ""
+    return ""
 
 
 def _split_3ds(roots: Sequence[str], rom_path: str) -> List[str]:
@@ -248,8 +256,12 @@ def _split_3ds(roots: Sequence[str], rom_path: str) -> List[str]:
                 title_dir = os.path.join(dirpath, "title")
                 for high in os.listdir(title_dir) if os.path.isdir(title_dir) else []:
                     candidate = os.path.join(title_dir, high, low)
-                    if os.path.isdir(candidate) and candidate not in matches:
-                        matches.append(candidate)
+                    if os.path.isdir(candidate):
+                        # 只上传 data/，避免把 content/（游戏本体）当存档打包。
+                        data_dir = os.path.join(candidate, "data")
+                        chosen = data_dir if os.path.isdir(data_dir) else candidate
+                        if chosen not in matches:
+                            matches.append(chosen)
     return matches
 
 
@@ -257,7 +269,8 @@ def _split_param_sfo(platform: str, roots: Sequence[str], title: str) -> List[st
     wanted = _norm_title(title)
     if not wanted:
         return []
-    matches: List[str] = []
+    exact: List[str] = []
+    fuzzy: List[str] = []
     for root in roots:
         for directory in _iter_savedata_dirs(platform, root):
             param = find_param_sfo(directory)
@@ -265,10 +278,18 @@ def _split_param_sfo(platform: str, roots: Sequence[str], title: str) -> List[st
                 continue
             meta = read_param_sfo(param)
             current = _norm_title(str(meta.get("TITLE", "") or ""))
-            if current and (current == wanted or wanted in current or current in wanted):
-                if directory not in matches:
-                    matches.append(directory)
-    return matches
+            if not current:
+                continue
+            if current == wanted:
+                if directory not in exact:
+                    exact.append(directory)
+            elif wanted in current or current in wanted:
+                if directory not in fuzzy:
+                    fuzzy.append(directory)
+    # 只有唯一模糊命中才采用，避免“最终幻想”把“最终幻想2/零式”一起打包。
+    if exact:
+        return exact
+    return fuzzy if len(fuzzy) == 1 else []
 
 
 def collect_emulator_save_paths(record: Any) -> EmulatorSaveResult:
@@ -287,6 +308,12 @@ def collect_emulator_save_paths(record: Any) -> EmulatorSaveResult:
                 candidates.append(path)
 
     roots = _portable_roots(record)
+    if platform == "gba":
+        # mGBA 默认把 .sav 放在 ROM 同目录（不是 saves/ 子目录）。
+        for root in roots:
+            path = _normalize_existing(root)
+            if path and path not in candidates and _has_entries(path):
+                candidates.append(path)
     for root in roots:
         for sub in PORTABLE_SUBDIRS.get(platform, ()):
             path = _normalize_existing(os.path.join(root, sub))
@@ -331,6 +358,11 @@ def restore_roots(record: Any) -> List[str]:
         path = os.path.realpath(os.path.expanduser(raw))
         if path and path not in roots:
             roots.append(path)
+    if platform == "gba":
+        for root in _portable_roots(record):
+            path = os.path.realpath(os.path.expanduser(root))
+            if path and path not in roots:
+                roots.append(path)
     for root in _portable_roots(record):
         for sub in PORTABLE_SUBDIRS.get(platform, ()):
             path = os.path.realpath(os.path.join(root, sub))

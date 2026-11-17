@@ -2,6 +2,37 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.0
+
+### 安全与稳定性
+
+- **tar 解压安全**：拒绝绝对路径、`..`、符号链接/硬链接/设备文件；staging 全树复查，合并阶段拒绝 symlink，修复归档路径穿越与用户文件被移动。
+- **运行时升级**：7-Zip 23.01 → 26.06（CVE-2024-11477 影响面）、Node 20.18.1 → 24.22.3 LTS；aria2/7z/node 全部二进制固定 SHA256，下载/已存在跳过时都校验；GitHub 下载 HTTP/2 失败回退 HTTP/1.1。
+- **凭据与日志**：`/tmp/freedeckcy.log` 固定 0600；HTTP/OpenAPI 诊断递归脱敏；state.json 改为 0600 临时文件 + fsync + 原子替换，损坏文件备份后重建。
+- **本地 API/校验**：目录 `openpath` 校验、CSV 公式注入校验；submission 同步；扫描 ROM 路径禁止越界。
+- **诊断**：新增 QAM 设置「诊断」页（自检 + 导出诊断包），含目录/运行时/Steam/SD/网络/百度扫码/任务/日志；诊断包含 `self-check.json`。
+
+### 安装 / 任务 / 云存档
+
+- 修复设置页 `tabs` 漏依赖导致百度扫码/AppKey 输入冻结；扫码超时、TLS 证书回退、BAIDUID Cookie、轮询状态解析和过期提示。
+- 修复模拟器记录持久化丢失 `platform/emulator/rom_path/launcher_path`。
+- 修复 `proton_tool/cloud_save_*` 设置不生效、空目录被 realpath 成 CWD。
+- 任务刷新/创建串行化，重复安装复用活动任务，多文件失败回滚 aria2，aria2 重建前终止旧进程。
+- 恢复保留 PSP/PS3/3DS 目录层；备份移出存档树、排除旧备份、保留最近 10 份；源缺失/计划失败不再假成功或卡 running。
+- 卸载与安装收尾共用安装锁。
+
+### 模拟器 / PS1 / 3DS
+
+- `find_rom_file` 支持 `strict` 与标题；PS1 按目录/游戏名分组，openpath 完整路径与标题唯一匹配，仍歧义则明确失败，不再注册错游戏。
+- PS1 平铺多游戏独立 m3u、cue/chd 去重、嵌套碟目录自然排序。
+- GBA 支持 ROM 同目录 `.sav`；3DS sysdata 保留目录树且不覆盖；`.cia` 不再当直接 ROM；NCCH title id；只上传 3DS `data/`。
+- 模拟器下载 `.part` 原子落盘。
+
+### 工程化
+
+- 打包校验运行时 ELF 架构、排除 `dist/*.map`；CI 增加 Python 编译与 shell 语法检查。
+- 测试 354 → 377。
+
 ## v0.25.0
 
 ### 修复

@@ -47,7 +47,8 @@ class BaiduOpenApiError(RuntimeError):
 
     def __init__(self, message: str, *, diagnostics: Optional[Dict[str, Any]] = None):
         super().__init__(message)
-        self.diagnostics = diagnostics or {}
+        # 所有异常出口统一脱敏，避免 access_token/client_secret 进入日志/面板。
+        self.diagnostics = _sanitize_diagnostics(diagnostics or {})
 
 
 def _mask_secret(raw: str, *, head: int = 4, tail: int = 4) -> str:

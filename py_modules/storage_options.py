@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 from typing import Any, Dict, List, Optional, Sequence
 
 _MOUNT_PREFIXES = (
@@ -54,6 +55,23 @@ def _read_mounts() -> str:
         return ""
 
 
+def _probe_writable(path: str) -> bool:
+    """实际创建临时文件验证可写（os.access 在 root/FUSE 下不可靠）。"""
+    probe = ""
+    try:
+        fd, probe = tempfile.mkstemp(prefix=".freedeckcy-write-", dir=path)
+        os.close(fd)
+        os.remove(probe)
+        return True
+    except Exception:
+        if probe:
+            try:
+                os.remove(probe)
+            except Exception:
+                pass
+        return False
+
+
 def _human_size(value: int) -> str:
     size = float(max(0, value))
     for unit in ("B", "KB", "MB", "GB", "TB"):
@@ -90,7 +108,10 @@ def detect_storage_options(
         real = os.path.realpath(mount)
         if real in seen or real in _SKIP_MOUNTS:
             continue
-        if not os.path.isdir(real) or not os.access(real, os.W_OK):
+        # /storage/emulated/* 与 /sdcard 是 Android 内部共享存储，不是 SD 卡。
+        if real.startswith("/storage/emulated/") or real == "/sdcard":
+            continue
+        if not os.path.isdir(real) or not _probe_writable(real):
             continue
         try:
             usage = usage_func(real)

@@ -16,6 +16,7 @@ import shutil
 import sqlite3
 import ssl
 import subprocess
+import tarfile
 import tempfile
 import time
 import uuid
@@ -402,7 +403,7 @@ def _tail_text(path: str, limit: int = 200) -> str:
 
 
 _REDACT_PATTERN = re.compile(
-    r"(?i)\b(cookie|authorization|token|sessionkey|accesstoken|uid|pwd)\b(\s*[=:]\s*)([^\s;，,]+)"
+    r"(?i)\b(cookie|authorization|token|access_token|refresh_token|sessionkey|accesstoken|client_secret|secret|uid|pwd|randsk|bduss|stoken|ptoken|bdstoken|sign)\b(\s*[=:]\s*)([^\s;，,]+)"
 )
 
 
@@ -480,6 +481,7 @@ class TianyiService:
         self.aria2 = Aria2Manager(plugin_dir=plugin_dir, work_dir=os.path.join(state_dir, "aria2"))
         self.seven_zip = SevenZipManager(plugin_dir=plugin_dir)
         self._lock = asyncio.Lock()
+        self._refresh_lock = asyncio.Lock()
         self._post_process_jobs: Dict[str, asyncio.Task] = {}
         self._launcher_repair_task: Optional[asyncio.Task] = None
         self._launcher_repair_done = False
@@ -934,7 +936,7 @@ class TianyiService:
             config.logger.info("Baidu QR ready sign_len=%s", len(str(qr.get("sign", ""))))
             raw = b""
             try:
-                raw = await asyncio.wait_for(fetch_qr_image(str(qr.get("imgurl", "") or "")), timeout=10)
+                raw = await asyncio.wait_for(fetch_qr_image(str(qr.get("imgurl", "") or "")), timeout=6)
             except Exception as exc:
                 config.logger.warning("下载百度二维码图片失败: %s", exc)
             qr_data_url = ""
@@ -973,6 +975,9 @@ class TianyiService:
                 return {"stage": "scanned", "message": "已扫码，请在手机上确认登录", **self._baidu_web_login_payload()}
             if stage == "error":
                 return {"stage": "failed", "message": f"扫码轮询失败：{result.get('error', '')}", **self._baidu_web_login_payload()}
+            if stage == "expired":
+                self._baidu_qr_session = {}
+                return {"stage": "expired", "message": "二维码已失效，请重新获取", **self._baidu_web_login_payload()}
             if stage != "confirmed":
                 return {"stage": "waiting", "message": "等待手机扫码…", **self._baidu_web_login_payload()}
             try:
@@ -3238,6 +3243,19 @@ class TianyiService:
             "updated_at": _now_wall_ts(),
         }
 
+    async def mark_cloud_save_restore_failed(self, message: str) -> None:
+        """RPC 异常兜底：把恢复状态从 running 复位为 failed。"""
+        try:
+            await self._set_cloud_save_restore_state(
+                stage="failed",
+                running=False,
+                progress=100.0,
+                message=str(message or "云存档恢复失败")[:500],
+                reason="rpc_failed",
+            )
+        except Exception:
+            pass
+
     async def list_cloud_save_restore_entries(
         self,
         *,
@@ -3277,11 +3295,21 @@ class TianyiService:
             diagnostics={},
         )
 
-        bundle = await self._download_and_extract_cloud_restore_version(
-            cookie=cookie,
-            game_key=normalized_game_key,
-            version_name=normalized_version,
-        )
+        try:
+            bundle = await self._download_and_extract_cloud_restore_version(
+                cookie=cookie,
+                game_key=normalized_game_key,
+                version_name=normalized_version,
+            )
+        except Exception as exc:
+            await self._set_cloud_save_restore_state(
+                stage="failed",
+                running=False,
+                progress=100.0,
+                message=f"读取存档项失败：{exc}",
+                reason="entries_failed",
+            )
+            raise
         try:
             extract_dir = str(bundle.get("extract_dir", "") or "")
             entries = [dict(item) for item in list(bundle.get("entries") or []) if isinstance(item, dict)]
@@ -3481,11 +3509,21 @@ class TianyiService:
             diagnostics={},
         )
 
-        bundle = await self._download_and_extract_cloud_restore_version(
-            cookie=cookie,
-            game_key=normalized_game_key,
-            version_name=normalized_version,
-        )
+        try:
+            bundle = await self._download_and_extract_cloud_restore_version(
+                cookie=cookie,
+                game_key=normalized_game_key,
+                version_name=normalized_version,
+            )
+        except Exception as exc:
+            await self._set_cloud_save_restore_state(
+                stage="failed",
+                running=False,
+                progress=100.0,
+                message=f"生成恢复计划失败：{exc}",
+                reason="plan_failed",
+            )
+            raise
 
         temp_dir = str(bundle.get("temp_dir", "") or "")
         extract_dir = str(bundle.get("extract_dir", "") or "")
@@ -3498,17 +3536,27 @@ class TianyiService:
             selected_ids = list(available_entry_ids)
 
         if str(manifest.get("source_strategy", "") or "").strip() == "emulator_saves":
-            return await self._plan_emulator_save_restore(
-                bundle=bundle,
-                manifest=manifest,
-                entries=entries,
-                selected_ids=selected_ids,
-                game_id=normalized_game_id,
-                game_key=normalized_game_key,
-                game_title=normalized_game_title,
-                version_name=normalized_version,
-                manifest_playtime=manifest_playtime,
-            )
+            try:
+                return await self._plan_emulator_save_restore(
+                    bundle=bundle,
+                    manifest=manifest,
+                    entries=entries,
+                    selected_ids=selected_ids,
+                    game_id=normalized_game_id,
+                    game_key=normalized_game_key,
+                    game_title=normalized_game_title,
+                    version_name=normalized_version,
+                    manifest_playtime=manifest_playtime,
+                )
+            except Exception as exc:
+                await self._set_cloud_save_restore_state(
+                    stage="failed",
+                    running=False,
+                    progress=100.0,
+                    message=f"模拟器存档恢复计划失败：{exc}",
+                    reason="plan_failed",
+                )
+                raise
 
         entry_target_dirs: Dict[str, str] = {}
         compat_user_dir = self._resolve_current_compat_user_dir(normalized_game_id)
@@ -3731,7 +3779,8 @@ class TianyiService:
         target_dir = str(plan.get("target_dir", "") or "")
         restored_files = 0
         backed_up_files = 0
-        backup_suffix = f".freedeckcy-bak-{time.strftime('%Y%m%d_%H%M%S')}"
+        backup_suffix = f"cloud-save-{time.strftime('%Y%m%d_%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        backup_root = os.path.join(str(config.DECKY_SEND_DIR), "backups", backup_suffix)
         results: List[Dict[str, Any]] = []
         exception_text = ""
 
@@ -3748,26 +3797,31 @@ class TianyiService:
 
         try:
             total_files = len(copy_pairs)
+            failed_files = 0
             for index, (src, dst) in enumerate(copy_pairs, start=1):
                 src_file = os.path.realpath(os.path.expanduser(str(src or "").strip()))
                 dst_file = os.path.realpath(os.path.expanduser(str(dst or "").strip()))
                 if not src_file or not os.path.isfile(src_file):
+                    failed_files += 1
                     continue
                 parent = os.path.dirname(dst_file)
                 os.makedirs(parent, exist_ok=True)
-                # 覆盖前先就地备份（同目录、带时间戳后缀），恢复失败还能手工找回。
-                if os.path.isdir(dst_file):
-                    backup_path = dst_file.rstrip("/\\") + backup_suffix
-                    if os.path.exists(backup_path):
-                        shutil.rmtree(backup_path, ignore_errors=True)
-                    os.replace(dst_file, backup_path)
-                    backed_up_files += 1
-                elif os.path.exists(dst_file):
-                    backup_path = dst_file + backup_suffix
-                    if os.path.exists(backup_path):
-                        os.remove(backup_path)
-                    os.replace(dst_file, backup_path)
-                    backed_up_files += 1
+                # 覆盖前备份到独立目录（不放在存档树里，避免被下次云上传打包）。
+                if os.path.isdir(dst_file) or os.path.exists(dst_file):
+                    try:
+                        os.makedirs(backup_root, exist_ok=True)
+                        digest = hashlib.sha1(dst_file.encode("utf-8", "replace")).hexdigest()[:12]
+                        backup_path = os.path.join(backup_root, f"{digest}_{os.path.basename(dst_file.rstrip('/\\'))}")
+                        if os.path.exists(backup_path):
+                            if os.path.isdir(backup_path):
+                                shutil.rmtree(backup_path, ignore_errors=True)
+                            else:
+                                os.remove(backup_path)
+                        # 存档可能在 SD 卡，备份目录在 HOME：move 支持跨文件系统。
+                        shutil.move(dst_file, backup_path)
+                        backed_up_files += 1
+                    except Exception as exc:
+                        raise RuntimeError(f"备份原存档失败：{exc}") from exc
                 shutil.copy2(src_file, dst_file)
                 restored_files += 1
                 progress = 100.0 if total_files <= 0 else (float(index) / float(total_files)) * 100.0
@@ -3777,6 +3831,11 @@ class TianyiService:
                     progress=progress,
                     message=f"正在恢复文件 {index}/{total_files}",
                     restored_files=restored_files,
+                )
+
+            if failed_files > 0:
+                raise RuntimeError(
+                    f"存档源文件缺失/不可读 {failed_files}/{total_files}，已恢复 {restored_files} 个，未上报成功"
                 )
 
             for item in plan_items:
@@ -3791,6 +3850,8 @@ class TianyiService:
                     }
                 )
 
+            if backed_up_files:
+                self._prune_cloud_save_backups()
             manifest_playtime = dict(plan.get("manifest_playtime") or {})
             playtime_merge: Dict[str, Any] = {}
             try:
@@ -3823,12 +3884,14 @@ class TianyiService:
                 "restored_files": restored_files,
                 "backed_up_files": backed_up_files,
                 "backup_suffix": backup_suffix if backed_up_files else "",
+                "backup_dir": backup_root if backed_up_files else "",
                 "restored_entries": len(plan_items),
                 "conflicts_overwritten": max(0, _safe_int(plan.get("conflict_count"), 0)),
                 "results": results,
                 "diagnostics": {
                     "requires_confirmation": requires_confirmation,
                     "backup_suffix": backup_suffix,
+                    "backup_dir": backup_root if backed_up_files else "",
                     "backed_up_files": backed_up_files,
                     "conflict_samples": list(plan.get("conflict_samples") or []),
                     "entry_target_dirs": dict(plan.get("entry_target_dirs") or {}),
@@ -4070,6 +4133,23 @@ class TianyiService:
             )
         )
         return games
+
+    @staticmethod
+    def _prune_cloud_save_backups(keep: int = 10) -> None:
+        """保留最近 N 份云存档恢复备份，避免备份目录无限增长。"""
+        root = Path(config.DECKY_SEND_DIR) / "backups"
+        try:
+            if not root.is_dir():
+                return
+            dirs = sorted(
+                [item for item in root.iterdir() if item.is_dir()],
+                key=lambda item: item.stat().st_mtime,
+                reverse=True,
+            )
+            for old in dirs[max(1, int(keep)):]:
+                shutil.rmtree(old, ignore_errors=True)
+        except Exception as exc:
+            config.logger.warning("清理云存档备份失败: %s", exc)
 
     def _normalize_cloud_restore_entries(self, *, manifest: Dict[str, Any], extract_dir: str) -> List[Dict[str, Any]]:
         """从 manifest 或归档目录生成可选存档项。"""
@@ -4849,14 +4929,22 @@ class TianyiService:
                 dest = os.path.join(entry_target_root, os.path.basename(entry_root))
                 pairs_for_entry.append((entry_root, dest))
             else:
+                # 目录型存档：按游戏拆分的目录（SAVEDATA/<TITLEID>、title/<hi>/<lo>）
+                # 需要恢复出 entry_name 这一层；共享根（memcards）则直接回填内容。
+                target_basename = os.path.basename(os.path.normpath(entry_target_root))
+                restore_root = entry_target_root
+                if entry_name and entry_name != target_basename:
+                    restore_root = os.path.realpath(os.path.join(entry_target_root, entry_name))
+                if not _is_within_dir(restore_root, entry_target_root):
+                    continue
                 for dirpath, _dirnames, filenames in os.walk(entry_root):
                     for filename in filenames:
                         if filename == "manifest.json":
                             continue
                         src_file = os.path.join(dirpath, filename)
                         rel_file = os.path.relpath(src_file, entry_root)
-                        dst_file = os.path.realpath(os.path.join(entry_target_root, rel_file))
-                        if not _is_within_dir(dst_file, entry_target_root):
+                        dst_file = os.path.realpath(os.path.join(restore_root, rel_file))
+                        if not _is_within_dir(dst_file, restore_root):
                             continue
                         pairs_for_entry.append((src_file, dst_file))
 
@@ -4897,6 +4985,11 @@ class TianyiService:
         ]
         if not normalized:
             raise ValueError("缺少待打包路径")
+        # 单个目录存档：以父目录为工作目录，归档内保留目录名（PSP/PS3/3DS 恢复需要）。
+        if len(normalized) == 1 and os.path.isdir(normalized[0]):
+            parent = os.path.dirname(normalized[0])
+            if parent and os.path.isdir(parent):
+                return parent
 
         try:
             common = os.path.commonpath(normalized)
@@ -5073,6 +5166,7 @@ class TianyiService:
                 archive_path,
                 source_paths,
                 working_dir,
+                excludes=["*.freedeckcy-bak-*"],
             )
 
             entry_items: List[Dict[str, Any]] = []
@@ -5475,7 +5569,30 @@ class TianyiService:
         delete_files: bool = True,
         delete_compatdata: bool = False,
     ) -> Dict[str, Any]:
-        """卸载已安装游戏（删除文件并移除记录），可选回收 Proton 前缀。"""
+        """卸载已安装游戏；与同目录的安装收尾串行，避免解压/注册竞态。"""
+        record = self._find_installed_record(
+            game_id=str(game_id or "").strip(),
+            install_path=str(install_path or "").strip(),
+        )
+        if record is None:
+            raise ValueError("未找到已安装游戏记录")
+        async with self._install_lock_for(str(record.install_path or "")):
+            return await self._uninstall_installed_game_impl(
+                game_id=game_id,
+                install_path=install_path,
+                delete_files=delete_files,
+                delete_compatdata=delete_compatdata,
+            )
+
+    async def _uninstall_installed_game_impl(
+        self,
+        *,
+        game_id: str = "",
+        install_path: str = "",
+        delete_files: bool = True,
+        delete_compatdata: bool = False,
+    ) -> Dict[str, Any]:
+        """卸载实现（调用方需持有安装目录锁）。"""
         target_game_id = str(game_id or "").strip()
         target_install_path = str(install_path or "").strip()
         if not target_game_id and not target_install_path:
@@ -5619,7 +5736,10 @@ class TianyiService:
     ) -> Dict[str, Any]:
         """更新下载设置。"""
         if download_dir is not None:
-            path = os.path.realpath(os.path.expanduser(str(download_dir).strip()))
+            raw = str(download_dir).strip()
+            if not raw:
+                raise ValueError("下载目录不能为空")
+            path = os.path.realpath(os.path.expanduser(raw))
             if not path:
                 raise ValueError("下载目录无效")
             os.makedirs(path, exist_ok=True)
@@ -5628,7 +5748,10 @@ class TianyiService:
             self.plugin.downloads_dir = path
             await self.plugin.set_download_dir(path)
         if install_dir is not None:
-            path = os.path.realpath(os.path.expanduser(str(install_dir).strip()))
+            raw = str(install_dir).strip()
+            if not raw:
+                raise ValueError("安装目录不能为空")
+            path = os.path.realpath(os.path.expanduser(raw))
             if not path:
                 raise ValueError("安装目录无效")
             os.makedirs(path, exist_ok=True)
@@ -5641,6 +5764,9 @@ class TianyiService:
             page_size=page_size,
             auto_delete_package=auto_delete_package,
             auto_install=True,
+            proton_tool=proton_tool,
+            cloud_save_auto_upload=cloud_save_auto_upload,
+            cloud_save_include_emulators=cloud_save_include_emulators,
         )
         self._invalidate_panel_cache(all_data=True)
         return asdict(self.store.settings)
@@ -5689,9 +5815,25 @@ class TianyiService:
             split = int(split_count or settings.split_count or 16)
             split = max(1, min(64, split))
 
-            created = await self._create_tasks_from_plan(plan=plan, split=split)
-            self.store.upsert_tasks(created)
-            self._invalidate_panel_cache(tasks=True)
+            plan_game_id = str(plan.get("game_id", "") or game_id or "").strip()
+            if plan_game_id:
+                active_existing = [
+                    task for task in list(self.store.tasks)
+                    if str(task.game_id or "").strip() == plan_game_id
+                    and not _is_terminal(task.status)
+                ]
+                if active_existing:
+                    # 双击/双入口重复安装：复用正在下载的任务，避免两个 aria2 写同一文件。
+                    return {
+                        "plan": plan,
+                        "tasks": [_task_to_view(task) for task in active_existing],
+                        "reused": True,
+                    }
+
+            async with self._refresh_lock:
+                created = await self._create_tasks_from_plan(plan=plan, split=split)
+                self.store.upsert_tasks(created)
+                self._invalidate_panel_cache(tasks=True)
             await self.refresh_tasks(sync_aria2=True)
 
             created_ids = {task.task_id for task in created}
@@ -5783,7 +5925,7 @@ class TianyiService:
             )
         emulator_info: Dict[str, Any] = {}
         if emulator:
-            emulator_info = emulator_status(platform, self.plugin_dir)
+            emulator_info = await asyncio.to_thread(emulator_status, platform, self.plugin_dir)
             if not emulator_info.get("available"):
                 raise ValueError(str(emulator_info.get("message") or "mGBA 不可用"))
 
@@ -6014,75 +6156,84 @@ class TianyiService:
         group_total = len(plan_files)
 
         created: List[TianyiTaskRecord] = []
-        for file_item in plan_files:
-            file_id = str(file_item.get("file_id", "")).strip()
-            name = str(file_item.get("name", "")).strip() or f"file-{file_id}"
-            file_size = max(0, _safe_int(file_item.get("size"), 0))
+        try:
+            for file_item in plan_files:
+                file_id = str(file_item.get("file_id", "")).strip()
+                name = str(file_item.get("name", "")).strip() or f"file-{file_id}"
+                file_size = max(0, _safe_int(file_item.get("size"), 0))
 
-            if provider == "baidu":
-                direct_url = await self._fetch_baidu_web_direct_url(share_ctx, file_id)
-                gid = await self.aria2.add_uri(
-                    direct_url=direct_url,
-                    cookie=str(self.store.baidu_login.cookie or "").strip(),
-                    download_dir=target_dir,
-                    out_name=name,
-                    split=split,
-                    referer="https://pan.baidu.com/disk/home",
-                    user_agent="pan.baidu.com",
+                if provider == "baidu":
+                    direct_url = await self._fetch_baidu_web_direct_url(share_ctx, file_id)
+                    gid = await self.aria2.add_uri(
+                        direct_url=direct_url,
+                        cookie=str(self.store.baidu_login.cookie or "").strip(),
+                        download_dir=target_dir,
+                        out_name=name,
+                        split=split,
+                        referer="https://pan.baidu.com/disk/home",
+                        user_agent="pan.baidu.com",
+                    )
+                elif provider == "baidu_openapi":
+                    direct_url = await self._fetch_baidu_direct_url(share_ctx, file_id)
+                    gid = await self.aria2.add_uri(
+                        direct_url=direct_url,
+                        cookie="",
+                        download_dir=target_dir,
+                        out_name=name,
+                        split=split,
+                        referer="https://pan.baidu.com/disk/home",
+                        user_agent="pan.baidu.com",
+                    )
+                else:
+                    direct_url = await fetch_download_url(
+                        self.store.login.cookie,
+                        access_token,
+                        share_id,
+                        file_id,
+                    )
+                    gid = await self.aria2.add_uri(
+                        direct_url=direct_url,
+                        cookie=self.store.login.cookie,
+                        download_dir=target_dir,
+                        out_name=name,
+                        split=split,
+                    )
+                now = _now_wall_ts()
+                created.append(
+                    TianyiTaskRecord(
+                        task_id=str(uuid.uuid4()),
+                        gid=gid,
+                        game_id=game_id,
+                        game_title=game_title,
+                        share_code=share_code,
+                        share_id=share_id,
+                        file_id=file_id,
+                        file_name=name,
+                        download_dir=target_dir,
+                        local_path=os.path.join(target_dir, name),
+                        status="waiting",
+                        progress=0.0,
+                        speed=0,
+                        openpath=open_path,
+                        file_size=file_size,
+                        group_id=group_id,
+                        group_total=group_total,
+                        platform=str(plan.get("platform", "pc") or "pc"),
+                        provider=provider,
+                        share_url=share_url,
+                        share_ctx=self._compact_baidu_share_ctx(share_ctx) if provider in {"baidu", "baidu_openapi"} else {},
+                        created_at=now,
+                        updated_at=now,
+                    )
                 )
-            elif provider == "baidu_openapi":
-                direct_url = await self._fetch_baidu_direct_url(share_ctx, file_id)
-                gid = await self.aria2.add_uri(
-                    direct_url=direct_url,
-                    cookie="",
-                    download_dir=target_dir,
-                    out_name=name,
-                    split=split,
-                    referer="https://pan.baidu.com/disk/home",
-                    user_agent="pan.baidu.com",
-                )
-            else:
-                direct_url = await fetch_download_url(
-                    self.store.login.cookie,
-                    access_token,
-                    share_id,
-                    file_id,
-                )
-                gid = await self.aria2.add_uri(
-                    direct_url=direct_url,
-                    cookie=self.store.login.cookie,
-                    download_dir=target_dir,
-                    out_name=name,
-                    split=split,
-                )
-            now = _now_wall_ts()
-            created.append(
-                TianyiTaskRecord(
-                    task_id=str(uuid.uuid4()),
-                    gid=gid,
-                    game_id=game_id,
-                    game_title=game_title,
-                    share_code=share_code,
-                    share_id=share_id,
-                    file_id=file_id,
-                    file_name=name,
-                    download_dir=target_dir,
-                    local_path=os.path.join(target_dir, name),
-                    status="waiting",
-                    progress=0.0,
-                    speed=0,
-                    openpath=open_path,
-                    file_size=file_size,
-                    group_id=group_id,
-                    group_total=group_total,
-                    platform=str(plan.get("platform", "pc") or "pc"),
-                    provider=provider,
-                    share_url=share_url,
-                    share_ctx=self._compact_baidu_share_ctx(share_ctx) if provider in {"baidu", "baidu_openapi"} else {},
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
+        except Exception:
+            # 任一分卷/文件失败：回滚已加入 aria2 的任务，避免孤儿下载。
+            for _task in created:
+                try:
+                    await self.aria2.remove(str(_task.gid or ""))
+                except Exception:
+                    pass
+            raise
         return created
 
     def _tasks_persist_signature(self, tasks: Sequence[TianyiTaskRecord]) -> tuple:
@@ -6338,7 +6489,12 @@ class TianyiService:
         return True
 
     async def refresh_tasks(self, sync_aria2: bool = True, persist: bool = True) -> List[Dict[str, Any]]:
-        """刷新任务列表并同步状态。"""
+        """刷新任务列表并同步状态（与创建任务串行，避免旧快照覆盖新任务）。"""
+        async with self._refresh_lock:
+            return await self._refresh_tasks_locked(sync_aria2=sync_aria2, persist=persist)
+
+    async def _refresh_tasks_locked(self, sync_aria2: bool = True, persist: bool = True) -> List[Dict[str, Any]]:
+        """刷新任务列表实现；调用方需持有 _refresh_lock。"""
         tasks = list(self.store.tasks)
         before_signature = self._tasks_persist_signature(tasks)
         if sync_aria2 and any(not _is_terminal(task.status) for task in tasks):
@@ -6794,8 +6950,11 @@ class TianyiService:
             return ""
         openpath = str(getattr(entry, "openpath", "") or "").replace("\\", "/").strip("/")
         if openpath and openpath.lower().endswith(".exe"):
-            target = os.path.realpath(os.path.join(root, *openpath.split("/")))
-            if os.path.isfile(target):
+            parts = [part for part in openpath.split("/") if part not in {"", "."}]
+            if ".." in parts or openpath.startswith("/"):
+                return ""
+            target = os.path.realpath(os.path.join(root, *parts))
+            if os.path.isfile(target) and _is_within_dir(target, root):
                 return target
             target_name = os.path.basename(openpath).lower()
             for dirpath, _dirnames, filenames in os.walk(root):
@@ -6923,7 +7082,13 @@ class TianyiService:
             rom_path = ""
             if platform != "pc":
                 try:
-                    rom_path = find_rom_file(install_path, str(match.openpath or ""), platform)
+                    rom_path = find_rom_file(
+                        install_path,
+                        str(match.openpath or ""),
+                        platform,
+                        strict=True,
+                        title=str(match.title or ""),
+                    )
                 except Exception:
                     rom_path = ""
             display_title = self._derive_display_title_for_steam(str(match.title or normalized_name))
@@ -8057,9 +8222,15 @@ class TianyiService:
             target_dir,
             open_path=str(task.openpath or ""),
             platform_name=platform,
+            strict=True,
+            title=str(task.game_title or ""),
         )
         if not rom_path:
-            return {"ok": False, "message": "安装目录未找到 ROM 文件（.gba）"}
+            hint = "；.cia 需要先在 Azahar 中安装，不能直接当 ROM 启动" if str(platform).lower() == "3ds" else ""
+            return {
+                "ok": False,
+                "message": f"安装目录未找到可唯一定位的 {str(platform).upper()} ROM，请检查目录/openpath{hint}",
+            }
         try:
             command = await ensure_emulator(platform, self.plugin_dir)
         except Exception as exc:
@@ -8267,6 +8438,31 @@ class TianyiService:
         # game.7z.001 / game.part1.rar / game.z01 / game.r00 这类分卷
         return looks_like_multi_volume_name(file_path)
 
+    def _safe_extract_tar(self, archive_path: str, staging_dir: str) -> None:
+        """安全解压 tar 系归档：拒绝绝对路径、..、链接/设备文件。"""
+        with tarfile.open(archive_path, "r:*") as archive:
+            for member in archive.getmembers():
+                name = str(member.name or "").replace("\\", "/")
+                parts = [part for part in name.split("/") if part not in {"", "."}]
+                if name.startswith("/") or ".." in parts:
+                    raise ValueError(f"压缩包包含越界路径: {name[:200]}")
+                if member.issym() or member.islnk() or member.isdev():
+                    raise ValueError(f"压缩包包含链接/设备文件，已拒绝: {name[:200]}")
+            try:
+                archive.extractall(staging_dir, filter="data")
+            except TypeError:
+                # Python < 3.12 没有 filter；上面的成员校验已挡住链接与越界路径。
+                archive.extractall(staging_dir)
+
+    @staticmethod
+    def _assert_staging_safe(staging_dir: str) -> None:
+        """解压后再次确认 staging 中没有符号链接。"""
+        for dirpath, dirnames, filenames in os.walk(staging_dir, followlinks=False):
+            for name in list(dirnames) + list(filenames):
+                path = os.path.join(dirpath, name)
+                if os.path.islink(path):
+                    raise ValueError(f"压缩包包含符号链接，已拒绝: {os.path.relpath(path, staging_dir)[:200]}")
+
     def _extract_archive_to_dir(
         self,
         archive_path: str,
@@ -8301,11 +8497,15 @@ class TianyiService:
                     return False, f"7z 解压异常: {exc}"
             else:
                 try:
-                    shutil.unpack_archive(archive_path, staging_dir)
+                    if normalized.endswith((".tar", ".tgz", ".tar.gz", ".tbz2", ".tar.bz2", ".tar.xz", ".txz")):
+                        self._safe_extract_tar(archive_path, staging_dir)
+                    else:
+                        shutil.unpack_archive(archive_path, staging_dir)
                 except Exception as exc:
                     return False, f"解压失败: {exc}"
 
             try:
+                self._assert_staging_safe(staging_dir)
                 self._merge_extracted_content(staging_dir, target_dir)
             except Exception as exc:
                 return False, f"整理解压目录失败: {exc}"
@@ -8326,11 +8526,17 @@ class TianyiService:
         source_root = staging_dir
         target_base = os.path.basename(os.path.normpath(target_dir))
         preferred = os.path.join(staging_dir, target_base)
-        if target_base and os.path.isdir(preferred):
+        if target_base and os.path.isdir(preferred) and not os.path.islink(preferred):
             source_root = preferred
         else:
-            dir_entries = [name for name in entries if os.path.isdir(os.path.join(staging_dir, name))]
-            file_entries = [name for name in entries if not os.path.isdir(os.path.join(staging_dir, name))]
+            dir_entries = [
+                name for name in entries
+                if os.path.isdir(os.path.join(staging_dir, name)) and not os.path.islink(os.path.join(staging_dir, name))
+            ]
+            file_entries = [
+                name for name in entries
+                if not (os.path.isdir(os.path.join(staging_dir, name)) and not os.path.islink(os.path.join(staging_dir, name)))
+            ]
             if len(dir_entries) == 1 and not file_entries:
                 source_root = os.path.join(staging_dir, dir_entries[0])
 
@@ -8341,6 +8547,8 @@ class TianyiService:
 
     def _merge_path(self, source_path: str, target_path: str) -> None:
         """将 source_path 合并到 target_path，目录递归合并，文件冲突时覆盖。"""
+        if os.path.islink(source_path):
+            raise ValueError("拒绝合并符号链接")
         if not os.path.exists(source_path):
             return
 

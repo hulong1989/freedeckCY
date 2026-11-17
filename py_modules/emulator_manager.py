@@ -170,7 +170,8 @@ EMULATORS: Dict[str, EmulatorSpec] = {
         assets={"x86_64": "azahar.AppImage"},
         archive="appimage",
         launch_args=("{rom}",),
-        rom_extensions=(".3ds", ".cia", ".cci", ".cxi", ".app"),
+        # Azahar 不支持直接启动 .cia（需先安装）；只收录可当 ROM 加载的格式。
+        rom_extensions=(".3ds", ".cci", ".cxi", ".app", ".3dsx", ".elf", ".axf"),
         env_var="FREEDECKCY_AZAHAR_BIN",
         notes="Azahar 官方 AppImage（仅 x86_64）；需要 3DS system files",
         min_bytes=60 * 1024 * 1024,
@@ -648,20 +649,27 @@ async def _download_asset(spec: EmulatorSpec, arch: str) -> str:
 
     url = f"{spec.download_base}/{asset}"
     timeout = aiohttp.ClientTimeout(total=1800, sock_read=120)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(url, allow_redirects=True) as response:
-            if int(response.status) != 200:
-                raise RuntimeError(f"下载 {spec.name} 失败: HTTP {int(response.status)}")
-            with open(target, "wb") as fh:
-                async for chunk in response.content.iter_chunked(1024 * 256):
-                    if chunk:
-                        fh.write(chunk)
-    if not target.is_file() or target.stat().st_size < spec.min_bytes:
+    part = target.with_name(target.name + ".part")
+    try:
+        if part.exists():
+            part.unlink()
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, allow_redirects=True) as response:
+                if int(response.status) != 200:
+                    raise RuntimeError(f"下载 {spec.name} 失败: HTTP {int(response.status)}")
+                with open(part, "wb") as fh:
+                    async for chunk in response.content.iter_chunked(1024 * 256):
+                        if chunk:
+                            fh.write(chunk)
+        if not part.is_file() or part.stat().st_size < spec.min_bytes:
+            raise RuntimeError(f"{spec.name} 下载不完整")
+        os.replace(part, target)
+    except Exception:
         try:
-            target.unlink()
+            part.unlink()
         except Exception:
             pass
-        raise RuntimeError(f"{spec.name} 下载不完整")
+        raise
     os.chmod(target, 0o755)
     return str(target)
 
@@ -673,8 +681,10 @@ def _ensure_extracted(spec: EmulatorSpec, appimage: str) -> List[str]:
         return [existing]
     try:
         _run_appimage_extract(appimage, _state_root(spec, arch))
-    except Exception:
-        # 某些 AppImage 不带 runtime（或当前环境不允许执行），尝试直接运行下载的 AppImage
+    except Exception as exc:
+        # 某些 AppImage 不带 runtime（或当前环境不允许执行），尝试直接运行下载的 AppImage；
+        # 记录原因，安装消息仍会走到 Steam 注册，后续启动失败可据此排查。
+        config.logger.warning("%s AppImage 解包失败，回退直接运行: %s", spec.name, exc)
         return [appimage]
     found = installed_command(spec, arch)
     if not found:
@@ -739,6 +749,16 @@ def _common_parent(paths: Sequence[Path]) -> Path:
     return Path(common)
 
 
+def _ps1_game_key(value: str) -> str:
+    """去掉 Disc 1/CD2 等碟号后的游戏名，用于平铺目录分组。"""
+    import re
+
+    text = Path(str(value or "")).stem.lower()
+    text = re.sub(r"\b(?:disc|disk|cd)\s*[-_ ]?\s*\d+\b", "", text)
+    text = re.sub(r"[\(\[].*?[\)\]]", "", text)
+    return re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", text)
+
+
 def _natural_disc_key(name: str):
     """Disc 1/2/10、CD1/CD2 自然排序。"""
     import re
@@ -747,7 +767,14 @@ def _natural_disc_key(name: str):
     return [int(part) if part.isdigit() else part for part in parts]
 
 
-def find_rom_file(target_dir: str, open_path: str = "", platform_name: str = "gba") -> str:
+def find_rom_file(
+    target_dir: str,
+    open_path: str = "",
+    platform_name: str = "gba",
+    *,
+    strict: bool = False,
+    title: str = "",
+) -> str:
     spec = get_spec(platform_name)
     if spec is None:
         return ""
@@ -771,22 +798,129 @@ def find_rom_file(target_dir: str, open_path: str = "", platform_name: str = "gb
         exact = [path for path in roms if path.stem.lower() == wanted_stem]
         if exact:
             roms = exact
+        elif strict:
+            # 扫描/自动注册时不在多个不同 ROM 中随便选第一个，避免注册错游戏。
+            distinct_stems = {path.stem.lower() for path in roms}
+            if len(distinct_stems) > 1:
+                config.logger.warning("ROM 歧义：openpath=%s 未精确匹配，候选 %s", open_path, sorted(distinct_stems)[:8])
+                return ""
 
     if str(platform_name or "").lower() == "ps1":
         playlists = [path for path in roms if path.suffix.lower() == ".m3u"]
-        if playlists:
-            return str(sorted(playlists, key=sort_key)[0])
-        discs = [
-            path
-            for path in roms
-            if path.suffix.lower() in {".cue", ".chd"}
-        ]
+        discs = [path for path in roms if path.suffix.lower() in {".cue", ".chd"}]
+        wanted_rel = str(open_path or "").replace("\\", "/").strip("/").lower()
+        title_key = _ps1_game_key(title) if title else ""
+
+        def rel_norm(path: Path) -> str:
+            try:
+                return os.path.relpath(path, root).replace(os.sep, "/").strip("/").lower()
+            except Exception:
+                return str(path).replace("\\", "/").strip("/").lower()
+
+        def is_disc_dir(name: str) -> bool:
+            return bool(name) and any(token in name.lower() for token in ("disc", "disk", "cd"))
+
+        # 按“游戏根目录 + 去碟号名称”分组，而不是把所有 cue/chd 混在一起。
+        groups: Dict[tuple, List[Path]] = {}
+        for disc in discs:
+            group_dir = disc.parent
+            if group_dir != root and is_disc_dir(group_dir.name):
+                group_dir = group_dir.parent
+            if group_dir == root:
+                game_key = _ps1_game_key(disc.stem) or "__discs__"
+            else:
+                game_key = _ps1_game_key(group_dir.name) or _ps1_game_key(disc.stem) or "__discs__"
+            groups.setdefault((rel_norm(group_dir), game_key), []).append(disc)
+
+        def choose_group_by_title(candidates: List[tuple]) -> Optional[tuple]:
+            if not title_key or not candidates:
+                return None
+            exact = [group_id for group_id, game_key in candidates if game_key == title_key]
+            if len(exact) == 1:
+                return exact[0]
+            fuzzy = [
+                group_id for group_id, game_key in candidates
+                if game_key and (title_key in game_key or game_key in title_key)
+            ]
+            return fuzzy[0] if len(fuzzy) == 1 else None
+
+        selected: Optional[tuple] = None
+        if wanted_rel:
+            # 1) openpath 完整相对路径命中碟文件。
+            for group_id, items in groups.items():
+                if any(rel_norm(item) == wanted_rel for item in items):
+                    selected = group_id
+                    break
+            # 2) openpath 指向目录 / 碟目录。
+            if selected is None:
+                wanted_parent = os.path.dirname(wanted_rel).strip("/")
+                if wanted_rel.endswith((".cue", ".chd", ".bin", ".m3u")):
+                    wanted_dir = wanted_parent
+                else:
+                    wanted_dir = wanted_rel
+                dir_matches = [
+                    group_id for group_id in groups
+                    if group_id[0] == wanted_dir or (wanted_parent and group_id[0] == wanted_parent)
+                ]
+                if len(dir_matches) == 1:
+                    selected = dir_matches[0]
+                elif len(dir_matches) > 1:
+                    selected = choose_group_by_title(dir_matches)
+            # 3) openpath 的碟文件名在多组中出现时，用标题消歧。
+            if selected is None:
+                matches = [
+                    group_id for group_id, items in groups.items()
+                    if any(_ps1_game_key(item.stem) == _ps1_game_key(wanted_rel) for item in items)
+                ]
+                if len(matches) == 1:
+                    selected = matches[0]
+                elif len(matches) > 1:
+                    selected = choose_group_by_title([(group_id, group_id[1]) for group_id in matches])
+
+        # 4) 标题唯一匹配。
+        if selected is None and title_key and groups:
+            selected = choose_group_by_title([(group_id, group_id[1]) for group_id in groups])
+
+        # 5) 只有一组才可直接使用；否则明确歧义，不能注册错游戏。
+        if selected is None:
+            if len(groups) == 1:
+                selected = next(iter(groups))
+            elif groups:
+                config.logger.warning(
+                    "PS1 存档/ROM 分组歧义：openpath=%s title=%s groups=%s",
+                    open_path,
+                    title,
+                    sorted(f"{key[1]}@{key[0]}" for key in groups)[:8],
+                )
+                return ""
+            elif len(playlists) == 1:
+                return str(playlists[0])
+            elif playlists:
+                config.logger.warning("PS1 m3u 歧义：openpath=%s title=%s count=%s", open_path, title, len(playlists))
+                return ""
+            return ""
+
+        discs = groups[selected]
+        # 同一张碟同时有 cue/chd 时只保留一个，避免重复行。
+        deduped: Dict[tuple, Path] = {}
+        for disc in discs:
+            key = (str(disc.parent), disc.stem.lower())
+            previous = deduped.get(key)
+            if previous is None or (previous.suffix.lower() == ".chd" and disc.suffix.lower() == ".cue"):
+                deduped[key] = disc
+        discs = list(deduped.values())
+
         if len(discs) > 1:
             parent = _common_parent(discs)
-            playlist = parent / "freedeckcy-multidisc.m3u"
+            playlist_key = selected[1] if selected[1] != "__discs__" else ""
+            playlist = parent / (f"freedeckcy-{playlist_key}-multidisc.m3u" if playlist_key else "freedeckcy-multidisc.m3u")
             try:
+                def disc_key(path: Path):
+                    rel = os.path.relpath(path, parent).replace(os.sep, "/")
+                    return tuple(_natural_disc_key(part) for part in rel.split("/"))
+
                 lines = ["#EXTM3U"]
-                for disc in sorted(discs, key=lambda path: _natural_disc_key(path.name)):
+                for disc in sorted(discs, key=disc_key):
                     lines.append(os.path.relpath(disc, parent).replace(os.sep, "/"))
                 playlist.write_text("\n".join(lines) + "\n", encoding="utf-8")
                 config.logger.info("PS1 multi-disc playlist generated: %s (%d discs)", playlist, len(discs))
@@ -794,6 +928,20 @@ def find_rom_file(target_dir: str, open_path: str = "", platform_name: str = "gb
             except Exception as exc:
                 config.logger.warning("PS1 m3u 生成失败，回退单碟: %s", exc)
 
+        if playlists:
+            matching = [
+                path for path in playlists
+                if rel_norm(path.parent) == selected[0]
+                and (not selected[1] or selected[1] == "__discs__" or selected[1] in _ps1_game_key(path.stem))
+            ]
+            if len(matching) == 1:
+                return str(matching[0])
+            if len(matching) > 1:
+                config.logger.warning("PS1 m3u 歧义：openpath=%s title=%s matching=%s", open_path, title, [path.name for path in matching[:8]])
+                return ""
+            if len(playlists) == 1:
+                return str(playlists[0])
+        return str(sorted(discs, key=sort_key)[0])
     return str(sorted(roms, key=sort_key)[0])
 
 
@@ -824,10 +972,16 @@ def create_launch_wrapper(
     if platform_name == "3ds":
         # SteamOS/Game Mode 下强制 XWayland，避开 Azahar Wayland 后端的兼容问题。
         env_lines = "export QT_QPA_PLATFORM=xcb\nexport SDL_VIDEODRIVER=x11\n"
+    # portable.ini / qt.ini 写在可执行文件所在目录；部分模拟器按 cwd 探测 portable 模式。
+    cwd_line = ""
+    command_dir = os.path.dirname(os.path.realpath(os.path.expanduser(argv[0])))
+    if command_dir and os.path.isdir(command_dir) and os.path.basename(argv[0]) != "flatpak":
+        cwd_line = f"cd {shlex.quote(command_dir)}\n"
     script = (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         + env_lines
+        + cwd_line
         + 'exec ' + " ".join(shlex.quote(part) for part in [*argv, *args]) + "\n"
     )
     wrapper = Path(wrapper_path)

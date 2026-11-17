@@ -30,7 +30,7 @@ import { FaCloudDownloadAlt } from "react-icons/fa";
 type ApiStatus = "success" | "error";
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.25.0";
+const PLUGIN_UI_BUILD = "0.26.0";
 
 interface ApiResponse<T> {
   status: ApiStatus;
@@ -1381,27 +1381,6 @@ function resolveLibraryOverviewNode(tree: unknown): Record<string, unknown> | nu
   });
 }
 
-function resolvePatchHandleUnpatch(handle: unknown): () => void {
-  if (handle && typeof handle === "object" && typeof (handle as { unpatch?: unknown }).unpatch === "function") {
-    return () => {
-      try {
-        (handle as { unpatch: () => void }).unpatch();
-      } catch {
-        // 忽略移除 patch 异常。
-      }
-    };
-  }
-  if (typeof handle === "function") {
-    return () => {
-      try {
-        (handle as () => void)();
-      } catch {
-        // 忽略移除 patch 异常。
-      }
-    };
-  }
-  return () => {};
-}
 
 function LibraryTimeBlock({ appId, title }: { appId: number; title: string }) {
   const appIdText = String(Math.max(0, Number(appId || 0)));
@@ -1555,12 +1534,13 @@ function LibraryTimeBlock({ appId, title }: { appId: number; title: string }) {
 function installLibraryPlaytimePatch(): () => void {
   const hookApi = routerHook as unknown as {
     addPatch?: (route: string, patcher: (props: unknown) => unknown) => unknown;
+    removePatch?: (route: string, patcher: unknown) => void;
   };
   if (typeof hookApi.addPatch !== "function") {
     return () => {};
   }
 
-  const patchHandle = hookApi.addPatch("/library/app/:appid", (props: unknown) => {
+  const patchFn = (props: unknown) => {
     if (!props || typeof props !== "object") return props;
     const propsMap = props as Record<string, unknown>;
     const childNode = propsMap.children as Record<string, unknown> | undefined;
@@ -1665,9 +1645,16 @@ function installLibraryPlaytimePatch(): () => void {
     patchedRender.__FREDECK_LIBRARY_RENDER_PATCHED = true;
     patchedRender.__FREDECK_LIBRARY_RENDER_UNPATCH = renderPatch.unpatch;
     return props;
-  });
+  };
 
-  return resolvePatchHandleUnpatch(patchHandle);
+  const patchHandle = hookApi.addPatch("/library/app/:appid", patchFn);
+  return () => {
+    try {
+      hookApi.removePatch?.("/library/app/:appid", patchHandle);
+    } catch {
+      // 忽略移除 patch 异常。
+    }
+  };
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
@@ -1704,7 +1691,7 @@ function isTaskAlreadyInstalled(task: TaskItem): boolean {
 function isTaskActive(task: TaskItem): boolean {
   const status = String(task.status || "").trim().toLowerCase();
   if (!status) return false;
-  return !["complete", "error", "removed"].includes(status);
+  return !["complete", "error", "removed", "paused"].includes(status);
 }
 
 function countActiveTasks(tasks: TaskItem[]): number {
@@ -1744,6 +1731,7 @@ function SettingsPage() {
   const [baiduQr, setBaiduQr] = useState<BaiduQrState>({ stage: "idle" });
   const [baiduQrBusy, setBaiduQrBusy] = useState<boolean>(false);
   const baiduQrPollBusyRef = useRef<boolean>(false);
+  const baiduQrPollFailuresRef = useRef<number>(0);
   const [baiduLogin, setBaiduLogin] = useState<BaiduOpenApiLoginState>(EMPTY_BAIDU_OPENAPI_STATE);
   const [baiduAppKey, setBaiduAppKey] = useState<string>("");
   const [baiduSecretKey, setBaiduSecretKey] = useState<string>("");
@@ -2089,7 +2077,10 @@ function SettingsPage() {
           "轮询百度扫码状态超时",
         );
         if (cancelled) return;
-        if (result.status !== "success" || !result.data) return;
+        if (result.status !== "success" || !result.data) {
+          throw new Error(result.message || "轮询百度扫码状态失败");
+        }
+        baiduQrPollFailuresRef.current = 0;
         const next = result.data;
         setBaiduQr(next);
         if (next.stage === "success") {
@@ -2099,10 +2090,20 @@ function SettingsPage() {
             message: String(next.message || "已登录"),
           });
           toaster.toast({ title: "freedeckCY", body: "百度网盘扫码登录成功" });
-          await refreshSettings();
+          try {
+            await refreshSettings();
+          } catch {
+            // 登录成功优先，设置刷新失败不覆盖成功状态。
+          }
         }
-      } catch {
-        // 轮询失败保持等待，下一轮继续。
+      } catch (error) {
+        baiduQrPollFailuresRef.current += 1;
+        if (baiduQrPollFailuresRef.current >= 3 && !cancelled) {
+          setBaiduQr({
+            stage: "failed",
+            message: `扫码状态连续失败：${String(error)}`,
+          });
+        }
       } finally {
         baiduQrPollBusyRef.current = false;
       }
@@ -2115,21 +2116,22 @@ function SettingsPage() {
 
   const onStartBaiduQr = useCallback(async () => {
     if (baiduQrBusy) return;
+    baiduQrPollFailuresRef.current = 0;
     setBaiduQrBusy(true);
     toaster.toast({ title: "freedeckCY", body: "正在获取百度二维码..." });
     try {
       const result = await withTimeout(
         startBaiduQrLogin(),
-        20000,
+        25000,
         "获取百度二维码超时（网络/TLS 可能受阻，请稍后重试或运行诊断）",
       );
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "获取百度二维码失败");
       }
-      setBaiduQr(result.data);
       if (!result.data.qr_data_url && !result.data.qrcode_url) {
         throw new Error("百度二维码为空");
       }
+      setBaiduQr(result.data);
     } catch (error) {
       toaster.toast({ title: "freedeckCY", body: String(error) });
     } finally {
@@ -2166,7 +2168,7 @@ function SettingsPage() {
     if (diagnosticsBusy) return;
     setDiagnosticsBusy(true);
     try {
-      const result = await runTianyiDiagnostics();
+      const result = await withTimeout(runTianyiDiagnostics(), 90000, "自检超时");
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "自检失败");
       }
@@ -2187,7 +2189,7 @@ function SettingsPage() {
     if (diagnosticsExportBusy) return;
     setDiagnosticsExportBusy(true);
     try {
-      const result = await exportTianyiDiagnosticsFile();
+      const result = await withTimeout(exportTianyiDiagnosticsFile(), 120000, "导出诊断包超时");
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "导出诊断包失败");
       }
@@ -2205,7 +2207,7 @@ function SettingsPage() {
     if (scanningInstalled) return;
     setScanningInstalled(true);
     try {
-      const result = await scanTianyiInstalledGames();
+      const result = await withTimeout(scanTianyiInstalledGames(), 90000, "扫描已安装游戏超时");
       if (result.status !== "success") {
         throw new Error(result.message || "扫描已安装游戏失败");
       }
@@ -3007,6 +3009,7 @@ function SettingsPage() {
       login.user_account,
       onPickDownloadDir,
       onPickInstallDir,
+      onUseStorage,
       onClearLogin,
       onStartCloudSaveUpload,
       onSaveSplit,
@@ -3049,6 +3052,24 @@ function SettingsPage() {
       diagnosticsExportMessage,
       onRunDiagnostics,
       onExportDiagnostics,
+      storageOptions,
+      baiduQr,
+      baiduQrBusy,
+      baiduWebLogin,
+      baiduLogin,
+      baiduAppKey,
+      baiduSecretKey,
+      baiduAuthCode,
+      baiduBusy,
+      onStartBaiduQr,
+      onCancelBaiduQr,
+      onClearBaiduWeb,
+      onSaveBaiduApp,
+      onBaiduAuthorize,
+      onExchangeBaiduCode,
+      onClearBaiduLogin,
+      scanningInstalled,
+      onScanInstalledSettings,
     ],
   );
 
@@ -3378,7 +3399,11 @@ function Content() {
             : "（含 Proton 前缀）"
           : "";
         toaster.toast({ title: "freedeckCY", body: `已卸载：${title}${suffix}` });
-        await syncState();
+        try {
+          await syncState();
+        } catch {
+          // 卸载已成功；列表刷新失败不再弹“卸载失败”误导用户。
+        }
       } catch (error) {
         toaster.toast({ title: "freedeckCY", body: String(error) });
       } finally {
@@ -3478,7 +3503,11 @@ function Content() {
           title: "freedeckCY",
           body: `${label}：${task.game_title || task.file_name || taskId}`,
         });
-        await syncState(PANEL_POLL_MODE_ACTIVE);
+        try {
+          await syncState(PANEL_POLL_MODE_ACTIVE);
+        } catch {
+          // 操作已成功；刷新失败不覆盖成功提示。
+        }
       } catch (error) {
         toaster.toast({ title: "freedeckCY", body: String(error) });
       } finally {
@@ -3719,14 +3748,18 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
     async (targetPage: number) => {
       setLoadingCatalog(true);
       try {
-        const result = await listTianyiCatalog({
-          query: activeQuery,
-          page: Math.max(1, targetPage),
-          page_size: pageSize,
-          platform,
-          category,
-          sort,
-        });
+        const result = await withTimeout(
+          listTianyiCatalog({
+            query: activeQuery,
+            page: Math.max(1, targetPage),
+            page_size: pageSize,
+            platform,
+            category,
+            sort,
+          }),
+          15000,
+          "读取游戏列表超时",
+        );
         if (result.status !== "success" || !result.data) {
           throw new Error(result.message || "读取游戏列表失败");
         }
@@ -3751,7 +3784,7 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
   const loadInstalled = useCallback(async () => {
     setLoadingInstalled(true);
     try {
-      const result = await listTianyiInstalledGames();
+      const result = await withTimeout(listTianyiInstalledGames(), 15000, "读取已安装列表超时");
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "读取已安装列表失败");
       }
@@ -3799,7 +3832,11 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
     if (busyKey) return;
     setBusyKey(item.game_id);
     try {
-      const result = await prepareTianyiInstall({ game_id: item.game_id });
+      const result = await withTimeout(
+        prepareTianyiInstall({ game_id: item.game_id }),
+        30000,
+        "生成安装计划超时",
+      );
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "生成安装计划失败");
       }
@@ -3822,7 +3859,11 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
           onOK={() => {
             void (async () => {
               try {
-                const started = await startTianyiInstall({ game_id: item.game_id });
+                const started = await withTimeout(
+                  startTianyiInstall({ game_id: item.game_id }),
+                  30000,
+                  "启动安装超时",
+                );
                 if (started.status !== "success") {
                   throw new Error(started.message || "启动安装失败");
                 }
@@ -3846,7 +3887,7 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
     if (busyKey) return;
     setBusyKey(item.game_id);
     try {
-      const result = await launchTianyiInstalledGame(item.game_id);
+      const result = await withTimeout(launchTianyiInstalledGame(item.game_id), 20000, "启动游戏超时");
       if (result.status !== "success") throw new Error(result.message || "启动失败");
       toaster.toast({ title: "freedeckCY", body: `正在启动 ${item.title}` });
     } catch (error) {
@@ -3860,7 +3901,7 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
     if (busyKey) return;
     setBusyKey(item.game_id);
     try {
-      const result = await openTianyiInstalledFolder(item.game_id);
+      const result = await withTimeout(openTianyiInstalledFolder(item.game_id), 20000, "打开目录超时");
       if (result.status !== "success") throw new Error(result.message || "打开目录失败");
     } catch (error) {
       toaster.toast({ title: "freedeckCY", body: String(error) });
@@ -3879,11 +3920,11 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
         onOK={() => {
           void (async () => {
             try {
-              const result = await uninstallTianyiInstalled({
+              const result = await withTimeout(uninstallTianyiInstalled({
                 game_id: item.game_id,
                 install_path: item.install_path,
                 delete_files: true,
-              });
+              }), 30000, "卸载超时");
               if (result.status !== "success") throw new Error(result.message || "卸载失败");
               toaster.toast({ title: "freedeckCY", body: "已卸载" });
               await loadInstalled();

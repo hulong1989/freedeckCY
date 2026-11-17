@@ -9,21 +9,45 @@ function buildUrl(path, query = {}) {
   return url.toString();
 }
 
+async function readJSONResponse(resp) {
+  const text = await resp.text();
+  if (!text) {
+    return { status: resp.ok ? "success" : "error", message: `HTTP ${resp.status}` };
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`HTTP ${resp.status} 响应不是 JSON：${text.slice(0, 160)}`);
+  }
+}
+
+async function requestJSON(path, options = {}) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 20000);
+  try {
+    const resp = await fetch(path, { ...options, signal: controller.signal });
+    return await readJSONResponse(resp);
+  } catch (error) {
+    if (error && error.name === "AbortError") throw new Error("请求超时（20 秒）");
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function apiGet(path, query = {}) {
-  const resp = await fetch(buildUrl(path, query), {
+  return requestJSON(buildUrl(path, query), {
     method: "GET",
     headers: { Accept: "application/json" },
   });
-  return resp.json();
 }
 
 async function apiPost(path, body = {}) {
-  const resp = await fetch(path, {
+  return requestJSON(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
   });
-  return resp.json();
 }
 
 createApp({
@@ -252,6 +276,8 @@ createApp({
     },
     storageEnough(plan) {
       if (!plan || typeof plan !== "object") return false;
+      // 后端 can_install 是唯一权威（压缩包下载后可删除，不能简单相加）。
+      if (typeof plan.can_install === "boolean") return plan.can_install;
       if (this.isSameStorage(plan)) return this.combinedSpaceOk(plan);
       return this.downloadSpaceOk(plan) && this.installSpaceOk(plan);
     },
@@ -370,7 +396,8 @@ createApp({
       if (this.installDialog.visible) {
         return 2;
       }
-      const cardCount = this.showResults ? Number(this.list.items.length || 0) : 0;
+      const items = this.mode === "installed" ? this.installed.items : this.list.items;
+      const cardCount = this.showResults ? Number((items || []).length || 0) : 0;
       return 2 + this.filterChipCount() + Math.max(0, cardCount);
     },
     getCardColumns() {
@@ -751,7 +778,10 @@ createApp({
       this.scanBusy = true;
       try {
         const result = await apiPost("/api/tianyi/installed/scan", {});
-        const data = result && result.data ? result.data : {};
+        if (!result || result.status !== "success") {
+          throw new Error((result && result.message) || "扫描失败");
+        }
+        const data = result.data || {};
         await this.reloadInstalled();
         this.flash(data.message || `已扫描：新增 ${data.added_count || 0} 个`);
       } catch (error) {
@@ -1048,7 +1078,11 @@ createApp({
           if (preferred) {
             this.coverCache[cacheKey] = preferred;
           }
-          if (preferred || coverUrl || squareCoverUrl || protonTier || appId > 0) {
+          if (preferred) {
+            return;
+          }
+          if (coverUrl || squareCoverUrl || protonTier || appId > 0) {
+            this.coverMissCache[cacheKey] = true;
             return;
           }
         }
@@ -1151,12 +1185,20 @@ createApp({
       this.installDialog.game = item;
       this.setFocusIndex(0, { scroll: false });
 
-      const result = await apiPost("/api/tianyi/install/prepare", {
-        game_id: item.game_id,
-        share_url: String(item.down_url || ""),
-        download_dir: this.settings.download_dir,
-        install_dir: this.settings.install_dir,
-      });
+      let result;
+      try {
+        result = await apiPost("/api/tianyi/install/prepare", {
+          game_id: item.game_id,
+          share_url: String(item.down_url || ""),
+          download_dir: this.settings.download_dir,
+          install_dir: this.settings.install_dir,
+        });
+      } catch (error) {
+        this.installDialog.loading = false;
+        this.flash(`读取安装信息失败：${String(error && error.message ? error.message : error)}`);
+        this.closeInstallDialog(true);
+        return;
+      }
       this.installDialog.loading = false;
       if (result.status !== "success") {
         const errorText = this.buildPrepareInstallError(result);
@@ -1187,14 +1229,21 @@ createApp({
         ? plan.files.map((item) => String((item && item.file_id) || "")).filter(Boolean)
         : [];
 
-      const result = await apiPost("/api/tianyi/install/start", {
-        game_id: String(plan.game_id || ""),
-        share_url: String(plan.share_url || (this.installDialog.game && this.installDialog.game.down_url) || ""),
-        file_ids: fileIds,
-        split_count: this.settings.split_count,
-        download_dir: this.settings.download_dir,
-        install_dir: this.settings.install_dir,
-      });
+      let result;
+      try {
+        result = await apiPost("/api/tianyi/install/start", {
+          game_id: String(plan.game_id || ""),
+          share_url: String(plan.share_url || (this.installDialog.game && this.installDialog.game.down_url) || ""),
+          file_ids: fileIds,
+          split_count: this.settings.split_count,
+          download_dir: this.settings.download_dir,
+          install_dir: this.settings.install_dir,
+        });
+      } catch (error) {
+        this.installDialog.submitting = false;
+        this.flash(`创建安装任务失败：${String(error && error.message ? error.message : error)}`);
+        return;
+      }
       this.installDialog.submitting = false;
       if (result.status !== "success") {
         this.flash(result.message || "创建安装任务失败");

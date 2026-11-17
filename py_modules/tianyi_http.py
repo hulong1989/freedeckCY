@@ -12,7 +12,7 @@ import decky
 from aiohttp import web
 
 import config
-from tianyi_service import LocalWebNotReadyError
+from tianyi_service import LocalWebNotReadyError, _redact_text
 
 
 def _json_ok(data: Optional[Dict[str, Any]] = None) -> web.Response:
@@ -33,13 +33,35 @@ def _json_error(message: str, status: int = 400, *, reason: str = "", diagnostic
     return web.json_response(payload, status=status)
 
 
+def _mask_diagnostics(value: Any) -> Any:
+    """递归遮蔽诊断中的 token/secret/cookie。"""
+    sensitive = ("token", "secret", "cookie", "pwd", "bduss", "stoken", "ptoken", "sign", "randsk")
+    if isinstance(value, dict):
+        masked = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if any(token in key_text.lower() for token in sensitive):
+                masked[key_text] = "<redacted>"
+            else:
+                masked[key_text] = _mask_diagnostics(item)
+        return masked
+    if isinstance(value, list):
+        return [_mask_diagnostics(item) for item in value]
+    if isinstance(value, str):
+        return _redact_text(value)
+    return value
+
+
 def _json_error_from_exception(exc: Exception, status: int = 400) -> web.Response:
     """把异常转换为统一错误响应，并尽量透传诊断信息。"""
     diagnostics = getattr(exc, "diagnostics", None)
-    if not isinstance(diagnostics, dict):
+    if isinstance(diagnostics, dict):
+        diagnostics = _mask_diagnostics(diagnostics)
+    else:
         diagnostics = None
     try:
-        config.logger.exception("Tianyi HTTP error status=%s exc=%s diagnostics=%s", status, exc, diagnostics)
+        safe_detail = _redact_text(f"{exc} | {diagnostics if diagnostics else ''}")[:1200]
+        config.logger.error("Tianyi HTTP error status=%s detail=%s", status, safe_detail)
     except Exception:
         pass
     return _json_error(str(exc), status=status, diagnostics=diagnostics)
@@ -538,6 +560,10 @@ async def handle_cloud_save_restore_entries(request: web.Request, plugin: Any) -
         )
         return _json_ok({"data": data})
     except Exception as exc:
+        try:
+            await _service(plugin).mark_cloud_save_restore_failed(f"读取存档项失败：{exc}")
+        except Exception:
+            pass
         return _json_error_from_exception(exc)
 
 
@@ -558,6 +584,10 @@ async def handle_cloud_save_restore_plan(request: web.Request, plugin: Any) -> w
         )
         return _json_ok({"data": data})
     except Exception as exc:
+        try:
+            await _service(plugin).mark_cloud_save_restore_failed(f"生成恢复计划失败：{exc}")
+        except Exception:
+            pass
         return _json_error_from_exception(exc)
 
 

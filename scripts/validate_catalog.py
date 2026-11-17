@@ -109,6 +109,8 @@ def main() -> int:
     with_cover = 0
     total_size = 0
     platform_in_category = 0
+    bad_openpath = 0
+    formula_cells = 0
 
     for row in rows:
         game_id = str(row.get("game_id") or "").strip()
@@ -116,6 +118,11 @@ def main() -> int:
         down_url = str(row.get("down_url") or "").strip()
         platform = str(row.get("platform") or "pc").strip().lower() or "pc"
         category = str(row.get("categories") or "").strip()
+        openpath = str(row.get("openpath") or "").replace("\\", "/")
+        if openpath.startswith("/") or ".." in [part for part in openpath.split("/") if part]:
+            bad_openpath += 1
+        if title.startswith(("=", "+", "@", "\t", "\r")) or category.startswith(("=", "+", "@", "\t", "\r")):
+            formula_cells += 1
 
         ids[game_id] += 1
         urls[down_url] += 1
@@ -155,6 +162,10 @@ def main() -> int:
         errors.append(f"空标题: {empty_title} 行")
     if platform_in_category:
         errors.append(f"分类里混入平台名: {platform_in_category} 处")
+    if bad_openpath:
+        errors.append(f"openpath 含绝对路径/..: {bad_openpath} 行")
+    if formula_cells:
+        errors.append(f"标题/分类以 CSV 公式字符开头: {formula_cells} 处")
     if empty_category:
         warnings.append(f"空分类: {empty_category} 行")
     if duplicate_urls:

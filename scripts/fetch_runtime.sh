@@ -3,8 +3,8 @@
 #
 # 默认下载到 <repo>/defaults/runtime/：
 #   aria2/<arch>/aria2c        abcfy2/aria2-static-build 1.37.0（musl 静态构建）
-#   7z/<arch>/7zz              https://www.7-zip.org/a/7z2301-linux-*.tar.xz
-#   node/<arch>/bin/node       https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-*.tar.xz
+#   7z/<arch>/7zz              https://github.com/ip7z/7zip/releases/download/26.06/7z2606-linux-*.tar.xz
+#   node/<arch>/bin/node       https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-*.tar.xz
 #
 # arch 统一使用 x86_64 / aarch64，与 Python 侧 platform.machine() 对齐。
 # 依赖：curl；aria2 需要 unzip；7z / node 需要 python3（本机无 xz 命令，用 tarfile 解压）。
@@ -25,12 +25,20 @@ ARIA2_AARCH64_ASSET="aria2-aarch64-linux-musl_static.zip"
 ARIA2_X86_64_FALLBACK_ID="416692128"
 ARIA2_AARCH64_FALLBACK_ID="416692696"
 
-SEVEN_ZIP_X86_64_URL="https://www.7-zip.org/a/7z2301-linux-x64.tar.xz"
-SEVEN_ZIP_AARCH64_URL="https://www.7-zip.org/a/7z2301-linux-arm64.tar.xz"
+SEVEN_ZIP_X86_64_URL="https://github.com/ip7z/7zip/releases/download/26.06/7z2606-linux-x64.tar.xz"
+SEVEN_ZIP_AARCH64_URL="https://github.com/ip7z/7zip/releases/download/26.06/7z2606-linux-arm64.tar.xz"
 
-NODE_VERSION="20.18.1"
+NODE_VERSION="24.22.3"
 NODE_X86_64_URL="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"
 NODE_AARCH64_URL="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-arm64.tar.xz"
+
+# 当前固定版本的二进制 SHA256（下载/安装后强校验，防止镜像/代理替换）。
+RUNTIME_SHA256_ARIA2_X86_64="80e577dc58348b96da46dd12d326bc99794b5021be395a3e890f2d67c8790c22"
+RUNTIME_SHA256_ARIA2_AARCH64="99a057bd383a28f1d5fab6e8cc5f6f3ed4172f5e65c59548242e965454d654c1"
+RUNTIME_SHA256_7Z_X86_64="f94066e93f9a807547a3bff1021b3ec79d5ea4f57dfead018e9698182ad283b5"
+RUNTIME_SHA256_7Z_AARCH64="798bf71d3e2c33ae098c32965b9868e1b4ae8bfaeeba9bed06d9eabceffcd1a4"
+RUNTIME_SHA256_NODE_X86_64="a7ec1b37e6ff9d187e4198c5b6df9a4eb1c74dd31804fb3bac55cc4ceca1ac01"
+RUNTIME_SHA256_NODE_AARCH64="8f9c2a55879e9705cb285b6cdd649d95df642c6720f052cb30f300d2677da99f"
 
 MIN_BINARY_SIZE=1048576 # 1 MiB，防止把 LFS 占位符 / 错误页面当成二进制
 
@@ -60,8 +68,8 @@ usage() {
 
 下载 freedeckCY 运行所需的 Linux 二进制到 defaults/runtime/：
   aria2/<arch>/aria2c       aria2 1.37.0 静态构建（来自 abcfy2/aria2-static-build）
-  7z/<arch>/7zz             7-Zip 23.01 官方 Linux 版
-  node/<arch>/bin/node      Node.js v20.18.1（天翼 JS 解析器使用）
+  7z/<arch>/7zz             7-Zip 26.06 官方 Linux 版
+  node/<arch>/bin/node      Node.js v24.22.3（天翼 JS 解析器使用）
 
 选项:
   --arch <x86_64|aarch64|all>  目标架构，默认按本机 uname -m 自动识别
@@ -325,10 +333,15 @@ download() { # url out label [accept]
     fi
     curl_args+=(-fL --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 1800 -o "${out}" "${url}")
     if ! curl "${curl_args[@]}"; then
-        warn "下载失败: ${label}"
-        warn "  源地址: ${url}"
-        warn "  建议: 检查网络/代理设置后重试；确认 curl 可访问该域名（aria2 走 api.github.com，7z/node 走官方直链）"
-        return 1
+        # GitHub 直链在部分网络下 HTTP/2 framing 会失败，回退 HTTP/1.1 再试一次。
+        warn "下载失败，尝试 HTTP/1.1 重试: ${label}"
+        rm -f -- "${out}"
+        if ! curl --http1.1 "${curl_args[@]}"; then
+            warn "下载失败: ${label}"
+            warn "  源地址: ${url}"
+            warn "  建议: 检查网络/代理设置后重试；确认 curl 可访问该域名（aria2 走 api.github.com，7z/node 走官方直链）"
+            return 1
+        fi
     fi
     if [[ ! -s "${out}" ]]; then
         warn "下载结果为空文件: ${label} (${out})"
@@ -369,8 +382,27 @@ find_first_file() { # dir find-args...
     printf '%s' "${found}"
 }
 
-install_binary() { # src dest label arch
-    local src="$1" dest="$2" label="$3" arch="$4"
+verify_binary_sha256() { # path expected label
+    local path="$1" expected="$2" label="$3" actual=""
+    [[ -n "${expected}" ]] || return 0
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual="$(sha256sum "${path}" | awk '{print $1}')"
+    elif command -v shasum >/dev/null 2>&1; then
+        actual="$(shasum -a 256 "${path}" | awk '{print $1}')"
+    else
+        warn "缺少 sha256sum/shasum，无法校验 ${label}"
+        return 1
+    fi
+    if [[ "${actual}" != "${expected}" ]]; then
+        warn "${label} SHA256 不匹配（期望 ${expected}，实际 ${actual}）"
+        return 1
+    fi
+    log "SHA256 校验通过 ${label}"
+    return 0
+}
+
+install_binary() { # src dest label arch [expected_sha256]
+    local src="$1" dest="$2" label="$3" arch="$4" expected="${5:-}"
     if [[ -z "${src}" || ! -f "${src}" ]]; then
         warn "${label} 解压产物中未找到可执行文件"
         return 1
@@ -383,6 +415,10 @@ install_binary() { # src dest label arch
     chmod 755 "${dest}"
     if ! validate_binary "${dest}" "${label}" "${arch}"; then
         warn "安装后校验失败: ${dest}"
+        return 1
+    fi
+    if ! verify_binary_sha256 "${dest}" "${expected}" "${label}"; then
+        warn "安装后 SHA256 校验失败: ${dest}"
         return 1
     fi
     log "完成 ${label} -> ${dest}"
@@ -492,7 +528,13 @@ fetch_aria2() { # arch
     esac
 
     dest="${DEST}/aria2/${arch}/aria2c"
+    local expected=""
+    case "${arch}" in
+        x86_64) expected="${RUNTIME_SHA256_ARIA2_X86_64}" ;;
+        aarch64) expected="${RUNTIME_SHA256_ARIA2_AARCH64}" ;;
+    esac
     if should_skip "${dest}" "aria2c (${arch})" "${arch}"; then
+        verify_binary_sha256 "${dest}" "${expected}" "aria2c (${arch})" || return 1
         return 0
     fi
 
@@ -512,7 +554,7 @@ fetch_aria2() { # arch
     extract_zip "${zip}" "${extract}" || return 1
 
     dir="$(find_first_file "${extract}" -name aria2c)"
-    install_binary "${dir}" "${dest}" "aria2c (${arch})" "${arch}" || return 1
+    install_binary "${dir}" "${dest}" "aria2c (${arch})" "${arch}" "${expected}" || return 1
     install_optional_licenses "${extract}" "$(dirname "${dest}")" "aria2c (${arch})"
 }
 
@@ -529,7 +571,13 @@ fetch_7z() { # arch
     esac
 
     dest="${DEST}/7z/${arch}/7zz"
+    local expected=""
+    case "${arch}" in
+        x86_64) expected="${RUNTIME_SHA256_7Z_X86_64}" ;;
+        aarch64) expected="${RUNTIME_SHA256_7Z_AARCH64}" ;;
+    esac
     if should_skip "${dest}" "7zz (${arch})" "${arch}" "License.txt"; then
+        verify_binary_sha256 "${dest}" "${expected}" "7zz (${arch})" || return 1
         return 0
     fi
 
@@ -541,7 +589,7 @@ fetch_7z() { # arch
     extract_tar_xz "${tar}" "${extract}" || return 1
 
     dir="$(find_first_file "${extract}" -name 7zz)"
-    install_binary "${dir}" "${dest}" "7zz (${arch})" "${arch}" || return 1
+    install_binary "${dir}" "${dest}" "7zz (${arch})" "${arch}" "${expected}" || return 1
     install_required_license "${extract}" "$(dirname "${dest}")" "License.txt" "7zz (${arch})"
 }
 
@@ -559,7 +607,13 @@ fetch_node() { # arch
 
     dest="${DEST}/node/${arch}/bin/node"
     license_dir="${DEST}/node/${arch}"
+    local expected=""
+    case "${arch}" in
+        x86_64) expected="${RUNTIME_SHA256_NODE_X86_64}" ;;
+        aarch64) expected="${RUNTIME_SHA256_NODE_AARCH64}" ;;
+    esac
     if should_skip "${dest}" "node (${arch})" "${arch}" "LICENSE" "${license_dir}"; then
+        verify_binary_sha256 "${dest}" "${expected}" "node (${arch})" || return 1
         return 0
     fi
 
@@ -574,7 +628,7 @@ fetch_node() { # arch
     if [[ -z "${dir}" ]]; then
         dir="$(find_first_file "${extract}" -name node)"
     fi
-    install_binary "${dir}" "${dest}" "node (${arch})" "${arch}" || return 1
+    install_binary "${dir}" "${dest}" "node (${arch})" "${arch}" "${expected}" || return 1
     install_required_license "${extract}" "${license_dir}" "LICENSE" "node (${arch})"
 }
 

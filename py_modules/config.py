@@ -29,6 +29,11 @@ def setup_logger() -> logging.Logger:
         handler = logging.StreamHandler()
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    # 日志可能含分享令牌/会话片段，固定 0600，避免同机其他用户读取。
+    try:
+        os.chmod("/tmp/freedeckcy.log", 0o600)
+    except Exception:
+        pass
     # 不向 root logger 传播，避免和 Decky 自己的日志配置互相覆盖。
     logger.propagate = False
     return logger
