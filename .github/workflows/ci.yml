@@ -153,7 +153,7 @@ jobs:
       - name: Install QEMU and arm64 sysroot
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-user-static gcc-aarch64-linux-gnu libstdc++6-arm64-cross libgcc-s1-arm64-cross
+          sudo apt-get install -y qemu-user gcc-aarch64-linux-gnu libstdc++6-arm64-cross libgcc-s1-arm64-cross
 
       - name: Fetch aarch64 runtime
         env:
@@ -168,5 +168,5 @@ jobs:
           bash scripts/verify_runtime.sh \
             --dir /tmp/freedeckcy-runtime-arm64 \
             --arch aarch64 \
-            --runner qemu-aarch64-static \
+            --runner qemu-aarch64 \
             --sysroot /usr/aarch64-linux-gnu
