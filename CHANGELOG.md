@@ -2,6 +2,32 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.2
+
+### 多智能体集中修复
+
+- **后端**：分卷组 lead 优先主卷并保留 `bundled` 语义；安装收尾异常不再错误标记 `post_processed`；
+  自动重试最多 5 次后转终态；7 天清理不再删除“已下完未安装”的任务；
+  面板只读刷新不再裁掉 installed 记录；卸载与安装收尾竞态；HTTP 错误 message 脱敏；
+  跨站 GET 副作用拒绝；Origin 端口随服务端口重置；并发 start_server 单实例；
+  日志 `O_NOFOLLOW`、aria2 runtime meta 0600 原子写。
+- **模拟器/存档**：3DS sysdata 临时目录/`azahar-emu` 路径/`nand+sdmc` 布局修复；
+  `.cia` title-id 与按 title 存档；PS1 `.iso/.pbp`、单组回退、已有 m3u 优先；
+  GBA 嵌套 ROM 目录不再当存档；PSP/PS3/3DS 跨设备恢复目录层；
+  模拟器缓存完整性、Content-Length、原子解包、Flatpak 非交互。
+- **前端**：设置页漏依赖、百度扫码状态、全局 busy 超时；原生库请求序号/搜索回车/卸载锁；
+  “Steam 库”兜底；网页库 API 错误、安装卡死、焦点/回车、登录态与备份入口。
+- **网盘/提交/打包**：百度 QR 错误脱敏/Cookie 回退/超时状态；OpenAPI 双层脱敏；
+  分享码归一、pwd 覆盖、openpath/公式校验；Android 存储别名；
+  runtime 损坏自愈、`--verify-only`/`--self-test`/manifest；package 全架构检查与自动 sha256。
+- **测试**：新增 `tests/sim/` 全模拟与 `tests/test_backend_fixes.py`；385 → 518。
+
+### 已知限制
+
+- 3DS CIA 自动安装后仍无直接 Steam 快捷方式，从 Azahar 列表启动。
+- SteamOS/DroidDeck 真机、CIA 启动、百度真实扫码仍需验收。
+- docs 部分历史行号/旧路径可能滞后，后续统一校准。
+
 ## v0.26.1
 
 ### 新增

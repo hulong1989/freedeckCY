@@ -7,10 +7,17 @@ from pathlib import Path
 
 
 class _PrivateRotatingFileHandler(RotatingFileHandler):
-    """轮转日志始终用 0600 创建，避免新日志文件按 umask 变成 0644。"""
+    """轮转日志始终用 0600 创建，避免新日志文件按 umask 变成 0644。
+
+    额外用 O_NOFOLLOW：/tmp 是全用户可写的，别人可以预先放一个
+    `/tmp/freedeckcy.log -> ~/.bashrc` 之类的符号链接，让以本用户身份运行的
+    插件把日志追加进任意文件；遇到符号链接直接拒绝打开（setup_logger 会退回
+    stderr，不影响功能也不跟随链接）。
+    """
 
     def _open(self):
-        fd = os.open(self.baseFilename, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(self.baseFilename, flags, 0o600)
         return os.fdopen(fd, self.mode, encoding=self.encoding)
 
 
@@ -32,16 +39,18 @@ def setup_logger() -> logging.Logger:
             backupCount=3,
             encoding="utf-8",
         )
+        # 只有文件处理器真的打开成功后才收紧权限：打开失败（例如 /tmp 下被放了
+        # 符号链接）时退化为 stderr，绝不能对链接目标执行 chmod。
+        # 日志可能含分享令牌/会话片段，固定 0600，避免同机其他用户读取。
+        try:
+            os.chmod("/tmp/freedeckcy.log", 0o600)
+        except Exception:
+            pass
     except Exception:
         # 只读环境等场景退化到 stderr，至少不丢日志。
         handler = logging.StreamHandler()
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    # 日志可能含分享令牌/会话片段，固定 0600，避免同机其他用户读取。
-    try:
-        os.chmod("/tmp/freedeckcy.log", 0o600)
-    except Exception:
-        pass
     # 不向 root logger 传播，避免和 Decky 自己的日志配置互相覆盖。
     logger.propagate = False
     return logger

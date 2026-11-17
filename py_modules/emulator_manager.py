@@ -407,6 +407,7 @@ async def _run_flatpak(args: Sequence[str], *, timeout: float = 600.0) -> Tuple[
     try:
         process = await asyncio.create_subprocess_exec(
             *args,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
@@ -439,13 +440,13 @@ async def _ensure_flatpak(spec: EmulatorSpec, *, allow_download: bool) -> Option
         timeout=120,
     )
     code, output = await _run_flatpak(
-        [binary, "install", "-y", "--user", "flathub", spec.flatpak_id],
+        [binary, "install", "-y", "--noninteractive", "--user", "flathub", spec.flatpak_id],
         timeout=1200,
     )
     if code != 0:
         config.logger.warning("Flatpak user install failed for %s: %s", spec.flatpak_id, output[-500:])
         code, output = await _run_flatpak(
-            [binary, "install", "-y", "flathub", spec.flatpak_id],
+            [binary, "install", "-y", "--noninteractive", "flathub", spec.flatpak_id],
             timeout=1200,
         )
     if flatpak_installed(spec.flatpak_id, max_age=0):
@@ -608,18 +609,72 @@ def emulator_status(platform_name: str, plugin_dir: str = "") -> Dict[str, Any]:
     }
 
 
+_ELF_MAGIC = b"\x7fELF"
+
+
+def _asset_integrity_error(spec: EmulatorSpec, path: str) -> str:
+    """检查已下载/缓存的发行包是否明显不可用（大小、文件头）。
+
+    返回空字符串表示通过；否则返回面向用户/日志的原因。
+    """
+    try:
+        size = int(os.path.getsize(path))
+    except OSError as exc:
+        return f"文件不可读（{exc}）"
+    if size < spec.min_bytes:
+        return f"文件不完整（{size}/{spec.min_bytes} 字节）"
+    if spec.archive == "zip":
+        if not zipfile.is_zipfile(path):
+            return "不是有效的 zip 压缩包"
+        return ""
+    try:
+        with open(path, "rb") as fh:
+            magic = fh.read(4)
+    except OSError as exc:
+        return f"无法读取文件头（{exc}）"
+    if magic != _ELF_MAGIC:
+        return "不是有效的 AppImage（缺少 ELF 文件头）"
+    return ""
+
+
 def _run_appimage_extract(appimage: str, dest_dir: Path) -> None:
+    """把 AppImage 解包到 dest_dir/squashfs-root。
+
+    先在临时目录解包、成功后再原子替换，避免中途失败留下半成品目录，
+    被 installed_command() 误判为“已安装”。
+    """
     dest_dir.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        [appimage, "--appimage-extract"],
-        cwd=str(dest_dir),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=300,
-    )
-    if result.returncode != 0:
-        message = (result.stderr or b"").decode("utf-8", "replace").strip()
-        raise RuntimeError(f"解包 AppImage 失败: {message[:300]}")
+    staging = dest_dir / f".squashfs-extract-{os.getpid()}-{int(time.time() * 1000)}"
+    final_root = dest_dir / "squashfs-root"
+    staging.mkdir(parents=True, exist_ok=True)
+    try:
+        try:
+            os.chmod(appimage, 0o755)
+        except OSError:
+            pass
+        result = subprocess.run(
+            [appimage, "--appimage-extract"],
+            cwd=str(staging),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            message = (result.stderr or b"").decode("utf-8", "replace").strip()
+            raise RuntimeError(f"解包 AppImage 失败: {message[:300]}")
+        extracted = staging / "squashfs-root"
+        if not extracted.is_dir():
+            raise RuntimeError("解包 AppImage 失败: 未生成 squashfs-root 目录")
+        if final_root.is_dir():
+            shutil.rmtree(final_root, ignore_errors=True)
+        os.replace(extracted, final_root)
+    except Exception:
+        # 失败时清理半成品，下次启动不会误用不完整的解包目录。
+        shutil.rmtree(staging, ignore_errors=True)
+        shutil.rmtree(final_root, ignore_errors=True)
+        raise
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def _extract_zip_emulator(spec: EmulatorSpec, archive: str, dest_dir: Path) -> str:
@@ -645,8 +700,16 @@ async def _download_asset(spec: EmulatorSpec, arch: str) -> str:
     root = _state_root(spec, arch)
     root.mkdir(parents=True, exist_ok=True)
     target = root / asset
-    if target.is_file() and target.stat().st_size >= spec.min_bytes:
-        return str(target)
+    if target.is_file():
+        error = _asset_integrity_error(spec, str(target))
+        if not error:
+            return str(target)
+        # 上次下载/解包失败可能留下坏文件，不能直接信任缓存。
+        config.logger.warning("%s 缓存文件不可用（%s），重新下载", spec.name, error)
+        try:
+            target.unlink()
+        except OSError:
+            pass
 
     url = f"{spec.download_base}/{asset}"
     timeout = aiohttp.ClientTimeout(total=1800, sock_read=120)
@@ -654,21 +717,42 @@ async def _download_asset(spec: EmulatorSpec, arch: str) -> str:
     try:
         if part.exists():
             part.unlink()
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url, allow_redirects=True) as response:
-                if int(response.status) != 200:
-                    raise RuntimeError(f"下载 {spec.name} 失败: HTTP {int(response.status)}")
-                with open(part, "wb") as fh:
-                    async for chunk in response.content.iter_chunked(1024 * 256):
-                        if chunk:
-                            fh.write(chunk)
-        if not part.is_file() or part.stat().st_size < spec.min_bytes:
-            raise RuntimeError(f"{spec.name} 下载不完整")
+        expected: Optional[int] = None
+        received = 0
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, allow_redirects=True) as response:
+                    status = int(response.status)
+                    if status != 200:
+                        hint = "（可能触发 GitHub 下载限流，请稍后重试）" if status in {403, 429} else ""
+                        raise RuntimeError(f"下载 {spec.name} 失败: HTTP {status}{hint}")
+                    try:
+                        expected = int(response.headers.get("Content-Length") or 0) or None
+                    except (TypeError, ValueError):
+                        expected = None
+                    with open(part, "wb") as fh:
+                        async for chunk in response.content.iter_chunked(1024 * 256):
+                            if chunk:
+                                fh.write(chunk)
+                                received += len(chunk)
+        except asyncio.TimeoutError as exc:
+            raise RuntimeError(f"下载 {spec.name} 超时，请检查网络后重试") from exc
+        except aiohttp.ClientError as exc:
+            raise RuntimeError(f"下载 {spec.name} 网络错误: {exc}") from exc
+        except OSError as exc:
+            raise RuntimeError(f"下载 {spec.name} 写入失败: {exc}") from exc
+        if expected and received != expected:
+            raise RuntimeError(
+                f"{spec.name} 下载不完整（收到 {received} / 预期 {expected} 字节），请重试"
+            )
+        error = _asset_integrity_error(spec, str(part))
+        if error:
+            raise RuntimeError(f"{spec.name} 下载校验失败：{error}")
         os.replace(part, target)
     except Exception:
         try:
             part.unlink()
-        except Exception:
+        except OSError:
             pass
         raise
     os.chmod(target, 0o755)
@@ -685,6 +769,11 @@ def _ensure_extracted(spec: EmulatorSpec, appimage: str) -> List[str]:
     except Exception as exc:
         # 某些 AppImage 不带 runtime（或当前环境不允许执行），尝试直接运行下载的 AppImage；
         # 记录原因，安装消息仍会走到 Steam 注册，后续启动失败可据此排查。
+        if not os.access(appimage, os.X_OK):
+            raise RuntimeError(
+                f"{spec.name} AppImage 解包失败且无法直接执行：{appimage}（{exc}）；"
+                "请检查下载文件完整性，或系统是否支持 AppImage/FUSE"
+            ) from exc
         config.logger.warning("%s AppImage 解包失败，回退直接运行: %s", spec.name, exc)
         return [appimage]
     found = installed_command(spec, arch)
@@ -721,7 +810,7 @@ async def ensure_emulator(
     command = resolve_command(spec, plugin_dir)
     if command:
         first = command[0]
-        if first.lower().endswith((".appimage", ".appimage")):
+        if first.lower().endswith(".appimage"):
             return _ensure_extracted(spec, first)
         return command
 
@@ -748,6 +837,11 @@ def _common_parent(paths: Sequence[Path]) -> Path:
     except Exception:
         common = str(paths[0].parent)
     return Path(common)
+
+
+PS1_DISC_EXTENSIONS = (".cue", ".chd", ".iso", ".pbp")
+# 同一张碟有多种格式时优先 .cue（保留音轨信息），其次 chd/iso/pbp。
+_PS1_DISC_RANK = {".cue": 0, ".chd": 1, ".iso": 2, ".pbp": 3}
 
 
 def _ps1_game_key(value: str) -> str:
@@ -808,7 +902,9 @@ def find_rom_file(
 
     if str(platform_name or "").lower() == "ps1":
         playlists = [path for path in roms if path.suffix.lower() == ".m3u"]
-        discs = [path for path in roms if path.suffix.lower() in {".cue", ".chd"}]
+        # .cue/.chd/.iso/.pbp 都是单文件碟镜像；只认 cue/chd 会让“只有 iso/pbp
+        # 的 PS1 安装目录”永远找不到 ROM，这里一并纳入分组。
+        discs = [path for path in roms if path.suffix.lower() in PS1_DISC_EXTENSIONS]
         wanted_rel = str(open_path or "").replace("\\", "/").strip("/").lower()
         title_keys = {
             _ps1_game_key(part)
@@ -825,7 +921,7 @@ def find_rom_file(
         def is_disc_dir(name: str) -> bool:
             return bool(name) and any(token in name.lower() for token in ("disc", "disk", "cd"))
 
-        # 按“游戏根目录 + 去碟号名称”分组，而不是把所有 cue/chd 混在一起。
+        # 按“游戏根目录 + 去碟号名称”分组，而不是把所有碟镜像混在一起。
         groups: Dict[tuple, List[Path]] = {}
         for disc in discs:
             group_dir = disc.parent
@@ -859,7 +955,7 @@ def find_rom_file(
             # 2) openpath 指向目录 / 碟目录。
             if selected is None:
                 wanted_parent = os.path.dirname(wanted_rel).strip("/")
-                if wanted_rel.endswith((".cue", ".chd", ".bin", ".m3u")):
+                if wanted_rel.endswith((*PS1_DISC_EXTENSIONS, ".bin", ".m3u")):
                     wanted_dir = wanted_parent
                 else:
                     wanted_dir = wanted_rel
@@ -898,22 +994,40 @@ def find_rom_file(
                     sorted(f"{key[1]}@{key[0]}" for key in groups)[:8],
                 )
                 return ""
-            elif len(playlists) == 1:
-                return str(playlists[0])
-            elif playlists:
-                config.logger.warning("PS1 m3u 歧义：openpath=%s title=%s count=%s", open_path, title, len(playlists))
+            else:
+                # 没有可分组碟镜像（只有 m3u 等）：唯一 playlist 可直接用。
+                if len(playlists) == 1:
+                    return str(playlists[0])
+                if playlists:
+                    config.logger.warning("PS1 m3u 歧义：openpath=%s title=%s count=%s", open_path, title, len(playlists))
                 return ""
-            return ""
 
         discs = groups[selected]
-        # 同一张碟同时有 cue/chd 时只保留一个，避免重复行。
+        # 同一张碟同时有多种格式时只保留一个，避免 m3u 重复行。
         deduped: Dict[tuple, Path] = {}
         for disc in discs:
             key = (str(disc.parent), disc.stem.lower())
             previous = deduped.get(key)
-            if previous is None or (previous.suffix.lower() == ".chd" and disc.suffix.lower() == ".cue"):
+            if previous is None or _PS1_DISC_RANK.get(disc.suffix.lower(), 99) < _PS1_DISC_RANK.get(previous.suffix.lower(), 99):
                 deduped[key] = disc
         discs = list(deduped.values())
+
+        def matching_playlists() -> List[Path]:
+            return [
+                path for path in playlists
+                if rel_norm(path.parent) == selected[0]
+                and (not selected[1] or selected[1] == "__discs__" or selected[1] in _ps1_game_key(path.stem))
+            ]
+
+        # 用户已有的 m3u 优先（即使组内是多碟）：尊重用户选择，不额外生成文件。
+        matching = matching_playlists()
+        if len(matching) == 1:
+            return str(matching[0])
+        if len(matching) > 1:
+            config.logger.warning("PS1 m3u 歧义：openpath=%s title=%s matching=%s", open_path, title, [path.name for path in matching[:8]])
+            return ""
+        if len(playlists) == 1 and len(groups) == 1:
+            return str(playlists[0])
 
         if len(discs) > 1:
             parent = _common_parent(discs)
@@ -933,19 +1047,6 @@ def find_rom_file(
             except Exception as exc:
                 config.logger.warning("PS1 m3u 生成失败，回退单碟: %s", exc)
 
-        if playlists:
-            matching = [
-                path for path in playlists
-                if rel_norm(path.parent) == selected[0]
-                and (not selected[1] or selected[1] == "__discs__" or selected[1] in _ps1_game_key(path.stem))
-            ]
-            if len(matching) == 1:
-                return str(matching[0])
-            if len(matching) > 1:
-                config.logger.warning("PS1 m3u 歧义：openpath=%s title=%s matching=%s", open_path, title, [path.name for path in matching[:8]])
-                return ""
-            if len(playlists) == 1:
-                return str(playlists[0])
         return str(sorted(discs, key=sort_key)[0])
     return str(sorted(roms, key=sort_key)[0])
 

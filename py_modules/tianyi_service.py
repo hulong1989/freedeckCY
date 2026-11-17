@@ -102,6 +102,9 @@ MAINTENANCE_INTERVAL_SECONDS = 8.0
 MAINTENANCE_SYNC_TIMEOUT_SECONDS = 8.0
 # aria2 单次状态查询失败不立刻判死，连续多次才标记错误（容忍重启/瞬时不可用）。
 TASK_SYNC_ERROR_THRESHOLD = 5
+# 安装收尾异常的后台自动重试上限：退避重试到上限后转为终态失败（避免永久重试刷日志）。
+# 用户修复目录/空间后仍可在任务上手动“重试”，会重新获得重试次数。
+POST_PROCESS_MAX_ATTEMPTS = 5
 # 解压前的最低剩余空间系数：压缩包之外还要留一点余量。
 EXTRACT_FREE_SPACE_MARGIN = 1.05
 # 安装空间估算系数（压缩包 -> 解压后），仅用于给用户提示，不作为硬性拦截。
@@ -5668,6 +5671,7 @@ class TianyiService:
                 install_path=install_path,
                 delete_files=delete_files,
                 delete_compatdata=delete_compatdata,
+                record=record,
             )
 
     async def _uninstall_installed_game_impl(
@@ -5677,14 +5681,19 @@ class TianyiService:
         install_path: str = "",
         delete_files: bool = True,
         delete_compatdata: bool = False,
+        record: Optional[TianyiInstalledGame] = None,
     ) -> Dict[str, Any]:
-        """卸载实现（调用方需持有安装目录锁）。"""
+        """卸载实现（调用方需持有安装目录锁）。
+
+        `record` 由加锁前的初始查询传入：等锁期间记录可能被另一路卸载/面板清理删掉，
+        此时继续用初始记录完成剩余清理，避免“文件已删但接口报错、Steam 快捷方式残留”。
+        """
         target_game_id = str(game_id or "").strip()
         target_install_path = str(install_path or "").strip()
         if not target_game_id and not target_install_path:
             raise ValueError("缺少卸载目标")
 
-        record = self._find_installed_record(game_id=target_game_id, install_path=target_install_path)
+        record = self._find_installed_record(game_id=target_game_id, install_path=target_install_path) or record
         if record is None:
             raise ValueError("未找到已安装游戏记录")
 
@@ -5755,7 +5764,14 @@ class TianyiService:
                     persist_warning = str(exc)
                     config.logger.warning("Installed record fallback save failed: %s", exc)
             else:
-                raise RuntimeError("卸载记录写入失败，请重试")
+                # 记录已被并发清理（另一路卸载/面板刷新裁剪掉已删目录）：
+                # 文件都删完了，继续清理 Steam 快捷方式即可，不要在这里报错。
+                removed = record
+                config.logger.info(
+                    "Uninstall record already gone, continue cleanup game=%s path=%s",
+                    record.game_id,
+                    record.install_path,
+                )
 
         steam_cleanup: Dict[str, Any] = {}
         steam_warning = ""
@@ -6396,6 +6412,20 @@ class TianyiService:
         return members
 
     @staticmethod
+    def _group_install_lead(members: Sequence[TianyiTaskRecord]) -> TianyiTaskRecord:
+        """安装收尾的 lead：优先主卷/入口文件（非 bundled 成员）。
+
+        分卷任务的排序是 created_at+task_id，同秒创建且非主卷 task_id 更小时，
+        members[0] 会是非主卷；若直接拿它当 lead，收尾会把它的 ``bundled``
+        状态覆盖成 ``installed``（展示语义错误），也可能让 Steam 注册用错文件。
+        """
+        candidates = list(members or [])
+        for member in candidates:
+            if str(member.install_status or "") != "bundled":
+                return member
+        return candidates[0]
+
+    @staticmethod
     def _post_process_group_key(task: TianyiTaskRecord) -> str:
         return str(task.group_id or task.task_id or "").strip()
 
@@ -6406,7 +6436,8 @@ class TianyiService:
             return False
         return float(state.get("next_retry_at", 0) or 0) > time.time()
 
-    def _record_post_process_failure(self, task: TianyiTaskRecord, exc: Exception) -> None:
+    def _record_post_process_failure(self, task: TianyiTaskRecord, exc: Exception) -> int:
+        """记录一次安装收尾失败并返回累计失败次数（用于判定是否放弃自动重试）。"""
         key = self._post_process_group_key(task)
         state = self._post_process_failures.get(key) or {"count": 0}
         count = int(state.get("count", 0) or 0) + 1
@@ -6417,9 +6448,33 @@ class TianyiService:
             "next_retry_at": time.time() + delay,
         }
         config.logger.warning("Post-process backoff group=%s count=%s next=%ss: %s", key, count, int(delay), exc)
+        return count
 
     def _clear_post_process_failure(self, task: TianyiTaskRecord) -> None:
         self._post_process_failures.pop(self._post_process_group_key(task), None)
+
+    def _give_up_post_process(self, task: TianyiTaskRecord, exc: Exception, *, attempt: int) -> None:
+        """自动重试次数用尽：标记终态失败并停止调度，避免永久重试。
+
+        安装根不可用/磁盘写满这类问题可能长期存在，后台每 5 分钟重试一次既刷日志
+        又永远不结束；到上限后转成用户可见的失败，修复环境后点击“重试”即可重新开始。
+        """
+        key = self._post_process_group_key(task)
+        self._post_process_failures.pop(key, None)
+        reason = _redact_text(str(exc or "未知错误")).strip()[:300] or "未知错误"
+        for member in self._install_group_members(task):
+            if bool(member.post_processed) and str(member.install_status or "") == "installed":
+                continue
+            member.post_processed = True
+            member.install_status = "failed"
+            member.install_message = (
+                f"安装收尾连续失败 {int(attempt)} 次，已停止自动重试：{reason}；"
+                "请检查安装目录/磁盘空间后点击重试"
+            )
+            member.updated_at = _now_wall_ts()
+        config.logger.error(
+            "Post-process gave up after %s attempts group=%s: %s", int(attempt), key, reason
+        )
 
     def _maybe_schedule_group_post_process(self, task: TianyiTaskRecord) -> None:
         """组内全部文件都下完了才调度安装，避免分卷包缺文件就开始解压。"""
@@ -6754,12 +6809,23 @@ class TianyiService:
             raise
         except Exception as exc:
             config.logger.exception("Post-process failed for task %s: %s", task_id, exc)
-            self._record_post_process_failure(task, exc)
-            task.install_status = "failed"
-            task.install_message = f"安装流程异常: {exc}；将稍后自动重试"
-            task.updated_at = _now_wall_ts()
+            attempts = self._record_post_process_failure(task, exc)
+            if attempts >= POST_PROCESS_MAX_ATTEMPTS:
+                self._give_up_post_process(task, exc, attempt=attempts)
+            else:
+                task.install_status = "failed"
+                task.install_message = (
+                    f"安装流程异常: {_redact_text(str(exc))[:300]}；"
+                    f"将在后台自动重试（第 {attempts}/{POST_PROCESS_MAX_ATTEMPTS} 次）"
+                )
+                task.updated_at = _now_wall_ts()
         finally:
-            await asyncio.to_thread(self.store.save)
+            try:
+                await asyncio.to_thread(self.store.save)
+            except Exception as exc:
+                # 后台任务里的状态写入失败不能冒泡成未处理异常，否则整个“后台自动重试”
+                # 机制会静默失效；下一次刷新/维护会把状态重新落盘。
+                config.logger.warning("Post-process state save failed: %s", exc)
 
     async def pause_task(self, task_id: str) -> Dict[str, Any]:
         """暂停任务。"""
@@ -6856,11 +6922,27 @@ class TianyiService:
         return None
 
     def _cleanup_tasks(self, tasks: List[TianyiTaskRecord]) -> None:
-        """清理过旧终态任务。"""
+        """清理过旧终态任务（下载已完成但安装收尾未完成的除外）。"""
         now = _now_wall_ts()
+        # 同一安装计划里还有“已下完但没装完”的成员时，组内失败分卷不能单独清掉：
+        # 否则 7 天后会自动把残缺分卷组放行去解压，结果是安装失败/重下。
+        pending_group_ids = {
+            str(task.group_id or "").strip()
+            for task in tasks
+            if str(task.status or "") == "complete"
+            and not bool(task.post_processed)
+            and str(task.group_id or "").strip()
+        }
         filtered: List[TianyiTaskRecord] = []
         for task in tasks:
             if not _is_terminal(task.status):
+                filtered.append(task)
+                continue
+            if str(task.status or "") == "complete" and not bool(task.post_processed):
+                # 下载完成但安装还没收尾：即使插件很久没开机也不能丢，重启后要继续补装。
+                filtered.append(task)
+                continue
+            if str(task.status or "") == "error" and str(task.group_id or "").strip() in pending_group_ids:
                 filtered.append(task)
                 continue
             if now - int(task.updated_at) <= TASK_RETENTION_SECONDS:
@@ -6868,7 +6950,12 @@ class TianyiService:
         tasks[:] = filtered
 
     def _build_installed_summary(self, limit: int = 8, persist: bool = True) -> Dict[str, Any]:
-        """构建已安装游戏预览。"""
+        """构建已安装游戏预览。
+
+        persist=False 是纯读路径（主界面轮询）：只过滤展示，不修改内存里的
+        installed_games。否则 SD 卡瞬时未挂载时面板刷新会把记录从内存裁掉，
+        之后任意一次 store.save（设置/任务状态）都会把丢记录落盘。
+        """
         normalized_limit = max(0, int(limit or 0))
         visible_items: List[Dict[str, Any]] = []
         kept_records: List[TianyiInstalledGame] = []
@@ -6882,10 +6969,9 @@ class TianyiService:
             kept_records.append(record)
             visible_items.append(self._installed_record_to_view(record))
 
-        if len(kept_records) != len(self.store.installed_games):
+        if persist and len(kept_records) != len(self.store.installed_games):
             self.store.installed_games = kept_records
-            if persist:
-                self.store.save()
+            self.store.save()
 
         return {
             "total": len(visible_items),
@@ -7835,6 +7921,9 @@ class TianyiService:
                     bundle_errors[path] = f"分卷不完整，缺少: {missing_text}"
 
             cancelled = False
+            # finished=True 只在整个安装收尾（含 Steam 注册/记录写入）走完时置位；
+            # 中途抛异常时保持 False，让未完成的成员留到退避重试，而不是被误标已处理。
+            finished = False
             repaired_members: set[str] = set()
             try:
                 failed = 0
@@ -7870,7 +7959,7 @@ class TianyiService:
                     if not ok:
                         failed += 1
 
-                lead = all_members[0] if all_members else members[0]
+                lead = self._group_install_lead(all_members or members)
                 if failed == 0 and not repaired_members:
                     # 用整组（含此前已装好的分卷）计算体积/写记录，避免部分修复后体积只剩一个包
                     await self._finalize_group_install(lead=lead, members=all_members, target_dir=target_dir)
@@ -7901,6 +7990,7 @@ class TianyiService:
                             if member.install_status == "failed":
                                 continue
                             member.install_message = f"「{title}」有文件安装失败，已跳过 Steam 注册"
+                finished = True
             except asyncio.CancelledError:
                 # 插件卸载/取消时不要把任务标记成已完成，重启后还能继续。
                 cancelled = True
@@ -7908,11 +7998,16 @@ class TianyiService:
             finally:
                 if not cancelled:
                     # 标记放在工作结束之后：解压中崩溃时任务仍未处理，下次启动会被重新拾起。
+                    # 只有整组收尾真正完成才标记 post_processed；异常中断时保持未处理，
+                    # 由 _run_post_process_task 的退避重试继续推进，避免“提示会自动重试但永不再试”。
                     for member in members:
-                        if member.task_id in repaired_members:
+                        if finished and member.task_id not in repaired_members:
+                            member.post_processed = True
+                        else:
                             member.post_processed = False
-                            continue
-                        member.post_processed = True
+                            if not finished and str(member.install_status or "") in {"installing", "waiting"}:
+                                member.install_status = "failed"
+                                member.install_message = "安装流程异常中断，稍后自动重试"
                         member.updated_at = _now_wall_ts()
                     self._invalidate_panel_cache(tasks=True)
 
@@ -8218,7 +8313,9 @@ class TianyiService:
             if deleted:
                 message_parts.append(f"已删除 {deleted} 个下载压缩包")
 
-        lead.install_status = "installed"
+        # 非主卷（bundled）的 lead 不能被覆盖成 installed：那只是主卷解压出来的分卷文件。
+        if str(lead.install_status or "") != "bundled":
+            lead.install_status = "installed"
         lead.installed_path = target_dir
         lead.install_message = "，".join(message_parts)
         lead.updated_at = _now_wall_ts()

@@ -46,17 +46,69 @@ class BaiduOpenApiError(RuntimeError):
     """百度网盘官方 OpenAPI 异常。"""
 
     def __init__(self, message: str, *, diagnostics: Optional[Dict[str, Any]] = None):
-        super().__init__(message)
+        # 错误正文可能拼进 URL/上游响应，先脱敏再交给日志/QAM 面板。
+        super().__init__(_sanitize_text(message))
         # 所有异常出口统一脱敏，避免 access_token/client_secret 进入日志/面板。
         self.diagnostics = _sanitize_diagnostics(diagnostics or {})
+
+
+# 诊断键名里出现这些片段即视为凭证（兼容 accessToken/client_secret 等命名）。
+_SENSITIVE_KEY_FRAGMENTS = (
+    "token",
+    "secret",
+    "cookie",
+    "bduss",
+    "stoken",
+    "ptoken",
+    "bdstoken",
+    "authorization",
+    "randsk",
+    "sekey",
+    "device_code",
+)
+_SENSITIVE_KEYS = frozenset(
+    {
+        "access_token",
+        "refresh_token",
+        "secret_key",
+        "client_secret",
+        "authorization",
+        "session_key",
+        "session_secret",
+        "cookie",
+        "bduss",
+        "stoken",
+        "ptoken",
+        "bdstoken",
+        "device_code",
+        "sekey",
+        "randsk",
+        "sign",
+        "pwd",
+    }
+)
+# 上游错误正文/URL 里的 "key=value" 形式凭证。
+_SENSITIVE_TEXT_RE = re.compile(
+    r"(?i)\b(access_token|refresh_token|client_secret|secret_key|session_key|session_secret|"
+    r"bduss|stoken|ptoken|bdstoken|device_code|authorization|cookie|randsk|sekey|sign|pwd)"
+    r"(\s*[=:]\s*)([^\s&;，,]+)"
+)
+
+
+def _sanitize_text(raw: Any) -> str:
+    """遮蔽任意文本里 key=value 形式的凭证（用于异常正文/diagnostics 字符串）。"""
+    return _SENSITIVE_TEXT_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}<redacted>", str(raw or ""))
 
 
 def _mask_secret(raw: str, *, head: int = 4, tail: int = 4) -> str:
     text = str(raw or "").strip()
     if not text:
         return ""
-    if len(text) <= head + tail:
-        return text[: max(1, min(len(text), head))]
+    # 短凭证几乎不能露字符：<=8 位全遮，<=16 位只留首尾各 2 位。
+    if len(text) <= 8:
+        return "<redacted>"
+    if len(text) <= 16:
+        return f"{text[:2]}…{text[-2:]}"
     return f"{text[:head]}…{text[-tail:]}"
 
 
@@ -67,23 +119,24 @@ def _sanitize_json_value(value: Any) -> Any:
         return [_sanitize_json_value(item) for item in value]
     if isinstance(value, tuple):
         return [_sanitize_json_value(item) for item in value]
+    if isinstance(value, str):
+        return _sanitize_text(value)
     return value
+
+
+def _diagnostics_key_is_sensitive(key: Any) -> bool:
+    normalized_key = str(key or "").strip().lower()
+    return normalized_key in _SENSITIVE_KEYS or any(
+        fragment in normalized_key for fragment in _SENSITIVE_KEY_FRAGMENTS
+    )
 
 
 def _sanitize_diagnostics(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     diagnostics = _sanitize_json_value(raw or {})
-    sensitive_keys = {
-        "access_token",
-        "refresh_token",
-        "secret_key",
-        "client_secret",
-        "authorization",
-    }
     if not isinstance(diagnostics, dict):
         return {}
     for key, value in list(diagnostics.items()):
-        normalized_key = str(key or "").strip().lower()
-        if normalized_key in sensitive_keys:
+        if _diagnostics_key_is_sensitive(key):
             diagnostics[key] = _mask_secret(str(value or ""))
         elif isinstance(value, dict):
             diagnostics[key] = _sanitize_diagnostics(value)

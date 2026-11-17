@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from types import SimpleNamespace
 
 import config
@@ -54,7 +55,7 @@ def test_psp_shared_save_dir(tmp_path, monkeypatch):
 
 def test_3ds_flatpak_save_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
-    sdmc = tmp_path / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar" / "sdmc" / "Nintendo 3DS"
+    sdmc = tmp_path / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar-emu" / "sdmc" / "Nintendo 3DS"
     sdmc.mkdir(parents=True)
     result = emulator_saves.collect_emulator_save_paths(_record("3ds", rom_path="/roms/game.3ds"))
     assert str(sdmc.parent) in result.paths
@@ -262,7 +263,7 @@ def test_3ds_save_split_by_title_id(tmp_path, monkeypatch):
     header[0x108:0x110] = (0x0004000000033600).to_bytes(8, "little")
     rom.write_bytes(bytes(header))
 
-    sdmc = tmp_path / ".local" / "share" / "azahar" / "sdmc"
+    sdmc = tmp_path / ".local" / "share" / "azahar-emu" / "sdmc"
     title = sdmc / "Nintendo 3DS" / "id0" / "id1" / "title" / "00040000" / "00033600"
     (title / "data").mkdir(parents=True)
     (title / "data" / "00000001.sav").write_bytes(b"save")
@@ -403,3 +404,199 @@ def test_prune_keeps_legacy_backup_dir(tmp_path, monkeypatch):
     TianyiService._prune_cloud_save_backups(keep=2)
     assert len(list(backups.glob("cloud-save-*"))) == 2
     assert (backups / "legacy").is_dir()
+
+
+# --- 空路径不能归一成当前工作目录（真实 bug：os.path.realpath("") == cwd） ---
+
+
+def test_normalize_existing_empty_path_is_not_cwd(tmp_path, monkeypatch):
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+    assert emulator_saves._normalize_existing("") == ""
+    assert emulator_saves._normalize_existing("   ") == ""
+
+
+def test_restore_roots_ignore_empty_record_paths(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+    roots = emulator_saves.restore_roots(_record("psp"))
+    resolved_cwd = os.path.realpath(str(cwd))
+    assert resolved_cwd not in roots
+    assert not any(os.path.realpath(root).startswith(resolved_cwd + os.sep) for root in roots)
+
+
+def test_gba_empty_paths_do_not_scan_cwd(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    (cwd / "game.sav").write_bytes(b"leak")
+    monkeypatch.chdir(cwd)
+    result = emulator_saves.collect_emulator_save_paths(_record("gba"))
+    assert result.paths == []
+    assert result.reason == "save_dir_missing"
+
+
+# --- GBA ROM 同目录存档：同名游戏目录不能当成存档（会把 ROM 本体一起上传） ---
+
+
+def test_gba_nested_rom_folder_is_not_uploaded_as_save(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    install = tmp_path / "install"
+    rom = install / "Game Name" / "Game Name.gba"
+    rom.parent.mkdir(parents=True)
+    rom.write_bytes(b"rom")
+    save = rom.parent / "Game Name.sav"
+    save.write_bytes(b"save")
+
+    result = emulator_saves.collect_emulator_save_paths(
+        _record("gba", rom_path=str(rom), install_path=str(install))
+    )
+    assert result.per_game is True
+    assert result.paths == [str(save)]
+
+
+# --- 3DS CIA 安装：从 CIA 里读 Program ID，存档按 title 拆分 ---
+
+
+def _synthetic_cia(path, program_id: int = 0x0004000000033600):
+    header = bytearray(0x2020)
+    header[0x00:0x04] = (0x2020).to_bytes(4, "little")
+    ncch = bytearray(0x120)
+    ncch[0x100:0x104] = b"NCCH"
+    ncch[0x118:0x120] = program_id.to_bytes(8, "little")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(bytes(header) + bytes(ncch))
+
+
+def test_3ds_reads_title_id_from_cia(tmp_path):
+    cia = tmp_path / "game.cia"
+    _synthetic_cia(cia)
+    assert emulator_saves._read_3ds_title_id(str(cia)) == "0004000000033600"
+
+
+def test_3ds_cia_install_splits_save_by_program_id(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    install = tmp_path / "install" / "Game"
+    _synthetic_cia(install / "game.cia")
+    title = (
+        tmp_path
+        / ".local"
+        / "share"
+        / "azahar-emu"
+        / "sdmc"
+        / "Nintendo 3DS"
+        / "id0"
+        / "id1"
+        / "title"
+        / "00040000"
+        / "00033600"
+    )
+    (title / "data").mkdir(parents=True)
+    (title / "data" / "00000001.sav").write_bytes(b"save")
+
+    result = emulator_saves.collect_emulator_save_paths(
+        _record("3ds", install_path=str(install))
+    )
+    assert result.per_game is True
+    assert result.paths == [str(title / "data")]
+
+
+# --- PSP/PS3/3DS 跨设备恢复目录层（真实 bug：只回填到根目录，丢失 title/savedata 层） ---
+
+
+def test_restore_targets_cross_device_3ds_keeps_title_layers(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    sdmc = tmp_path / ".local" / "share" / "azahar-emu" / "sdmc"
+    sdmc.mkdir(parents=True)
+    source = (
+        "/home/olduser/.local/share/azahar-emu/sdmc/"
+        "Nintendo 3DS/id0/id1/title/00040000/00033600/data"
+    )
+    roots, targets = emulator_saves.build_restore_targets(
+        _record("3ds"),
+        [{"entry_id": "e1", "entry_name": "data", "source_path": source, "archive_rel_path": "data"}],
+    )
+    expected = sdmc / "Nintendo 3DS" / "id0" / "id1" / "title" / "00040000" / "00033600"
+    assert targets["e1"] == str(expected)
+
+
+def test_restore_targets_same_machine_3ds_keeps_original_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    title = (
+        tmp_path
+        / ".local"
+        / "share"
+        / "azahar-emu"
+        / "sdmc"
+        / "Nintendo 3DS"
+        / "id0"
+        / "id1"
+        / "title"
+        / "00040000"
+        / "00033600"
+    )
+    data = title / "data"
+    data.mkdir(parents=True)
+    roots, targets = emulator_saves.build_restore_targets(
+        _record("3ds"),
+        [{"entry_id": "e1", "entry_name": "data", "source_path": str(data), "archive_rel_path": "data"}],
+    )
+    assert targets["e1"] == str(title)
+
+
+def test_restore_targets_cross_device_ps3_keeps_user_savedata_layers(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    home = tmp_path / ".config" / "rpcs3" / "dev_hdd0" / "home"
+    home.mkdir(parents=True)
+    source = "/home/olduser/.config/rpcs3/dev_hdd0/home/00000001/savedata/NPWR10001"
+    roots, targets = emulator_saves.build_restore_targets(
+        _record("ps3"),
+        [{"entry_id": "e1", "entry_name": "NPWR10001", "source_path": source, "archive_rel_path": "NPWR10001"}],
+    )
+    assert targets["e1"] == str(home / "00000001" / "savedata")
+
+
+def test_restore_targets_cross_device_ps3_whole_savedata_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    home = tmp_path / ".config" / "rpcs3" / "dev_hdd0" / "home"
+    home.mkdir(parents=True)
+    source = "/home/olduser/.config/rpcs3/dev_hdd0/home/00000001/savedata"
+    roots, targets = emulator_saves.build_restore_targets(
+        _record("ps3"),
+        [{"entry_id": "e1", "entry_name": "savedata", "source_path": source, "archive_rel_path": "savedata"}],
+    )
+    assert targets["e1"] == str(home / "00000001")
+
+
+def test_restore_roots_ps3_prefers_discovered_savedata(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    savedata = tmp_path / ".config" / "rpcs3" / "dev_hdd0" / "home" / "00000001" / "savedata"
+    savedata.mkdir(parents=True)
+    roots = emulator_saves.restore_roots(_record("ps3"))
+    assert os.path.realpath(roots[0]) == os.path.realpath(str(savedata))
+
+
+def test_restore_targets_cross_device_psp_keeps_savedata_root(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    savedata = tmp_path / ".local" / "share" / "ppsspp" / "PSP" / "SAVEDATA"
+    savedata.mkdir(parents=True)
+    source = "/home/olduser/.local/share/ppsspp/PSP/SAVEDATA/ULUS10001"
+    roots, targets = emulator_saves.build_restore_targets(
+        _record("psp"),
+        [{"entry_id": "e1", "entry_name": "ULUS10001", "source_path": source, "archive_rel_path": "ULUS10001"}],
+    )
+    assert targets["e1"] == str(savedata)
+
+
+def test_restore_targets_untrusted_source_falls_back_to_known_root(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    savedata = tmp_path / ".local" / "share" / "ppsspp" / "PSP" / "SAVEDATA"
+    savedata.mkdir(parents=True)
+    roots, targets = emulator_saves.build_restore_targets(
+        _record("psp"),
+        [{"entry_id": "e1", "entry_name": "passwd", "source_path": "/etc/passwd", "archive_rel_path": ""}],
+    )
+    assert targets["e1"] == str(savedata)

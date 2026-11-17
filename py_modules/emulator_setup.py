@@ -33,7 +33,10 @@ _EDEN_KEYS = _EDEN_DATA / "keys"
 _EDEN_REGISTERED = _EDEN_DATA / "nand" / "system" / "Contents" / "registered"
 _RPCS3_CONFIG = Path.home() / ".config" / "rpcs3"
 _DUCKSTATION_DATA = Path.home() / ".local" / "share" / "duckstation"
-_AZAHAR_DATA = Path.home() / ".local" / "share" / "azahar"
+# Azahar Linux/XDG 用户目录是 azahar-emu（见上游 src/common/common_paths.h）；
+# 早期移植误写成 azahar，这里保留为兼容目标，但主目标放正确路径。
+_AZAHAR_DATA = Path.home() / ".local" / "share" / "azahar-emu"
+_AZAHAR_LEGACY_DATA = Path.home() / ".local" / "share" / "azahar"
 
 
 def _resolve_root(command: Sequence[str]) -> str:
@@ -387,91 +390,198 @@ def _copy_tree_missing(source: Path, target: Path) -> int:
     return copied
 
 
-def _find_sysdata_tree(root: Path) -> Optional[Path]:
-    """在解压目录里找 sysdata 子树（兼容 sysdata/ 或 sysdata.zip 解压后的单层目录）。"""
-    direct = root / "sysdata"
-    if direct.is_dir():
-        return direct
+_SYSDATA_DIR_NAMES = {"sysdata", "nand", "sdmc", "title"}
+_USER_DATA_DIR_NAMES = {"nand", "sdmc"}
+
+
+def _contains_sysdata_dirs(root: Path) -> bool:
+    """目录里是否存在 sysdata 结构的关键子目录（nand/、sdmc/、title/）。"""
     try:
-        children = [path for path in root.iterdir() if path.is_dir()]
+        entries = list(Path(root).iterdir())
     except Exception:
-        return None
-    if len(children) == 1:
-        only = children[0]
-        nested = only / "sysdata"
-        if nested.is_dir():
-            return nested
-        if only.name.lower() == "sysdata":
-            return only
-    return None
+        return False
+    return any(entry.is_dir() and entry.name.lower() in _SYSDATA_DIR_NAMES for entry in entries)
+
+
+def _has_user_data_dirs(root: Path) -> bool:
+    """是否含 nand//sdmc/ 这类“模拟器用户数据根”的一级目录。"""
+    try:
+        return any(entry.is_dir() and entry.name.lower() in _USER_DATA_DIR_NAMES for entry in Path(root).iterdir())
+    except Exception:
+        return False
+
+
+def _tree_has_files(root: Path) -> bool:
+    try:
+        for _dirpath, _dirnames, filenames in os.walk(root):
+            if filenames:
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _unwrap_payload_dir(root: Path) -> Path:
+    """跳过压缩包里的单层包装目录（如 3ds-system/），返回内容层。"""
+    base = Path(root)
+    for _ in range(2):
+        try:
+            children = list(base.iterdir())
+        except Exception:
+            return base
+        dirs = [child for child in children if child.is_dir()]
+        files = [child for child in children if child.is_file()]
+        if len(dirs) == 1 and not files and dirs[0].name.lower() not in _SYSDATA_DIR_NAMES:
+            base = dirs[0]
+            continue
+        break
+    return base
+
+
+def _resolve_3ds_payload(root: Path) -> Tuple[Path, str]:
+    """解析 3DS system files 载荷，返回 (要复制的目录, 目标类型)。
+
+    目标类型：
+      - "user_data"：内容是模拟器用户数据根（一级目录 nand/、sdmc/），
+        复制到 <userdata>/ 下（Azahar 里 nand/sdmc/sysdata 是平级的）；
+      - "sysdata"：内容是 sysdata 目录（keys/seeddb/shared_font 等），
+        复制到 <userdata>/sysdata/ 下。
+    """
+    base = _unwrap_payload_dir(root)
+    if base.name.lower() == "sysdata":
+        return base, "sysdata"
+    if _has_user_data_dirs(base):
+        return base, "user_data"
+    direct = base / "sysdata"
+    if direct.is_dir():
+        return direct, "sysdata"
+    return base, "sysdata"
+
+
+def _sysdata_targets() -> Tuple[List[Path], List[Path]]:
+    """返回 (用户数据根目录列表, 对应 sysdata 目标目录列表)。"""
+    roots = [
+        _AZAHAR_DATA,
+        _AZAHAR_LEGACY_DATA,
+        # Citra 的 Linux 用户目录是 citra-emu（不是 citra）。
+        Path.home() / ".local" / "share" / "citra-emu",
+        # Flatpak 沙箱内 XDG_DATA_HOME 是 ~/.var/app/<id>/data，Azahar 用户目录名为 azahar-emu。
+        Path.home() / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar-emu",
+        Path.home() / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar",
+    ]
+    return roots, [root / "sysdata" for root in roots]
+
+
+def _same_path(left: Any, right: Any) -> bool:
+    try:
+        return os.path.realpath(str(left)) == os.path.realpath(str(right))
+    except Exception:
+        return False
 
 
 def _deploy_3ds(files: Sequence[str], *, seven_zip: Any = None) -> List[str]:
-    """部署 3DS system files：保留目录树，且不覆盖用户已有 sysdata。"""
-    targets = [
-        _AZAHAR_DATA / "sysdata",
-        Path.home() / ".local" / "share" / "citra" / "sysdata",
-        Path.home() / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar" / "sysdata",
-        Path.home() / ".var" / "app" / "org.azahar_emu.Azahar" / "data" / "azahar-emu" / "sysdata",
-    ]
+    """部署 3DS system files：保留目录树，且不覆盖用户已有文件。
+
+    支持两类载荷（按内容自动判断）：
+      - 完整用户数据（含 nand/、sdmc/）：复制到 <userdata>/ 下；
+      - sysdata 目录内容（aes_keys.txt / seeddb.bin / shared_font.bin 等）：
+        复制到 <userdata>/sysdata/ 下。
+    """
+    user_data_targets, sysdata_targets = _sysdata_targets()
     base = bios_dir("3ds")
     copied = 0
-    deployed_roots: List[Path] = []
+    payloads: List[Tuple[Path, str]] = []
+    archive_files: List[str] = []
+    archive_failures = 0
+    extractor_missing = False
 
-    # 1) 已解压的 bios/3ds/sysdata 目录：复制内容（不创建 sysdata/sysdata）。
+    # 1) 已解压的 bios/3ds/sysdata 目录，或用户直接把 nand/、sdmc/ 等放在 bios/3ds/。
     source_tree = base / "sysdata"
     if source_tree.is_dir():
-        deployed_roots.append(source_tree)
+        payloads.append((source_tree, "sysdata"))
+    elif base.is_dir() and _contains_sysdata_dirs(base):
+        payloads.append(_resolve_3ds_payload(base))
 
-    # 2) sysdata.zip/7z：解压到临时目录后找 sysdata 子树，保留完整层级。
-    archive_files = _find_named(str(base), ARCHIVE_SUFFIXES) if base.is_dir() else []
-    if archive_files and seven_zip is not None:
-        temp_root = tempfile.mkdtemp(prefix="freedeckcy_3ds_sysdata_")
-        try:
-            for index, archive in enumerate(archive_files):
-                extract_dir = Path(temp_root) / f"extract_{index}"
-                try:
-                    seven_zip.extract_archive(archive, str(extract_dir))
-                except Exception as exc:
-                    config.logger.warning("解压 3DS sysdata 失败 %s: %s", archive, exc)
+    # 2) sysdata.zip/7z：必须在临时目录还存在时就完成复制，否则会复制到已删除的路径。
+    if base.is_dir():
+        archive_files = list(_find_named(str(base), ARCHIVE_SUFFIXES))
+    temp_root: Optional[str] = None
+    try:
+        if archive_files:
+            if seven_zip is None:
+                extractor_missing = True
+            else:
+                temp_root = tempfile.mkdtemp(prefix="freedeckcy_3ds_sysdata_")
+                for index, archive in enumerate(archive_files):
+                    extract_dir = Path(temp_root) / f"extract_{index}"
+                    try:
+                        seven_zip.extract_archive(archive, str(extract_dir))
+                    except Exception as exc:
+                        archive_failures += 1
+                        config.logger.warning("解压 3DS sysdata 失败 %s: %s", archive, exc)
+                        continue
+                    source, kind = _resolve_3ds_payload(extract_dir)
+                    if not _tree_has_files(source):
+                        continue
+                    if any(_same_path(source, existing) for existing, _kind in payloads):
+                        continue
+                    payloads.append((source, kind))
+
+        for source, kind in payloads:
+            targets = user_data_targets if kind == "user_data" else sysdata_targets
+            for target in targets:
+                copied += _copy_tree_missing(source, target)
+
+        # 3) 散落的 sysdata 文件（非 sysdata/ 或压缩包）：保持旧兼容，按文件名放到 sysdata。
+        #    若 bios/3ds 本身已经是目录树，上面已整树复制，不再平铺一遍。
+        has_tree_payload = any(
+            _same_path(source, base) or _same_path(source, source_tree) for source, _kind in payloads
+        )
+        if not has_tree_payload:
+            archive_names = {os.path.realpath(str(path)) for path in archive_files}
+            for raw in list(files or []):
+                path = os.path.realpath(str(raw or ""))
+                if not path or not os.path.isfile(path):
                     continue
-                tree = _find_sysdata_tree(extract_dir) or extract_dir
-                if tree.is_dir():
-                    deployed_roots.append(tree)
-        finally:
+                if path in archive_names:
+                    continue
+                if f"{os.sep}_extracted{os.sep}" in path or path.endswith(f"{os.sep}_extracted"):
+                    continue
+                if source_tree.is_dir() and (path == str(source_tree) or path.startswith(str(source_tree) + os.sep)):
+                    continue
+                if os.path.splitext(path)[1].lower() in ARCHIVE_SUFFIXES:
+                    continue
+                for target in sysdata_targets:
+                    try:
+                        target.mkdir(parents=True, exist_ok=True)
+                        destination = target / os.path.basename(path)
+                        if destination.exists():
+                            continue
+                        shutil.copy2(path, destination)
+                        copied += 1
+                    except Exception as exc:
+                        config.logger.warning("复制 3DS 文件失败 %s: %s", path, exc)
+    finally:
+        if temp_root:
             shutil.rmtree(temp_root, ignore_errors=True)
 
-    for source in deployed_roots:
-        for target in targets:
-            copied += _copy_tree_missing(source, target)
-
-    # 3) 散落的 sysdata 文件（非 sysdata/ 或压缩包）：保持旧兼容，按文件名放根。
-    archive_names = {os.path.realpath(str(path)) for path in archive_files}
-    for raw in list(files or []):
-        path = os.path.realpath(str(raw or ""))
-        if not path or not os.path.isfile(path):
-            continue
-        if path in archive_names:
-            continue
-        if f"{os.sep}_extracted{os.sep}" in path or path.endswith(f"{os.sep}_extracted"):
-            continue
-        if source_tree.is_dir() and (path == str(source_tree) or path.startswith(str(source_tree) + os.sep)):
-            continue
-        if os.path.splitext(path)[1].lower() in ARCHIVE_SUFFIXES:
-            continue
-        for target in targets:
-            try:
-                target.mkdir(parents=True, exist_ok=True)
-                destination = target / os.path.basename(path)
-                if destination.exists():
-                    continue
-                shutil.copy2(path, destination)
-                copied += 1
-            except Exception as exc:
-                config.logger.warning("复制 3DS 文件失败 %s: %s", path, exc)
-
+    notes: List[str] = []
+    if extractor_missing:
+        notes.append("有 sysdata 压缩包但解压组件（7z）不可用")
+    elif archive_failures:
+        notes.append(f"{archive_failures} 个压缩包解压失败")
+    suffix = f"（{'；'.join(notes)}）" if notes else ""
     if copied:
-        return [f"3DS system files 已部署：{copied} 个文件（保留目录树，未覆盖已有文件）"]
+        return [f"3DS system files 已部署：{copied} 个文件副本（保留目录树，未覆盖已有文件）{suffix}"]
+    if payloads and (
+        any(_tree_has_files(target) for target in sysdata_targets)
+        or any(_tree_has_files(target) for target in user_data_targets)
+    ):
+        return [f"3DS system files 已存在（未覆盖已有文件）{suffix}"]
+    if extractor_missing:
+        return ["找到 3DS sysdata 压缩包，但解压组件（7z）不可用，无法自动部署"]
+    if archive_failures:
+        return [f"解压 3DS sysdata 压缩包失败（{archive_failures} 个），请检查压缩包或手动解压到 bios/3ds/sysdata/"]
     return ["未找到 3DS system files（sysdata 文件/目录/zip 放到 bios/3ds/）"]
 
 
@@ -486,7 +596,9 @@ def setup_emulator(
     if spec is None:
         return []
     root = _resolve_root(command)
-    files = _source_files(platform, seven_zip=seven_zip)
+    # 3DS 的压缩包由 _deploy_3ds 自己解压（需要保留目录树）；在这里再解压一次
+    # 既浪费 I/O，也会在 bios/3ds/_extracted 留下拍平的副本。
+    files = _source_files(platform, seven_zip=None if platform == "3ds" else seven_zip)
     messages: List[str] = []
 
     # 保留旧的 BIOS 复制逻辑（PS1/PS2 用户数据目录），再补充 portable 目录。

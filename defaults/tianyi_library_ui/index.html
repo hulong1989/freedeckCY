@@ -10,7 +10,7 @@
   <main id="app" v-cloak class="page">
     <section class="hero">
       <h1 class="brand">freedeckCY</h1>
-      <form class="search-bar" @submit.prevent="reloadList(1)">
+      <form class="search-bar" @submit.prevent="submitSearch">
         <input
           id="search-input"
           v-model="query"
@@ -49,6 +49,19 @@
           title="扫描安装目录，把旧版本/手动安装的游戏补回列表"
           @click="scanInstalled"
         >{{ scanBusy ? "扫描中..." : "扫描已安装" }}</button>
+        <span class="toolbar-btn" style="cursor:default" :title="login.message || ''">
+          {{ loginLabel }}
+        </span>
+        <button class="toolbar-btn" tabindex="-1" :disabled="loginBusy" @click="openLoginBridge">
+          {{ loginBusy ? "打开中..." : (login.logged_in ? "重新登录" : "登录") }}
+        </button>
+        <button
+          class="toolbar-btn"
+          tabindex="-1"
+          :disabled="backupBusy"
+          title="把本机游戏存档备份到天翼云（也可在 QAM 设置 → 账号里操作）"
+          @click="startCloudSaveBackup"
+        >{{ backupBusy ? "启动中..." : "备份存档" }}</button>
         <button class="toolbar-btn" tabindex="-1" :disabled="diagnosticsBusy" @click="openDiagnostics">
           {{ diagnosticsBusy ? "打包中..." : "导出诊断" }}
         </button>
@@ -72,7 +85,7 @@
           :class="['filter-chip', 'platform-filter-chip', { active: activePlatform === chip.value, 'focus-ring': focusedIndex === pidx + 2 }]"
           :data-platform-index="pidx"
           tabindex="0"
-          @click="selectPlatform(chip.value)"
+          @click="activatePlatformChip(chip.value, pidx)"
         >
           {{ chip.label }}<span class="chip-count" v-if="chip.count">{{ chip.count }}</span>
         </button>
@@ -85,7 +98,7 @@
           :class="['filter-chip', { active: activeCategory === chip.value, 'focus-ring': focusedIndex === cidx + 2 + platformChipCount() }]"
           :data-chip-index="cidx"
           tabindex="0"
-          @click="selectCategory(chip.value)"
+          @click="activateCategoryChip(chip.value, cidx)"
         >
           {{ chip.label }}<span class="chip-count" v-if="chip.count">{{ chip.count }}</span>
         </button>
@@ -98,7 +111,7 @@
           :key="item.game_id + item.down_url"
           :data-card-index="idx"
           tabindex="0"
-          @click="openInstallConfirm(item)"
+          @click="activateCatalogCard(item, idx)"
         >
           <div class="card-media">
             <img
@@ -121,10 +134,11 @@
 
       <p class="empty" v-else>没有匹配结果</p>
 
+      <p class="hint small" v-if="listBusy">加载游戏列表中...</p>
       <div class="pager" v-if="list.total > 0">
-        <button class="pager-btn" tabindex="-1" :disabled="list.page <= 1" @click="gotoPage(list.page - 1)">上一页</button>
+        <button class="pager-btn" tabindex="-1" :disabled="listBusy || list.page <= 1" @click="gotoPage(list.page - 1)">上一页</button>
         <span class="pager-info">第 {{ list.page }} / {{ totalPages }} 页 · 共 {{ list.total }} 条</span>
-        <button class="pager-btn" tabindex="-1" :disabled="list.page >= totalPages" @click="gotoPage(list.page + 1)">下一页</button>
+        <button class="pager-btn" tabindex="-1" :disabled="listBusy || list.page >= totalPages" @click="gotoPage(list.page + 1)">下一页</button>
       </div>
       <p class="hint small" v-if="list.items.length">L1 / R1 或 PageUp / PageDown 翻页</p>
     </section>
@@ -138,7 +152,7 @@
           :data-card-index="idx"
           tabindex="0"
           :title="item.install_path"
-          @click="launchInstalled(item)"
+          @click="activateInstalledCard(item, idx)"
         >
           <div class="card-media">
             <img
@@ -193,7 +207,7 @@
       <div class="modal-card">
         <div class="modal-loading" v-if="installDialog.loading">
           正在读取安装信息...
-          <button class="toolbar-btn" tabindex="-1" style="margin-top:12px" @click="closeInstallDialog(true)">取消</button>
+          <button id="install-cancel" class="toolbar-btn" tabindex="-1" style="margin-top:12px" @click="closeInstallDialog(true)">取消</button>
         </div>
 
         <template v-else-if="installDialog.plan">
@@ -246,6 +260,9 @@
                 </div>
               </div>
 
+              <p class="modal-warning" v-if="!storageEnough(installDialog.plan)">
+                可用空间不足，无法安装：请清理空间，或到 QAM 设置 → 路径更换下载/安装目录后再试。
+              </p>
               <div class="modal-actions">
                 <button
                   id="install-confirm"
@@ -260,16 +277,20 @@
                   id="install-cancel"
                   class="btn-secondary"
                   :class="{ 'focus-ring': focusedIndex === 0 }"
+                  :disabled="installDialog.submitting"
                   @click="closeInstallDialog"
                 >
-                  取消安装
+                  {{ installDialog.submitting ? "提交中..." : "取消安装" }}
                 </button>
               </div>
             </div>
           </div>
         </template>
 
-        <div class="modal-loading" v-else>无法获取安装信息，请稍后重试。</div>
+        <div class="modal-loading" v-else>
+          无法获取安装信息，请稍后重试。
+          <button id="install-cancel" class="toolbar-btn" tabindex="-1" style="margin-top:12px" @click="closeInstallDialog(true)">关闭</button>
+        </div>
       </div>
     </section>
   </main>

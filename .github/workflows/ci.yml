@@ -1,8 +1,10 @@
 # freedeckCY CI
 #
-# 两个独立 job：
-#   - python：在 Python 3.12 上跑 pytest（依赖 requirements-dev.txt）
-#   - ui：pnpm 9 + Node 20 构建 Decky 前端产物 dist/index.js
+# 三个独立 job：
+#   - python：Python 3.12 跑 pytest + 目录/提交校验 + 运行时脚本离线自检 + 打包冒烟
+#   - ui：pnpm 9 + Node 24 构建 Decky 前端 dist/index.js，并校验 CI Node
+#         主版本与 scripts/fetch_runtime.sh 内置 Node 版本一致
+#   - runtime：下载内置 aria2c/7zz/node 后校验 SHA256/版本清单并实际执行冒烟
 name: CI
 
 on:
@@ -46,6 +48,12 @@ jobs:
             bash -n "$script"
           done
 
+      - name: Runtime script self-check (offline)
+        # 不联网验证 fetch_runtime/verify_runtime 的版本常量、SHA 与损坏文件重下逻辑
+        run: |
+          bash scripts/fetch_runtime.sh --self-test
+          bash scripts/verify_runtime.sh --self-test
+
       - name: Run pytest
         # 测试全部离线（conftest 注入假 decky），不依赖 Steam / 网络 / Decky 运行时
         run: python -m pytest -q
@@ -53,11 +61,21 @@ jobs:
       - name: Validate catalog data
         # 重复 game_id / 非法链接 / 分类混入平台名 会直接失败
         run: |
-          python scripts/validate_catalog.py defaults/tianyi_catalog/freedeckcy_catalog.csv             --cover-index defaults/tianyi_catalog/cover_index.csv --strict
+          python scripts/validate_catalog.py defaults/tianyi_catalog/freedeckcy_catalog.csv \
+            --cover-index defaults/tianyi_catalog/cover_index.csv --strict
 
       - name: Validate game submissions
         # submissions/*.json 的字段/平台/分享链接/重复 shareCode 校验
         run: python scripts/validate_submissions.py --catalog defaults/tianyi_catalog/freedeckcy_catalog.csv
+
+      - name: Package smoke
+        # 不依赖 defaults/runtime（CI 不下载二进制）也要能出结构正确的 zip
+        run: |
+          bash scripts/package.sh --out-dir /tmp/freedeckcy-package
+          zip_file="$(find /tmp/freedeckcy-package -maxdepth 1 -name 'freedeckCY-v*.zip' -print -quit)"
+          test -n "$zip_file"
+          test -f "${zip_file}.sha256"
+          unzip -Z1 "$zip_file" | grep -qx 'freedeckCY/plugin.json'
 
   ui:
     name: UI build (pnpm)
@@ -73,12 +91,25 @@ jobs:
         with:
           version: 9
 
+      # 与 scripts/fetch_runtime.sh 的 NODE_VERSION(24.22.3) 主版本保持一致。
       - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
+
+      - name: Node version consistency with bundled runtime
+        # 前端构建 Node 与插件内置 Node 主版本必须一致，避免两套 JS 运行时行为分叉。
+        run: |
+          bundled="$(sed -n 's/^NODE_VERSION="\([^"]*\)".*/\1/p' scripts/fetch_runtime.sh | head -n 1)"
+          test -n "$bundled"
+          installed="$(node -v | sed 's/^v//')"
+          echo "CI Node: ${installed}；内置运行时 Node: ${bundled}"
+          if [ "${installed%%.*}" != "${bundled%%.*}" ]; then
+            echo "::error::CI Node 主版本与 scripts/fetch_runtime.sh 内置 Node 不一致（${installed} vs ${bundled}）"
+            exit 1
+          fi
 
       - name: Install UI dependencies
         run: pnpm install --frozen-lockfile
@@ -98,7 +129,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Fetch bundled runtime
+        # 传入 GITHUB_TOKEN 避免未认证 api.github.com 限流导致随机失败
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/fetch_runtime.sh --arch x86_64 --dest /tmp/freedeckcy-runtime
 
+      - name: Verify runtime integrity (SHA256 + manifest)
+        # 不联网复核已安装文件：大小/ELF/SHA256/许可证/版本清单
+        run: bash scripts/fetch_runtime.sh --verify-only --arch x86_64 --dest /tmp/freedeckcy-runtime
+
       - name: Execute aria2/7z/node
+        # 实际执行并校验 aria2 1.37.0 / 7-Zip 26.06 / Node 24.22.3 版本一致
         run: bash scripts/verify_runtime.sh --dir /tmp/freedeckcy-runtime --arch x86_64

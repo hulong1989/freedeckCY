@@ -21,7 +21,7 @@ freedeckCY 的处理方式：
 - 若 DroidDeck 的 x64 Steam 客户端正在运行（`steam.pid` 存在），优先把快捷方式写到它的 `~/.droiddeck-x64/.local/share/Steam`，否则回退标准路径。
 - GBA 闭环（v0.6.0 起）使用 **mGBA arm64 AppImage**：v0.10.0 起**不再随包内置**，首次安装 GBA 时自动从官方 release 下载，再用 `--appimage-extract` 解包到 `~/.local/share/freedeckCY/emulators/gba/aarch64/squashfs-root`（GBA 兼容旧 `emulators/aarch64/`；**不依赖 FUSE**，proot 环境可用）；Steam 快捷方式的 Exe 是生成的 `launch-freedeckcy.sh`，**不写 Proton 映射**（原生 Linux 启动）。
 - 模拟器存档恢复（v0.16.0）：云存档恢复不再只支持 PC——模拟器存档按 `restore_roots` 白名单恢复（同机优先原父目录、跨设备落到平台第一个根），覆盖前自动生成 `*.freedeckcy-bak-<时间戳>` 备份；冲突需要确认。**aarch64 上可用 GBA/PSP/NDS/PS1/FC/MD 的恢复/拆分（3DS/PS2/PS3 平台本身隐藏）**；PSP（PARAM.SFO）、3DS（NCSD title id）拆分在 ARM 上同样适用（3DS 平台不可见）；PS1 多碟在 aarch64 上也会生成/优先 `.m3u`。
-- 模拟器存档上传（v0.15.0）：QAM「云存档上传 → 包含模拟器存档」（`cloud_save_include_emulators`，默认开）控制是否上传模拟器存档；发现路径基于 **proot 内 HOME**（`~/.local/share/...`、`~/.config/...`，如 `~/.local/share/ppsspp/PSP/SAVEDATA`、`~/.local/share/azahar/sdmc`、`~/.local/share/eden/nand/user/save`）。**Flatpak 的 `~/.var/app/...` 路径在 Android/proot 下不适用**（DroidDeck 没有 SteamOS Flatpak 环境），不会被误用；GBA/FC/MD/NDS 按 ROM 同名找单游戏存档，PSP/PS1/PS2/3DS/PS3/Switch 上传共享记忆卡/标题目录；**v0.16.0 起支持恢复**（见上一条，白名单目标 + 备份 + 冲突确认）。
+- 模拟器存档上传（v0.15.0）：QAM「云存档上传 → 包含模拟器存档」（`cloud_save_include_emulators`，默认开）控制是否上传模拟器存档；发现路径基于 **proot 内 HOME**（`~/.local/share/...`、`~/.config/...`，如 `~/.local/share/ppsspp/PSP/SAVEDATA`、`~/.local/share/azahar-emu/sdmc`、`~/.local/share/eden/nand/user/save`）。**Flatpak 的 `~/.var/app/...` 路径在 Android/proot 下不适用**（DroidDeck 没有 SteamOS Flatpak 环境），不会被误用；GBA/FC/MD/NDS 按 ROM 同名找单游戏存档，PSP/PS1/PS2/3DS/PS3/Switch 上传共享记忆卡/标题目录；**v0.16.0 起支持恢复**（见上一条，白名单目标 + 备份 + 冲突确认）。
 - 3DS（Azahar，v0.14.1）：SteamOS 3.9.5 上优先官方 Flathub Flatpak `org.azahar_emu.Azahar`（AppImage 有上游 #127/#953 兼容问题）；**DroidDeck/aarch64 没有 3DS 官方 arm64 包，目录里仍不显示 3DS**（架构白名单，见 §9.8）。如果设备能跑 x86_64 且装有 flatpak，则自动用 Flatpak、失败回退 AppImage；3DS 启动脚本会强制 XWayland（`QT_QPA_PLATFORM=xcb`/`SDL_VIDEODRIVER=x11`）；system files 放 `~/.local/share/freedeckCY/bios/3ds/sysdata/`，会部署到 azahar/citra 与 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`。已有 3DS 快捷方式由后台自动重写，无需重装。
 - 库页时长隔离（v0.25.0）：Steam 原有游戏详情页不再出现 freedeckCY 的「已玩/主线/总时长」块——前端只在 `managed===true` 时渲染，未匹配直接 `return null`；后端先按 AppID、再按标题匹配插件安装记录，未匹配返回 `managed=false` 且不查 HLTB。只影响插件安装/补录的游戏，DroidDeck 上同样生效。
 - 库页时长（v0.25.0）：仅 `managed=true` 显示；AppID 优先降低同名误判但非绝对；HLTB 失败只影响块内数值；依赖 Steam 库页结构。
@@ -323,5 +323,5 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 扫描补 Steam（v0.21.0）只写 `shortcuts.vdf`，需重启 Steam/切用户/重开库页才可见；模拟器未安装不自动下载；PC 找不到 exe/ROM 会跳过并记 `shortcut_error`。
 - 存储位置选择依赖 `/proc/mounts` 与 proot 内可写权限；Android 的 `/storage/emulated/0` 等路径可见性/可写性因设备而异，插件不自动挂载/格式化；不会检测 Steam 库同盘。
 - 扫描已安装依赖 proot 内 `settings.install_dir` 可见、目录名与目录标题匹配；只扫一层；v0.21.0 起会自动补建 Steam 快捷方式（模拟器未安装不下载，记 `shortcut_error`；Steam 需重启/切用户/重开库页才显示）；百度扫码要求手机 App 与网络可达 `passport.baidu.com`。
-- 本版测试基线：`make test` → 385 passed（2026-11 v0.26.1）。
+- 本版测试基线：`make test` → 518 passed（2026-11 v0.26.2）。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。

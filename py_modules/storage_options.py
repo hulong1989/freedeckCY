@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import tempfile
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 _MOUNT_PREFIXES = (
     "/run/media/",
@@ -33,8 +34,30 @@ _SKIP_FSTYPES = {
     "hugetlbfs",
     "overlay",
     "squashfs",
+    "autofs",
+    "ramfs",
+    "binder",
+    "binderfs",
+    "functionfs",
+    "nsfs",
 }
 _SKIP_MOUNTS = {"/", "/run", "/mnt", "/media", "/storage", "/sdcard"}
+# Android 内部共享存储的别名（root/proot 下可写，但不是可移动 SD 卡）。
+# /mnt/media_rw/<卷> 是 Android 物理 SD 的 root 视图，保留（与 /storage/<卷> 由身份去重合并）。
+_INTERNAL_STORAGE_PREFIXES = (
+    "/storage/emulated",
+    "/storage/self",
+    "/sdcard",
+    "/mnt/user",
+    "/mnt/runtime",
+    "/mnt/pass_through",
+    "/mnt/installer",
+    "/mnt/androidwritable",
+    "/mnt/obb",
+    "/mnt/asec",
+    "/mnt/expand",
+)
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def _unescape_mount(value: str) -> str:
@@ -53,6 +76,33 @@ def _read_mounts() -> str:
             return fh.read()
     except Exception:
         return ""
+
+
+def _path_is_under(path: str, prefix: str) -> bool:
+    """路径是否等于 prefix 或位于其下（按目录边界，避免 /storageX 误命中）。"""
+    base = str(prefix or "").rstrip("/")
+    value = str(path or "").rstrip("/")
+    if not base or not value:
+        return False
+    return value == base or value.startswith(base + "/")
+
+
+def _is_android_internal_storage(real: str) -> bool:
+    return any(_path_is_under(real, prefix) for prefix in _INTERNAL_STORAGE_PREFIXES)
+
+
+def _mount_identity(path: str) -> Optional[Tuple[int, int]]:
+    """返回挂载点的 (dev, inode)：bind mount / 多层别名会指向同一目录。"""
+    try:
+        stat = os.stat(path)
+        return int(stat.st_dev), int(stat.st_ino)
+    except Exception:
+        return None
+
+
+def _sanitize_label(value: str) -> str:
+    """卷标可能来自用户/U 盘，去掉控制字符避免 UI 注入或换行。"""
+    return re.sub(r"\s+", " ", _CONTROL_CHARS_RE.sub(" ", str(value or ""))).strip()
 
 
 def _probe_writable(path: str) -> bool:
@@ -94,11 +144,15 @@ def detect_storage_options(
 
     options: List[Dict[str, Any]] = []
     seen: set = set()
+    seen_ids: set = set()
     for line in str(text or "").splitlines():
         parts = line.split()
         if len(parts) < 3:
             continue
         mount = _unescape_mount(parts[1])
+        if not mount.startswith("/") or _CONTROL_CHARS_RE.search(mount):
+            # 挂载点必须是绝对路径且不含控制字符，否则拒绝拼进下载/安装目录。
+            continue
         fstype = str(parts[2] or "").lower()
         mount_options = str(parts[3] or "").lower().split(",") if len(parts) > 3 else []
         if mount in _SKIP_MOUNTS or fstype in _SKIP_FSTYPES or "ro" in mount_options:
@@ -108,8 +162,11 @@ def detect_storage_options(
         real = os.path.realpath(mount)
         if real in seen or real in _SKIP_MOUNTS:
             continue
-        # /storage/emulated/* 与 /sdcard 是 Android 内部共享存储，不是 SD 卡。
-        if real.startswith("/storage/emulated/") or real == "/sdcard":
+        if _is_android_internal_storage(real):
+            continue
+        identity = _mount_identity(real)
+        if identity is not None and identity in seen_ids:
+            # bind mount/别名指向同一目录时只保留一个选项。
             continue
         if not os.path.isdir(real) or not _probe_writable(real):
             continue
@@ -122,7 +179,9 @@ def detect_storage_options(
         if total_bytes <= 0:
             continue
         seen.add(real)
-        label = os.path.basename(real.rstrip("/")) or real
+        if identity is not None:
+            seen_ids.add(identity)
+        label = _sanitize_label(os.path.basename(real.rstrip("/"))) or "外置存储"
         options.append(
             {
                 "kind": "external",

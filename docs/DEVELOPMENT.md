@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.26.1**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.26.2**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -47,7 +47,7 @@
 | `scripts/doctor.sh` | 环境诊断（只读，`make doctor` 调用）：系统/Python/运行时/Steam/state/日志/端口/网络 |
 | `scripts/normalize_catalog_categories.py` | 原地清洗目录 `categories`（去平台名/去重/模拟器兜底；`--check` 只报告差异） |
 | `scripts/validate_catalog.py` | 目录数据体检（重复/非法链接/空标题/分类混平台名/封面覆盖率/平台分布/总大小；`--strict` 用于 CI） |
-| `tests/` | pytest 单测（385 个用例；原生库为前端构建验证）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
+| `tests/` | pytest 单测（518 个用例；原生库为前端构建验证）：**gamewatch 状态机 / Ludusavi 匹配解析 / 自动上传触发与指纹 / 模拟器存档发现（单游戏 vs 共享、开关）/ 恢复计划 / PSP-PS3-3DS 拆分 / PS1 多碟 m3u**、目录解析/平台筛选/排序、已安装列表/诊断导出/更新检查、**10 平台计划/ROM 查找/wrapper/注册表/BIOS/架构白名单/BIOS 部署与 portable 配置、提交校验/合并、百度扫码/Cookie + OpenAPI 回退（来源识别/二维码/计划/header/授权码交换）**、分类清洗、DroidDeck 检测/Proton 解析/双 Steam 根、VDF、状态存储、云存档版本、安装链路、分组语义、重启恢复、多分卷识别、aria2 运行时、多库识别、卸载/compatdata、安全边界等离线逻辑 |
 | `clear_freedeckcy_tasks.sh` | 运维脚本：清空 `state.json` 的 `tasks`（用 `$HOME`，可用 `FREEDECKCY_STATE_FILE` 覆盖路径） |
 | `docs/DROIDDECK.md` | DroidDeck（Android/ARM64）安装、构建、功能支持与排障指南（v0.4.0） |
 | `gl/` | 作者手工囤的数据（历史 CSV、模拟器分享链接），**代码不读**，可忽略 |
@@ -218,7 +218,7 @@ defaults/runtime/node/<arch>/bin/node
 | ps1 | DuckStation `latest` | `DuckStation-{x64,arm64}.AppImage` | AppImage，按需下载；**需要自备 BIOS** | `.m3u/.cue/.chd/.iso/.pbp/.bin` | `FREEDECKCY_DUCKSTATION_BIN` |
 | fc | Mesen2 2.1.1 | `Mesen_2.1.1_Linux_{x64,ARM64}.zip` | zip 内单文件 `Mesen`，按需下载 | `.nes/.fds/.unf/.unif` | `FREEDECKCY_MESEN_BIN` |
 | md | Mesen2 2.1.1 | 同上（**与 FC 共享缓存** `emulators/mesen/<arch>/`） | zip 内单文件 `Mesen`，按需下载 | `.md/.gen/.smd/.bin/.32x` | `FREEDECKCY_MESEN_BIN` |
-| 3ds | Azahar 2126.2 | **SteamOS 优先 Flathub `org.azahar_emu.Azahar`**；否则 `azahar.AppImage`（**仅 x86_64**） | 3DS system files（setup）；Flatpak 自动安装或 AppImage 回退 | `.3ds/.cia/.cci/.cxi/.app` | `FREEDECKCY_AZAHAR_BIN`（最高优先） |
+| 3ds | Azahar 2126.2 | **SteamOS 优先 Flathub `org.azahar_emu.Azahar`**；否则 `azahar.AppImage`（**仅 x86_64**） | 3DS system files（setup）；Flatpak 自动安装或 AppImage 回退 | `.3ds/.cci/.cxi/.app`（`.cia` 通过 `--install`） | `FREEDECKCY_AZAHAR_BIN`（最高优先） |
 | ps2 | PCSX2 v2.8.2 | `pcsx2-v2.8.2-linux-appimage-x64-Qt.AppImage`，**仅 x86_64** | AppImage，按需下载；需要 PS2 BIOS | `.iso/.chd/.cue/.bin/.gz` | `FREEDECKCY_PCSX2_BIN` |
 | ps3 | RPCS3 build-8d6b42e | `rpcs3-v0.0.43-20606-8d6b42e7_linux64.AppImage`，**仅 x86_64** | AppImage，按需下载；需要 PS3 固件（setup） | `.iso/.pkg/.elf/.self` | `FREEDECKCY_RPCS3_BIN` |
 | switch | Eden v0.2.1 | `stable.eden-emu.dev/v0.2.1/` 的 x86_64 + aarch64 AppImage | AppImage，按需下载；需要 prod.keys + 固件（setup） | `.nsp/.xci` | `FREEDECKCY_EDEN_BIN` |
@@ -239,7 +239,7 @@ defaults/runtime/node/<arch>/bin/node
 - **NDS**：`bios7.bin/bios9.bin/firmware.bin/dsi_firmware.bin` 等复制到 `<AppDir>` 与 `~/.local/share/melonDS`；
 - **Switch**：`prod.keys`/`title.keys` → `~/.local/share/eden/keys/`；固件解出的 `.nca` 目录 → `~/.local/share/eden/nand/system/Contents/registered/`；
 - **PS3**：`bios/ps3/PS3UPDAT.PUP`；若 `~/.config/rpcs3/dev_flash` 为空则执行 `rpcs3 --installfw <pup>`（600s 超时，失败原因写进消息）；
-- **3DS**：system files → `~/.local/share/azahar/sysdata` 与 `~/.local/share/citra/sysdata`；
+- **3DS**：system files → `~/.local/share/azahar-emu/sysdata`（兼容旧 `azahar`/`citra`）；
 - **GBA / PSP**：只写 portable 配置（mGBA `portable.ini`+`qt.ini` 全屏；PPSSPP `portable.txt`+`memstick/PSP/SYSTEM/ppsspp.ini` 全屏）；
 - `<AppDir>` 是 `ensure_emulator()` 返回的可执行文件目录（AppImage 解包后是 `squashfs-root/`）；目录不可写时只写用户数据目录并提示；
 - 部署消息并入**安装完成消息**（不再单独发 `warning`）；`emulator_status`/plan 仍返回 `bios_required/bios_present/bios_dir` 与 `setup_required/setup_hint`。缺失**不阻断安装**，但装完不能直接玩通常是文件没放对/没触发部署。详见 §6.8。
@@ -336,7 +336,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **385 个用例**（`make test` 实测 `385 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **518 个用例**（`make test` 实测 `518 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -497,7 +497,7 @@ curl -s http://127.0.0.1:59271/api/tianyi/update-check | python3 -m json.tool
 | ps1 | DuckStation `latest` | `DuckStation-x64.AppImage` / `DuckStation-arm64.AppImage` | x64 / arm64 | AppImage | `-batch -fullscreen <rom>` | `.m3u/.cue/.chd/.iso/.pbp/.bin` |
 | fc | Mesen2 2.1.1 | `Mesen_2.1.1_Linux_x64.zip` / `_ARM64.zip` | x64 / arm64 | zip 内单文件 `Mesen` | `/fullscreen <rom>` | `.nes/.fds/.unf/.unif` |
 | md | Mesen2 2.1.1 | 同 FC（共享 `emulators/mesen/<arch>/`） | x64 / arm64 | zip 内单文件 `Mesen` | `/fullscreen <rom>` | `.md/.gen/.smd/.bin/.32x` |
-| 3ds | Azahar 2126.2 | `azahar.AppImage` | **仅 x64** | AppImage（需 system files setup） | `<rom>` | `.3ds/.cia/.cci/.cxi/.app` |
+| 3ds | Azahar 2126.2 | `azahar.AppImage` | **仅 x64** | AppImage（需 system files setup） | `<rom>` | `.3ds/.cci/.cxi/.app`（`.cia` 通过 `--install`） |
 | ps2 | PCSX2 v2.8.2 | `pcsx2-v2.8.2-linux-appimage-x64-Qt.AppImage` | **仅 x64** | AppImage（需 PS2 BIOS） | `-batch -fullscreen <rom>` | `.iso/.chd/.cue/.bin/.gz` |
 | ps3 | RPCS3 build-8d6b42e | `rpcs3-v0.0.43-20606-8d6b42e7_linux64.AppImage` | **仅 x64** | AppImage（需 PS3 固件 setup） | `--no-gui <rom>` | `.iso/.pkg/.elf/.self` |
 | switch | Eden v0.2.1 | `stable.eden-emu.dev/v0.2.1/` 的 amd64/aarch64 AppImage | x64 / arm64 | AppImage（需 prod.keys+固件 setup） | `<rom>` | `.nsp/.xci` |
@@ -572,7 +572,7 @@ curl -s http://127.0.0.1:59271/api/tianyi/diagnostics | python3 -m json.tool
 
 - 选路：`FREEDECKCY_AZAHAR_BIN` > 已装 Flatpak > SteamOS 自动装 Flatpak > AppImage 下载/解包；把 `FREEDECKCY_AZAHAR_BIN` 指向 AppImage 可强制回退；
 - 3DS wrapper 会写 `export QT_QPA_PLATFORM=xcb` + `export SDL_VIDEODRIVER=x11`（XWayland），避免 Game Mode/Wayland 崩溃；
-- system files 除 `~/.local/share/azahar|citra/sysdata` 外，还部署到 `~/.var/app/org.azahar_emu.Azahar/data/azahar/sysdata` 与 `.../azahar-emu/sysdata`（`bios/3ds/sysdata/` 整树复制）；
+- system files 除 `~/.local/share/azahar-emu/sysdata` 外，还部署到 `~/.var/app/org.azahar_emu.Azahar/data/azahar-emu/sysdata`（`bios/3ds/` 的 `nand/sdmc/sysdata` 或压缩包，保留目录树）；
 - **已有游戏自动修复**：后台维护首次 tick 会扫已安装 3DS 记录并重写 `launch-freedeckcy.sh`（旧 AppImage 命令 → `flatpak run`），无需重装；日志关键字 `Repaired 3DS launcher for ...` / `Repair 3DS launcher failed`。
 
 **安装完成后检查**：
@@ -866,7 +866,7 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 
 **入口（v0.23.0）**：QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)`**，失败才 `Navigation.Navigate("/freedeckcy/library")`；`routerHook.addRoute` 仍注册全屏入口，卸载移除。旧的网页库（`defaults/tianyi_library_ui/`）保留为备用（桌面浏览器/回退），两者共用同一后端。
 
-**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。当前源码 `PLUGIN_UI_BUILD` 与 `package.json` 均为 `0.26.1`。
+**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。当前源码 `PLUGIN_UI_BUILD` 与 `package.json` 均为 `0.26.2`。
 
 **返回/关闭测试（v0.24.0）**：
 
@@ -1124,7 +1124,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 385 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 518 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；

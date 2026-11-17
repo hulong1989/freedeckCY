@@ -766,3 +766,414 @@ def test_3ds_cia_auto_install(tmp_path, monkeypatch):
     assert result["ok"] is True
     assert "CIA 已自动安装" in result["message"]
     assert calls and calls[0][-1] == str(cia)
+
+
+# --- PS1 iso/pbp 碟镜像与已有 m3u 优先（真实 bug：iso/pbp-only 目录找不到 ROM） ---
+
+
+def test_ps1_iso_only_returns_iso(tmp_path):
+    (tmp_path / "Game.iso").write_bytes(b"x")
+    assert emu.find_rom_file(str(tmp_path), "Game.zip", "ps1").endswith("Game.iso")
+
+
+def test_ps1_pbp_only_returns_pbp(tmp_path):
+    (tmp_path / "eboot.pbp").write_bytes(b"x")
+    assert emu.find_rom_file(str(tmp_path), "Game.zip", "ps1").endswith("eboot.pbp")
+
+
+def test_ps1_single_group_fallback_when_openpath_unmatched(tmp_path):
+    # 只有一组碟时不应因为 openpath（压缩包名）对不上就直接失败。
+    (tmp_path / "game.cue").write_text('FILE "game.bin" BINARY\n', encoding="utf-8")
+    assert emu.find_rom_file(str(tmp_path), "PS1CH001.7z", "ps1").endswith("game.cue")
+
+
+def test_ps1_multi_iso_generates_naturally_sorted_m3u(tmp_path):
+    for label in ("Disc 1", "Disc 2", "Disc 10"):
+        (tmp_path / f"Game ({label}).iso").write_bytes(b"x")
+    found = emu.find_rom_file(str(tmp_path), "Game (Disc 1).iso", "ps1")
+    assert found.endswith("freedeckcy-game-multidisc.m3u")
+    content = Path(found).read_text(encoding="utf-8")
+    assert content.index("Game (Disc 1).iso") < content.index("Game (Disc 2).iso")
+    assert content.index("Game (Disc 2).iso") < content.index("Game (Disc 10).iso")
+
+
+def test_ps1_existing_playlist_wins_over_generated_multidisc(tmp_path):
+    (tmp_path / "Game (Disc 1).cue").write_text('FILE "d1.bin" BINARY\n', encoding="utf-8")
+    (tmp_path / "Game (Disc 2).cue").write_text('FILE "d2.bin" BINARY\n', encoding="utf-8")
+    (tmp_path / "Game.m3u").write_text("Game (Disc 1).cue\nGame (Disc 2).cue\n", encoding="utf-8")
+    found = emu.find_rom_file(str(tmp_path), "Game (Disc 1).cue", "ps1")
+    assert found.endswith("Game.m3u")
+    assert not (tmp_path / "freedeckcy-game-multidisc.m3u").exists()
+
+
+def test_ps1_same_disc_mixed_formats_keep_cue_in_m3u(tmp_path):
+    (tmp_path / "Disc 1.cue").write_text('FILE "Disc 1.bin" BINARY\n', encoding="utf-8")
+    (tmp_path / "Disc 1.iso").write_bytes(b"iso")
+    (tmp_path / "Disc 2.iso").write_bytes(b"iso")
+    found = emu.find_rom_file(str(tmp_path), "Disc 1.cue", "ps1")
+    content = Path(found).read_text(encoding="utf-8")
+    assert "Disc 1.cue" in content
+    assert "Disc 1.iso" not in content
+    assert "Disc 2.iso" in content
+
+
+def test_3ds_cia_only_dir_not_detected_as_rom(tmp_path):
+    # 服务层靠 find_rom_file(...)=='' 才走 Azahar --install 分支，
+    # 这里防止有人把 .cia 加进 3ds rom_extensions 后自动安装静默失效。
+    (tmp_path / "game.cia").write_bytes(b"CIA")
+    assert emu.find_rom_file(str(tmp_path), "", "3ds", strict=True) == ""
+    (tmp_path / "game.3ds").write_bytes(b"NCSD")
+    assert emu.find_rom_file(str(tmp_path), "", "3ds", strict=True).endswith("game.3ds")
+
+
+# --- 模拟器下载完整性 / AppImage 解包原子性 / Flatpak 非交互 ---
+
+
+class _FakeContent:
+    def __init__(self, chunks):
+        self._chunks = list(chunks)
+
+    async def iter_chunked(self, _size):
+        for chunk in self._chunks:
+            yield chunk
+
+
+class _FakeResponse:
+    def __init__(self, *, status=200, chunks=(), headers=None, wait_exc=None):
+        self.status = status
+        self.headers = dict(headers or {})
+        self.content = _FakeContent(chunks)
+        self._wait_exc = wait_exc
+
+    async def __aenter__(self):
+        if self._wait_exc is not None:
+            raise self._wait_exc
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+
+class _FakeSession:
+    def __init__(self, response):
+        self._response = response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    def get(self, _url, allow_redirects=True):
+        return self._response
+
+
+def _fake_aiohttp(response, client_error_cls):
+    return SimpleNamespace(
+        ClientTimeout=lambda **kwargs: None,
+        ClientError=client_error_cls,
+        ClientSession=lambda **kwargs: _FakeSession(response),
+    )
+
+
+def _download_spec(min_bytes: int = 4):
+    return emu.EmulatorSpec(
+        platform="gba",
+        name="TestEmu",
+        adapter="mgba",
+        repo="example/test",
+        download_base="https://example.test/download",
+        assets={"x86_64": "test.appimage"},
+        archive="appimage",
+        launch_args=("{rom}",),
+        rom_extensions=(".gba",),
+        min_bytes=min_bytes,
+    )
+
+
+def _download_state(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(emu, "runtime_arch", lambda: "x86_64")
+    return tmp_path / "state" / "emulators" / "gba" / "x86_64" / "test.appimage"
+
+
+def test_asset_integrity_error_detects_html_and_short_files(tmp_path):
+    spec = _download_spec(min_bytes=8)
+    bad = tmp_path / "bad.appimage"
+    bad.write_bytes(b"<html>xx")
+    assert "ELF" in emu._asset_integrity_error(spec, str(bad))
+    short = tmp_path / "short.appimage"
+    short.write_bytes(b"\x7fELF")
+    assert "不完整" in emu._asset_integrity_error(spec, str(short))
+    good = tmp_path / "good.appimage"
+    good.write_bytes(b"\x7fELF" + b"\x00" * 8)
+    assert emu._asset_integrity_error(spec, str(good)) == ""
+
+
+def test_download_asset_redownloads_corrupt_cache(tmp_path, monkeypatch):
+    target = _download_state(tmp_path, monkeypatch)
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"<html>not-an-appimage")
+
+    class ClientError(Exception):
+        pass
+
+    response = _FakeResponse(chunks=(b"\x7fELF", b"payload"))
+    monkeypatch.setattr(emu, "aiohttp", _fake_aiohttp(response, ClientError))
+    path = asyncio.run(emu._download_asset(_download_spec(), "x86_64"))
+    assert Path(path) == target
+    assert target.read_bytes().startswith(b"\x7fELF")
+    assert not list(target.parent.glob("*.part"))
+
+
+def test_download_asset_rejects_truncated_response(tmp_path, monkeypatch):
+    target = _download_state(tmp_path, monkeypatch)
+
+    class ClientError(Exception):
+        pass
+
+    response = _FakeResponse(chunks=(b"\x7fELF",), headers={"Content-Length": "999"})
+    monkeypatch.setattr(emu, "aiohttp", _fake_aiohttp(response, ClientError))
+    with pytest.raises(RuntimeError, match="下载不完整"):
+        asyncio.run(emu._download_asset(_download_spec(), "x86_64"))
+    assert not target.exists()
+    assert not list(target.parent.glob("*.part"))
+
+
+def test_download_asset_http_error_is_actionable(tmp_path, monkeypatch):
+    _download_state(tmp_path, monkeypatch)
+
+    class ClientError(Exception):
+        pass
+
+    response = _FakeResponse(status=404)
+    monkeypatch.setattr(emu, "aiohttp", _fake_aiohttp(response, ClientError))
+    with pytest.raises(RuntimeError) as exc:
+        asyncio.run(emu._download_asset(_download_spec(), "x86_64"))
+    assert "HTTP 404" in str(exc.value)
+
+
+def test_download_asset_timeout_is_actionable(tmp_path, monkeypatch):
+    _download_state(tmp_path, monkeypatch)
+
+    class ClientError(Exception):
+        pass
+
+    response = _FakeResponse(wait_exc=asyncio.TimeoutError())
+    monkeypatch.setattr(emu, "aiohttp", _fake_aiohttp(response, ClientError))
+    with pytest.raises(RuntimeError, match="超时"):
+        asyncio.run(emu._download_asset(_download_spec(), "x86_64"))
+
+
+def test_run_appimage_extract_is_atomic(tmp_path, monkeypatch):
+    dest = tmp_path / "emulator"
+
+    def fake_run(_args, **kwargs):
+        staging = Path(kwargs["cwd"])
+        (staging / "squashfs-root").mkdir(parents=True)
+        (staging / "squashfs-root" / "AppRun").write_text("#!/bin/sh\n", encoding="utf-8")
+        return SimpleNamespace(returncode=0, stderr=b"")
+
+    monkeypatch.setattr(emu.subprocess, "run", fake_run)
+    emu._run_appimage_extract("/fake/app.AppImage", dest)
+    assert (dest / "squashfs-root" / "AppRun").is_file()
+    assert not list(dest.glob(".squashfs-extract-*"))
+
+
+def test_run_appimage_extract_failure_does_not_leave_partial(tmp_path, monkeypatch):
+    dest = tmp_path / "emulator"
+    stale = dest / "squashfs-root"
+    stale.mkdir(parents=True)
+    (stale / "junk").write_bytes(b"partial")
+
+    monkeypatch.setattr(
+        emu.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stderr=b"boom"),
+    )
+    with pytest.raises(RuntimeError, match="解包 AppImage 失败"):
+        emu._run_appimage_extract("/fake/app.AppImage", dest)
+    assert not (dest / "squashfs-root").exists()
+    assert not list(dest.glob(".squashfs-extract-*"))
+
+
+def test_flatpak_install_uses_noninteractive(monkeypatch):
+    spec = emu.get_spec("3ds")
+    monkeypatch.setattr(emu, "_flatpak_binary", lambda: "/usr/bin/flatpak")
+    state = {"installed": False}
+    monkeypatch.setattr(emu, "flatpak_installed", lambda app_id, **kwargs: state["installed"])
+    calls = []
+
+    async def fake_run(args, **_kwargs):
+        calls.append(list(args))
+        if "install" in args:
+            state["installed"] = True
+        return 0, ""
+
+    monkeypatch.setattr(emu, "_run_flatpak", fake_run)
+    command = asyncio.run(emu._ensure_flatpak(spec, allow_download=True))
+    assert command == ["/usr/bin/flatpak", "run", "org.azahar_emu.Azahar"]
+    install_calls = [call for call in calls if "install" in call]
+    assert install_calls
+    assert all("--noninteractive" in call for call in install_calls)
+
+
+# --- 3DS sysdata 压缩包/目录树边界（真实 bug：解压后临时目录先被删掉，从未部署） ---
+
+
+class _FakeSevenZip:
+    def __init__(self, *, fail: bool = False):
+        self.calls = 0
+        self.fail = fail
+
+    def extract_archive(self, archive_path, output_dir):
+        import zipfile
+
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("bad archive")
+        with zipfile.ZipFile(archive_path) as zf:
+            zf.extractall(output_dir)
+
+
+def _setup_3ds_env(tmp_path, monkeypatch):
+    import zipfile
+
+    monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(emu_setup, "_AZAHAR_DATA", tmp_path / "azahar")
+    root = tmp_path / "state" / "bios" / "3ds"
+    root.mkdir(parents=True)
+    target = tmp_path / "azahar" / "sysdata"
+    return root, target
+
+
+def test_setup_3ds_deploys_sysdata_zip_tree(tmp_path, monkeypatch):
+    import zipfile
+
+    bios, target = _setup_3ds_env(tmp_path, monkeypatch)
+    with zipfile.ZipFile(bios / "sysdata.zip", "w") as zf:
+        zf.writestr("sysdata/nand/data/file.bin", b"nand")
+        zf.writestr("sysdata/sdmc/sub/other.bin", b"sdmc")
+    seven_zip = _FakeSevenZip()
+    messages = emu_setup.setup_emulator("3ds", [], seven_zip=seven_zip)
+    assert (target / "nand" / "data" / "file.bin").read_bytes() == b"nand"
+    assert (target / "sdmc" / "sub" / "other.bin").read_bytes() == b"sdmc"
+    flatpak_target = (
+        tmp_path
+        / "home"
+        / ".var"
+        / "app"
+        / "org.azahar_emu.Azahar"
+        / "data"
+        / "azahar-emu"
+        / "sysdata"
+    )
+    assert (flatpak_target / "nand" / "data" / "file.bin").is_file()
+    assert seven_zip.calls == 1
+    assert not (bios / "_extracted").exists()
+    assert "已部署" in " ".join(messages)
+
+
+def test_setup_3ds_sysdata_folder_keys_files(tmp_path, monkeypatch):
+    import zipfile
+
+    bios, target = _setup_3ds_env(tmp_path, monkeypatch)
+    with zipfile.ZipFile(bios / "sysdata.zip", "w") as zf:
+        zf.writestr("sysdata/aes_keys.txt", b"keys")
+        zf.writestr("sysdata/seeddb.bin", b"seeddb")
+    emu_setup.setup_emulator("3ds", [], seven_zip=_FakeSevenZip())
+    assert (target / "aes_keys.txt").read_bytes() == b"keys"
+    assert (target / "seeddb.bin").is_file()
+
+
+def test_setup_3ds_unwraps_single_wrapper_directory(tmp_path, monkeypatch):
+    import zipfile
+
+    bios, _target = _setup_3ds_env(tmp_path, monkeypatch)
+    user_root = tmp_path / "azahar"
+    with zipfile.ZipFile(bios / "sysdata.zip", "w") as zf:
+        zf.writestr("3ds-system/nand/data/file.bin", b"x")
+    emu_setup.setup_emulator("3ds", [], seven_zip=_FakeSevenZip())
+    # nand/ 属于模拟器用户数据根，不能再套一层 sysdata/
+    assert (user_root / "nand" / "data" / "file.bin").is_file()
+    assert not (user_root / "sysdata" / "nand").exists()
+    assert not (user_root / "3ds-system").exists()
+
+
+def test_setup_3ds_content_at_archive_root(tmp_path, monkeypatch):
+    import zipfile
+
+    bios, _target = _setup_3ds_env(tmp_path, monkeypatch)
+    user_root = tmp_path / "azahar"
+    with zipfile.ZipFile(bios / "sysdata.zip", "w") as zf:
+        zf.writestr("nand/data/file.bin", b"x")
+        zf.writestr("sdmc/other.bin", b"y")
+    emu_setup.setup_emulator("3ds", [], seven_zip=_FakeSevenZip())
+    assert (user_root / "nand" / "data" / "file.bin").is_file()
+    assert (user_root / "sdmc" / "other.bin").is_file()
+
+
+def test_setup_3ds_full_user_data_package(tmp_path, monkeypatch):
+    import zipfile
+
+    bios, _target = _setup_3ds_env(tmp_path, monkeypatch)
+    user_root = tmp_path / "azahar"
+    with zipfile.ZipFile(bios / "system-files.zip", "w") as zf:
+        zf.writestr("nand/00000000/data.bin", b"nand")
+        zf.writestr("sysdata/seeddb.bin", b"seeddb")
+    emu_setup.setup_emulator("3ds", [], seven_zip=_FakeSevenZip())
+    assert (user_root / "nand" / "00000000" / "data.bin").is_file()
+    assert (user_root / "sysdata" / "seeddb.bin").is_file()
+
+
+def test_setup_3ds_deploys_loose_sysdata_tree(tmp_path, monkeypatch):
+    bios, _target = _setup_3ds_env(tmp_path, monkeypatch)
+    user_root = tmp_path / "azahar"
+    (bios / "nand" / "data").mkdir(parents=True)
+    (bios / "nand" / "data" / "file.bin").write_bytes(b"x")
+    emu_setup.setup_emulator("3ds", [])
+    assert (user_root / "nand" / "data" / "file.bin").is_file()
+
+
+def test_setup_3ds_does_not_overwrite_existing_files(tmp_path, monkeypatch):
+    bios, _target = _setup_3ds_env(tmp_path, monkeypatch)
+    user_root = tmp_path / "azahar"
+    (user_root / "nand").mkdir(parents=True)
+    (user_root / "nand" / "keep.bin").write_bytes(b"old")
+    (bios / "nand").mkdir(parents=True)
+    (bios / "nand" / "keep.bin").write_bytes(b"new")
+    (bios / "nand" / "fresh.bin").write_bytes(b"fresh")
+    messages = emu_setup.setup_emulator("3ds", [])
+    assert (user_root / "nand" / "keep.bin").read_bytes() == b"old"
+    assert (user_root / "nand" / "fresh.bin").read_bytes() == b"fresh"
+    assert "2 个文件" not in " ".join(messages)
+    # 第二次部署没有任何新文件时，提示“已存在”而不是“未找到”。
+    second = emu_setup.setup_emulator("3ds", [])
+    assert any("已存在" in message for message in second)
+
+
+def test_setup_3ds_reports_missing_extractor(tmp_path, monkeypatch):
+    import zipfile
+
+    bios, _target = _setup_3ds_env(tmp_path, monkeypatch)
+    with zipfile.ZipFile(bios / "sysdata.zip", "w") as zf:
+        zf.writestr("sysdata/nand/data/file.bin", b"x")
+    messages = emu_setup.setup_emulator("3ds", [], seven_zip=None)
+    assert any("解压组件" in message for message in messages)
+
+
+def test_azahar_default_data_dir_matches_upstream():
+    # 上游 Azahar 的 Linux/XDG 用户目录名是 azahar-emu，不是 azahar。
+    assert emu_setup._AZAHAR_DATA.name == "azahar-emu"
+    assert ".local" in emu_setup._AZAHAR_DATA.parts
+
+
+def test_setup_3ds_reports_archive_failure(tmp_path, monkeypatch):
+    import zipfile
+
+    bios, _target = _setup_3ds_env(tmp_path, monkeypatch)
+    with zipfile.ZipFile(bios / "sysdata.zip", "w") as zf:
+        zf.writestr("sysdata/nand/file.bin", b"x")
+    messages = emu_setup.setup_emulator("3ds", [], seven_zip=_FakeSevenZip(fail=True))
+    assert any("解压" in message and "失败" in message for message in messages)

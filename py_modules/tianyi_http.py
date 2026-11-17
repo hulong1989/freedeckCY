@@ -53,18 +53,30 @@ def _mask_diagnostics(value: Any) -> Any:
 
 
 def _json_error_from_exception(exc: Exception, status: int = 400) -> web.Response:
-    """把异常转换为统一错误响应，并尽量透传诊断信息。"""
+    """把异常转换为统一错误响应，并尽量透传（已脱敏的）诊断信息。"""
     diagnostics = getattr(exc, "diagnostics", None)
     if isinstance(diagnostics, dict):
         diagnostics = _mask_diagnostics(diagnostics)
     else:
         diagnostics = None
+    # 错误信息也可能带 cookie/token/HOME（例如底层 HTTP 异常文本），返回前统一脱敏。
+    safe_message = _redact_text(str(exc))[:1200]
     try:
         safe_detail = _redact_text(f"{exc} | {diagnostics if diagnostics else ''}")[:1200]
         config.logger.error("Tianyi HTTP error status=%s detail=%s", status, safe_detail)
     except Exception:
         pass
-    return _json_error(str(exc), status=status, diagnostics=diagnostics)
+    return _json_error(safe_message, status=status, diagnostics=diagnostics)
+
+
+def _local_web_error(exc: LocalWebNotReadyError, status: int = 503) -> web.Response:
+    """本地网页未就绪错误：reason/diagnostics 同样按敏感字段脱敏。"""
+    return _json_error(
+        _redact_text(str(exc)) or "本地网页服务未就绪",
+        status=status,
+        reason=exc.reason,
+        diagnostics=_mask_diagnostics(dict(exc.diagnostics or {})),
+    )
 
 
 def _ui_root() -> Optional[Path]:
@@ -282,7 +294,7 @@ async def handle_login_redirect(request: web.Request, plugin: Any) -> web.Respon
         url = await _service(plugin).get_login_url()
         raise web.HTTPFound(url)
     except LocalWebNotReadyError as exc:
-        return _json_error(str(exc), 503, reason=exc.reason, diagnostics=exc.diagnostics)
+        return _local_web_error(exc)
     except web.HTTPException:
         raise
     except Exception as exc:
@@ -726,7 +738,7 @@ async def handle_login_url(request: web.Request, plugin: Any) -> web.Response:
         url = await _service(plugin).get_login_url()
         return _json_ok({"data": {"url": url}, "url": url})
     except LocalWebNotReadyError as exc:
-        return _json_error(str(exc), 503, reason=exc.reason, diagnostics=exc.diagnostics)
+        return _local_web_error(exc)
     except Exception as exc:
         return _json_error_from_exception(exc, 500)
 

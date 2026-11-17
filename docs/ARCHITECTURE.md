@@ -1,6 +1,6 @@
 # freedeckCY 架构说明
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.26.1**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.26.2**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -18,11 +18,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 这是阅读本仓库最容易踩的坑：**GitHub Releases 里的成品功能远多于仓库代码**。
 
-> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.26.1**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
+> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.26.2**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.26.1`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块 |
+| 本仓库 `main` | `package.json` 版本 `0.26.2`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块 |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -112,7 +112,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 repo/
 ├── main.py                     # 插件入口：Plugin 类，24 个可调用 RPC，大部分薄转发给 TianyiService / server_manager
 ├── plugin.json                 # Decky 元信息（api_version=1, flags=[]，publish 描述已更新）
-├── package.json                # 版本 0.26.1；build=rollup；前端依赖
+├── package.json                # 版本 0.26.2；build=rollup；前端依赖
 ├── decky.pyi                   # Decky Python API 类型存根
 ├── Makefile                    # runtime / package / test / doctor / validate-catalog / validate-submissions / clean / help 目标（见 DEVELOPMENT.md）
 ├── requirements-dev.txt        # 开发与 CI 依赖（pytest 等，运行期依赖由 Decky 自带）
@@ -169,7 +169,7 @@ repo/
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（385 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
+├── tests/                      # pytest 单测（518 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -406,7 +406,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 | ps1 | DuckStation | `latest` / stenzek/duckstation | appimage：x64 / arm64 | `-batch -fullscreen {rom}` | `.cue` `.m3u` `.chd` `.iso` `.pbp` `.bin` | PS1 BIOS；`FREEDECKCY_DUCKSTATION_BIN` |
 | fc | Mesen2 | 2.1.1 / SourMesen/Mesen2 | zip 内单文件 `Mesen`：x86_64 / ARM64 | `/fullscreen {rom}` | `.nes` `.fds` `.unf` `.unif` | `FREEDECKCY_MESEN_BIN` |
 | md | Mesen2 | 2.1.1 / SourMesen/Mesen2 | 同上，与 FC 共享缓存 | `/fullscreen {rom}` | `.md` `.gen` `.smd` `.bin` `.32x` | 同 FC |
-| 3ds | Azahar | 2126.2 / azahar-emu/azahar | **SteamOS 优先 Flathub Flatpak `org.azahar_emu.Azahar`**；否则 appimage（**仅 x86_64**，`azahar.AppImage`） | `{rom}` | `.3ds` `.cia` `.cci` `.cxi` `.app` | 3DS system files（setup）；`FREEDECKCY_AZAHAR_BIN`；Flatpak `flatpak_id` |
+| 3ds | Azahar | 2126.2 / azahar-emu/azahar | **SteamOS 优先 Flathub Flatpak `org.azahar_emu.Azahar`**；否则 appimage（**仅 x86_64**，`azahar.AppImage`） | `{rom}` | `.3ds` `.cci` `.cxi` `.app`（`.cia` 走 `--install`） | 3DS system files（setup）；`FREEDECKCY_AZAHAR_BIN`；Flatpak `flatpak_id` |
 | ps2 | PCSX2 | v2.8.2 / PCSX2/pcsx2 | appimage：**仅 x86_64** | `-batch -fullscreen {rom}` | `.iso` `.chd` `.cue` `.bin` `.gz` | PS2 BIOS；`FREEDECKCY_PCSX2_BIN` |
 | ps3 | RPCS3 | build-8d6b42e / RPCS3/rpcs3-binaries-linux | appimage：**仅 x86_64** | `--no-gui {rom}` | `.iso` `.pkg` `.elf` `.self` | PS3 固件（setup）；`FREEDECKCY_RPCS3_BIN` |
 | switch | Eden | v0.2.1 / stable.eden-emu.dev | appimage：**x86_64 + aarch64** | `{rom}` | `.nsp` `.xci` | prod.keys + 固件（setup）；`FREEDECKCY_EDEN_BIN` |
@@ -449,7 +449,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 | NDS | `bios7.bin/bios9.bin/firmware.bin/dsi_firmware.bin` 等 | [emulator_setup.py:295](../py_modules/emulator_setup.py) `_deploy_nds()`：复制到 `<AppDir>` 与 `~/.local/share/melonDS` |
 | Switch | `prod.keys`/`title.keys` + 固件 `.nca` | [emulator_setup.py:304](../py_modules/emulator_setup.py) `_deploy_switch()`：keys → `~/.local/share/eden/keys/`；固件压缩包解出的 `.nca` 目录 → `~/.local/share/eden/nand/system/Contents/registered/` |
 | PS3 | `PS3UPDAT.PUP` | [emulator_setup.py:337](../py_modules/emulator_setup.py) `_install_rpcs3_firmware()`：若 `~/.config/rpcs3/dev_flash` 为空且 RPCS3 可执行，执行 `rpcs3 --installfw <pup>`（600s 超时，失败原因写进消息） |
-| 3DS | system files（`sysdata`） | [emulator_setup.py:362](../py_modules/emulator_setup.py) `_deploy_3ds()`：复制到 `~/.local/share/azahar/sysdata`、`~/.local/share/citra/sysdata`，以及 Flatpak 数据目录 `~/.var/app/org.azahar_emu.Azahar/data/azahar/sysdata`、`.../azahar-emu/sysdata`；`bios/3ds/sysdata/` 目录会整树复制 |
+| 3DS | system files（`sysdata`） | [emulator_setup.py:362](../py_modules/emulator_setup.py) `_deploy_3ds()`：复制到 `~/.local/share/azahar-emu/sysdata`（兼容旧 `azahar`/`citra`），以及 Flatpak 数据目录 `~/.var/app/org.azahar_emu.Azahar/data/azahar-emu/sysdata`；`bios/3ds/` 的 `nand/`、`sdmc/`、`sysdata/` 或压缩包按布局部署，保留目录树且不覆盖已有文件 |
 | GBA | portable 配置 | [emulator_setup.py:272](../py_modules/emulator_setup.py) `_write_mgba_config()`：`portable.ini` + `qt.ini`（`[General] fullScreen=true`） |
 | PSP | portable 配置 | [emulator_setup.py:285](../py_modules/emulator_setup.py) `_write_ppsspp_config()`：`portable.txt` + `memstick/PSP/SYSTEM/ppsspp.ini`（`[General] FullScreen=True`） |
 
@@ -469,7 +469,7 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
   4. 选路优先级：**`FREEDECKCY_AZAHAR_BIN` env > 已装 Flatpak > SteamOS 自动装 Flatpak > AppImage 下载/解包**；非 SteamOS 且未装 Flatpak 时仍走 AppImage；
 - **状态/提示**：`emulator_status()` 返回 `flatpak_id/flatpak_available/flatpak_installed`；有 flatpak 时下载提示改为"通过官方 Flatpak 安装 Azahar"；
 - **XWayland**：3DS wrapper 固定 `QT_QPA_PLATFORM=xcb`、`SDL_VIDEODRIVER=x11`（Game Mode/Wayland 崩溃规避）；
-- **system files**：除 `~/.local/share/azahar|citra/sysdata`，还部署到 Flatpak 的 `~/.var/app/org.azahar_emu.Azahar/data/azahar/sysdata` 与 `.../azahar-emu/sysdata`；
+- **system files**：`~/.local/share/azahar-emu/sysdata`（兼容旧 `azahar`/`citra`）及 Flatpak `~/.var/app/org.azahar_emu.Azahar/data/azahar-emu/sysdata`；
 - **已有游戏自动修复**：后台维护在首次 tick 调 [tianyi_service.py:4916](../py_modules/tianyi_service.py) `_maybe_schedule_launcher_repair()`，对已安装的 3DS 记录创建 repair task，[tianyi_service.py:4935](../py_modules/tianyi_service.py) `_repair_emulator_launchers()` 重新 `ensure_emulator("3ds")` 并重写 `launch-freedeckcy.sh`（AppImage 命令 → Flatpak 命令），保存 state/刷新已安装缓存；插件 shutdown 会取消该任务；用户无需重装游戏。
 
 ### 5.11 自动云存档（Ludusavi + gamewatch，v0.8.0；v0.15.0 模拟器存档）
@@ -1096,7 +1096,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### P2：工程性
 
-21. `tianyi_service.py` 约 9500 行、单类 100+ 方法；`src/index.tsx` 约 4200 行单文件。已补 `tests/`（385 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+21. `tianyi_service.py` 约 9500 行、单类 100+ 方法；`src/index.tsx` 约 4200 行单文件。已补 `tests/`（518 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
 22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
 23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
 24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）

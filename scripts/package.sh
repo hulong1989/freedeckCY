@@ -62,6 +62,8 @@ usage() {
 说明:
   打包过程在 mktemp 临时目录组装，zip 使用 `cd 临时目录 && zip -qr` 保证根结构；
   退出时自动清理临时目录。
+  产物旁会生成 <zip>.sha256（供发布/校验使用）；若 defaults/runtime 存在但缺少
+  runtime-manifest.txt，会提示重跑 make runtime（verify_runtime.sh 依赖它校验版本）。
 EOF
 }
 
@@ -192,23 +194,37 @@ log "插件版本: ${VERSION_RAW}"
 log "目标架构: ${PACKAGE_ARCH}"
 
 # ---- 运行时提示（缺失只警告） ----------------------------------------------
+runtime_has_binary() { # comp_file_name arch
+    local name="$1" arch="$2" found
+    found="$(find "$REPO_ROOT/defaults/runtime" -type f -path "*/${arch}/*" -name "$name" | sed -n '1p')"
+    [[ -n "${found}" ]]
+}
+
+warn_missing_runtime() { # arch
+    local arch="$1"
+    runtime_has_binary aria2c "${arch}" || warn "defaults/runtime/${arch}/ 中没有 aria2c：建议先 bash scripts/fetch_runtime.sh --arch ${arch}"
+    runtime_has_binary 7zz "${arch}" || warn "defaults/runtime/${arch}/ 中没有 7zz：建议先 bash scripts/fetch_runtime.sh --arch ${arch}"
+    runtime_has_binary node "${arch}" || warn "defaults/runtime/${arch}/ 中没有 node：建议先 bash scripts/fetch_runtime.sh --arch ${arch}"
+}
+
 if [[ ! -d "$REPO_ROOT/defaults/runtime" ]]; then
     warn "defaults/runtime/ 不存在：插件将回退系统 aria2c/7zz/node，Steam Deck 上通常没有。"
     warn "建议先执行: bash scripts/fetch_runtime.sh（或 make runtime）"
 else
-    runtime_has_binary() { # comp_file_name
-        local name="$1"
-        local found
-        if [[ "$PACKAGE_ARCH" == "all" ]]; then
-            found="$(find "$REPO_ROOT/defaults/runtime" -type f -name "$name" | sed -n '1p')"
-        else
-            found="$(find "$REPO_ROOT/defaults/runtime" -type f -path "*/${PACKAGE_ARCH}/*" -name "$name" | sed -n '1p')"
-        fi
-        [[ -n "$found" ]]
-    }
-    runtime_has_binary aria2c || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 aria2c：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
-    runtime_has_binary 7zz || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 7zz：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
-    runtime_has_binary node || warn "defaults/runtime/${PACKAGE_ARCH}/ 中没有 node：建议先 bash scripts/fetch_runtime.sh --arch ${PACKAGE_ARCH}"
+    if [[ "$PACKAGE_ARCH" == "all" ]]; then
+        # universal 包必须两套运行时都在，否则 ARM/x86 用户装上去会缺二进制。
+        for _arch in x86_64 aarch64; do
+            warn_missing_runtime "${_arch}"
+        done
+    else
+        warn_missing_runtime "$PACKAGE_ARCH"
+    fi
+    if ! ls "$REPO_ROOT"/defaults/runtime/*/*/ >/dev/null 2>&1; then
+        warn "defaults/runtime/ 下没有任何 <组件>/<架构>/ 目录：请先 bash scripts/fetch_runtime.sh"
+    fi
+    if [[ ! -f "$REPO_ROOT/defaults/runtime/runtime-manifest.txt" ]]; then
+        warn "defaults/runtime/ 缺少 runtime-manifest.txt（旧版运行时目录）：verify_runtime.sh 会跳过版本一致性校验，建议重跑 make runtime"
+    fi
     [[ -f "$REPO_ROOT/defaults/ludusavi/manifest.json.gz" ]] || warn "缺少 defaults/ludusavi/manifest.json.gz：自动云存档只会退回 Proton 目录扫描（make ludusavi-manifest）"
 fi
 
@@ -382,6 +398,22 @@ if have_cmd unzip; then
     fi
 else
     warn "未找到 unzip 命令，跳过 zip 结构检查（产物仍已生成）"
+fi
+
+# ---- 产物 SHA256（发布/校验用） ---------------------------------------------
+SHA_FILE="${OUT_ZIP}.sha256"
+ZIP_SHA=""
+if command -v sha256sum >/dev/null 2>&1; then
+    ZIP_SHA="$(sha256sum "$OUT_ZIP" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+    ZIP_SHA="$(shasum -a 256 "$OUT_ZIP" | awk '{print $1}')"
+fi
+if [[ -n "${ZIP_SHA}" ]]; then
+    printf '%s  %s\n' "${ZIP_SHA}" "$(basename "$OUT_ZIP")" >"$SHA_FILE"
+    log "SHA256: ${ZIP_SHA}"
+    log "校验文件: ${SHA_FILE}"
+else
+    warn "缺少 sha256sum/shasum，跳过生成 ${SHA_FILE}"
 fi
 
 log "打包完成: ${OUT_ZIP} (${ZIP_MB} MB)"

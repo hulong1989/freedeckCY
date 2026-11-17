@@ -14,11 +14,17 @@ async function readJSONResponse(resp) {
   if (!text) {
     return { status: resp.ok ? "success" : "error", message: `HTTP ${resp.status}` };
   }
+  let parsed;
   try {
-    return JSON.parse(text);
+    parsed = JSON.parse(text);
   } catch (error) {
     throw new Error(`HTTP ${resp.status} 响应不是 JSON：${text.slice(0, 160)}`);
   }
+  // 后端错误有时是 4xx/5xx + JSON：统一补上 status/message，调用方只看 status 不会误判成功。
+  const payload = parsed && typeof parsed === "object" ? parsed : { data: parsed };
+  if (!payload.status) payload.status = resp.ok ? "success" : "error";
+  if (!payload.message && !resp.ok) payload.message = `HTTP ${resp.status}`;
+  return payload;
 }
 
 async function requestJSON(path, options = {}) {
@@ -29,10 +35,17 @@ async function requestJSON(path, options = {}) {
     return await readJSONResponse(resp);
   } catch (error) {
     if (error && error.name === "AbortError") throw new Error("请求超时（20 秒）");
-    throw error;
+    if (error && error.message) throw error;
+    throw new Error(`网络请求失败：${String(error || "未知错误")}`);
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+function errorText(error) {
+  if (error && typeof error === "object" && error.message) return String(error.message);
+  const text = String(error || "").trim();
+  return text || "未知错误";
 }
 
 async function apiGet(path, query = {}) {
@@ -67,6 +80,15 @@ createApp({
       mode: "catalog",
       installed: { total: 0, items: [] },
       scanBusy: false,
+      listBusy: false,
+      installedBusy: false,
+      listRequestSeq: 0,
+      installedRequestSeq: 0,
+      login: { logged_in: false, user_account: "", message: "未登录" },
+      loginBusy: false,
+      stateBusy: false,
+      backupBusy: false,
+      flashSeq: 0,
       sort: "",
       sortOptions: ["", "title", "size_desc", "size_asc"],
       sortLabels: { "": "默认", title: "名称", size_desc: "大小↓", size_asc: "大小↑" },
@@ -88,6 +110,7 @@ createApp({
       gamepadPressed: {},
       gamepadRepeatState: {},
       gamepadPollMs: 160,
+      installReturnIndex: 0,
       installDialog: {
         visible: false,
         loading: false,
@@ -133,6 +156,11 @@ createApp({
     sortLabel() {
       return this.sortLabels[this.sort] || "默认";
     },
+    loginLabel() {
+      const login = this.login || {};
+      if (!login.logged_in) return "未登录";
+      return `已登录：${login.user_account || "未知账号"}`;
+    },
     modalCanConfirm() {
       if (!this.installDialog.plan) return false;
       if (this.installDialog.loading || this.installDialog.submitting) return false;
@@ -165,6 +193,8 @@ createApp({
     },
     onWindowFocus() {
       this.syncGamepadPolling();
+      // 从登录桥/其它标签页切回来时同步登录态（网页库是备用入口，登录走登录桥）。
+      void this.refreshLoginState();
     },
     onWindowBlur() {
       this.syncGamepadPolling();
@@ -180,8 +210,11 @@ createApp({
     flash(text) {
       this.message = String(text || "");
       if (!this.message) return;
+      this.flashSeq = Number(this.flashSeq || 0) + 1;
+      const seq = this.flashSeq;
       setTimeout(() => {
-        this.message = "";
+        // 旧提示的定时器不要清掉后出现的新提示。
+        if (seq === this.flashSeq) this.message = "";
       }, 2400);
     },
     formatShareAttempt(item) {
@@ -346,15 +379,36 @@ createApp({
       if (free > 0 || need > 0) return free >= need;
       return Boolean(plan.install_dir_ok);
     },
+    async fetchPanelState() {
+      const result = await apiGet("/api/tianyi/state");
+      if (!result || result.status !== "success") return false;
+      const data = result.data || {};
+      this.settings = Object.assign({}, this.settings, data.settings || {});
+      if (!this.settings.page_size) this.settings.page_size = 50;
+      if (!this.settings.split_count) this.settings.split_count = 16;
+      if (!this.settings.install_dir) this.settings.install_dir = this.settings.download_dir || "";
+      const login = data.login || {};
+      this.login = {
+        logged_in: Boolean(login.logged_in),
+        user_account: String(login.user_account || ""),
+        message: String(login.message || ""),
+      };
+      return true;
+    },
+    async refreshLoginState() {
+      if (this.stateBusy) return;
+      this.stateBusy = true;
+      try {
+        await this.fetchPanelState();
+      } catch (_error) {
+        // 登录态刷新失败保持旧值，不打断浏览。
+      } finally {
+        this.stateBusy = false;
+      }
+    },
     async bootstrap() {
       try {
-        const result = await apiGet("/api/tianyi/state");
-        if (result.status !== "success") return;
-        const data = result.data || {};
-        this.settings = Object.assign({}, this.settings, data.settings || {});
-        if (!this.settings.page_size) this.settings.page_size = 50;
-        if (!this.settings.split_count) this.settings.split_count = 16;
-        if (!this.settings.install_dir) this.settings.install_dir = this.settings.download_dir || "";
+        await this.fetchPanelState();
       } catch (_error) {
         // 状态读取失败不阻断浏览流程。
       }
@@ -394,7 +448,9 @@ createApp({
         return 2;
       }
       if (this.installDialog.visible) {
-        return 2;
+        // loading 时只有「取消」可聚焦；空间不足时确认按钮 disabled，也不应让焦点落上去「按了没反应」。
+        if (this.installDialog.loading) return 1;
+        return this.modalCanConfirm ? 2 : 1;
       }
       const items = this.mode === "installed" ? this.installed.items : this.list.items;
       const cardCount = this.showResults ? Number((items || []).length || 0) : 0;
@@ -557,14 +613,14 @@ createApp({
         await this.confirmInstall();
         return;
       }
+      const index = this.focusedIndex;
+      if (index <= 1) {
+        await this.submitSearch();
+        return;
+      }
       if (this.mode === "installed") {
         const item = this.focusedInstalledItem();
         if (item) await this.launchInstalled(item);
-        return;
-      }
-      const index = this.focusedIndex;
-      if (index <= 1) {
-        await this.reloadList(1);
         return;
       }
       const platformCount = this.platformChipCount();
@@ -584,6 +640,28 @@ createApp({
       if (item) {
         await this.openInstallConfirm(item);
       }
+    },
+    syncVirtualFocus(index) {
+      const total = this.getFocusableCount();
+      if (total <= 0) return;
+      this.focusedIndex = Math.max(0, Math.min(total - 1, Number(index || 0)));
+    },
+    activateCatalogCard(item, idx) {
+      // 鼠标点卡片时同步虚拟焦点，之后按回车/手柄 A 才会继续作用在同一张卡上。
+      this.syncVirtualFocus(Number(idx || 0) + this.cardStartIndex());
+      void this.openInstallConfirm(item);
+    },
+    activateInstalledCard(item, idx) {
+      this.syncVirtualFocus(Number(idx || 0) + this.cardStartIndex());
+      void this.launchInstalled(item);
+    },
+    activatePlatformChip(value, pidx) {
+      this.syncVirtualFocus(Number(pidx || 0) + 2);
+      this.selectPlatform(value);
+    },
+    activateCategoryChip(value, cidx) {
+      this.syncVirtualFocus(Number(cidx || 0) + 2 + this.platformChipCount());
+      this.selectCategory(value);
     },
     handleBackAction() {
       if (this.confirmDialog.visible) {
@@ -608,6 +686,14 @@ createApp({
       );
       if (typing) {
         if (key === "Escape") this.handleBackAction();
+        return;
+      }
+
+      const tagName = String((target && target.tagName) || "").toUpperCase();
+      const domInteractive = Boolean(target && (tagName === "BUTTON" || tagName === "A" || tagName === "SELECT"));
+      if (domInteractive && (key === "Enter" || key === " ")) {
+        // 鼠标点过工具栏/卡片按钮后 DOM 焦点在按钮上：交回浏览器原生 click，
+        // 否则会按旧的虚拟焦点索引去执行另一个操作（回车错位）。
         return;
       }
 
@@ -735,21 +821,44 @@ createApp({
       this.activeQuery = q;
       this.hintText = q ? "" : "浏览全部资源（可按平台/分类筛选）";
 
-      const result = await apiGet("/api/tianyi/catalog", {
-        q,
-        page,
-        page_size: this.settings.page_size,
-        category: this.activeCategory || "",
-        platform: this.activePlatform || "",
-        sort: this.sort || "",
-      });
-      if (result.status !== "success") {
-        this.flash(result.message || "加载失败");
+      const requestSeq = Number(this.listRequestSeq || 0) + 1;
+      this.listRequestSeq = requestSeq;
+      this.listBusy = true;
+      let result;
+      try {
+        result = await apiGet("/api/tianyi/catalog", {
+          q,
+          page,
+          page_size: this.settings.page_size,
+          category: this.activeCategory || "",
+          platform: this.activePlatform || "",
+          sort: this.sort || "",
+        });
+      } catch (error) {
+        // 网络中断/超时/非 JSON 响应也要有提示，避免出现在控制台里的未处理 Promise。
+        if (requestSeq === this.listRequestSeq) {
+          this.flash(`加载游戏列表失败：${errorText(error)}`);
+          this.setFocusIndex(0, { scroll: false });
+        }
+        return;
+      } finally {
+        if (requestSeq === this.listRequestSeq) this.listBusy = false;
+      }
+      // 旧请求（翻页/筛选快速切换）晚到时不覆盖新列表。
+      if (requestSeq !== this.listRequestSeq) return;
+
+      if (!result || result.status !== "success") {
+        this.flash((result && result.message) || "加载游戏列表失败");
         this.setFocusIndex(0, { scroll: false });
         return;
       }
 
-      this.list = Object.assign({ total: 0, page: 1, page_size: 50, items: [] }, result.data || {});
+      const data = result.data || {};
+      this.list = Object.assign(
+        { total: 0, page: 1, page_size: 50, items: [] },
+        data,
+        { items: Array.isArray(data.items) ? data.items : [] },
+      );
       this.categories = Array.isArray(this.list.categories) ? this.list.categories : this.categories;
       this.platforms = Array.isArray(this.list.platforms) ? this.list.platforms : this.platforms;
       const pages = this.totalPages;
@@ -766,7 +875,7 @@ createApp({
       } else {
         this.hintText = `共 ${this.list.total} 条资源${prefix}，第 ${this.list.page} / ${pages} 页`;
       }
-      if (!this.list.items || this.list.items.length === 0) {
+      if (!this.list.items.length) {
         this.setFocusIndex(0, { scroll: false });
       } else {
         this.setFocusIndex(this.cardStartIndex(), { scroll: true });
@@ -785,18 +894,33 @@ createApp({
         await this.reloadInstalled();
         this.flash(data.message || `已扫描：新增 ${data.added_count || 0} 个`);
       } catch (error) {
-        this.flash(`扫描失败：${String(error)}`);
+        this.flash(`扫描失败：${errorText(error)}`);
       } finally {
         this.scanBusy = false;
       }
     },
     async reloadInstalled() {
-      const result = await apiGet("/api/tianyi/installed");
-      if (result.status !== "success") {
-        this.flash(result.message || "读取已安装列表失败");
+      const requestSeq = Number(this.installedRequestSeq || 0) + 1;
+      this.installedRequestSeq = requestSeq;
+      this.installedBusy = true;
+      let result;
+      try {
+        result = await apiGet("/api/tianyi/installed");
+      } catch (error) {
+        if (requestSeq === this.installedRequestSeq) this.flash(`读取已安装列表失败：${errorText(error)}`);
+        return;
+      } finally {
+        if (requestSeq === this.installedRequestSeq) this.installedBusy = false;
+      }
+      if (requestSeq !== this.installedRequestSeq) return;
+      if (!result || result.status !== "success") {
+        this.flash((result && result.message) || "读取已安装列表失败");
         return;
       }
-      this.installed = Object.assign({ total: 0, items: [] }, result.data || {});
+      const data = result.data || {};
+      this.installed = Object.assign({ total: 0, items: [] }, data, {
+        items: Array.isArray(data.items) ? data.items : [],
+      });
       this.showResults = true;
       if (this.mode === "installed") {
         if (this.installed.items.length) {
@@ -822,6 +946,13 @@ createApp({
       if (this.confirmDialog.visible || this.installDialog.visible) return;
       void this.switchMode(this.mode === "catalog" ? "installed" : "catalog");
     },
+    async submitSearch() {
+      // 在「已安装」页签里按回车搜索时，先切回「游戏库」页签，否则结果区不显示、看起来像没反应。
+      if (this.mode !== "catalog") {
+        this.mode = "catalog";
+      }
+      await this.reloadList(1);
+    },
     async gotoPage(page) {
       if (this.mode !== "catalog") return;
       if (this.installDialog.visible || this.confirmDialog.visible) return;
@@ -842,7 +973,7 @@ createApp({
         if (result.status !== "success") throw new Error(result.message || "启动失败");
         this.flash(`已请求 Steam 启动：${item.title || item.game_id}`);
       } catch (error) {
-        this.flash(String((error && error.message) || error));
+        this.flash(errorText(error));
       }
     },
     async openInstalledFolder(item) {
@@ -852,7 +983,7 @@ createApp({
         if (result.status !== "success") throw new Error(result.message || "打开目录失败");
         this.flash("已请求打开安装目录");
       } catch (error) {
-        this.flash(String((error && error.message) || error));
+        this.flash(errorText(error));
       }
     },
     askUninstallInstalled(item) {
@@ -876,7 +1007,7 @@ createApp({
         await this.reloadInstalled();
         await this.reloadList(this.list.page || 1);
       } catch (error) {
-        this.flash(String((error && error.message) || error));
+        this.flash(`卸载失败：${errorText(error)}`);
       }
     },
     focusedInstalledItem() {
@@ -915,19 +1046,99 @@ createApp({
       if (typeof action === "function") void action();
       this.setFocusIndex(returnIndex, { scroll: false });
     },
-    openDiagnostics() {
+    async openLoginBridge() {
+      if (this.loginBusy) return;
+      this.loginBusy = true;
+      try {
+        const result = await apiGet("/api/tianyi/login-url");
+        const url = String((result && (result.url || (result.data && result.data.url))) || "");
+        if (!result || result.status !== "success" || !url) {
+          throw new Error((result && result.message) || "获取登录地址失败");
+        }
+        const opened = window.open(url, "_blank");
+        if (!opened) window.location.href = url;
+        this.flash("已打开天翼登录页，登录完成后本页会自动刷新登录态");
+      } catch (error) {
+        this.flash(`打开登录页失败：${errorText(error)}`);
+      } finally {
+        this.loginBusy = false;
+      }
+    },
+    async startCloudSaveBackup() {
+      if (this.backupBusy) return;
+      this.backupBusy = true;
+      try {
+        const result = await apiPost("/api/tianyi/cloud-save/upload/start", {});
+        if (!result || result.status !== "success") {
+          throw new Error((result && result.message) || "启动云存档备份失败");
+        }
+        const data = result.data || {};
+        this.flash(String(data.message || "云存档备份任务已启动"));
+        this.pollBackupStatus(0);
+      } catch (error) {
+        this.flash(`云存档备份失败：${errorText(error)}`);
+      } finally {
+        this.backupBusy = false;
+      }
+    },
+    pollBackupStatus(attempt) {
+      const round = Number(attempt || 0);
+      if (round > 90) return;
+      window.setTimeout(async () => {
+        try {
+          const result = await apiGet("/api/tianyi/cloud-save/upload/status");
+          if (!result || result.status !== "success") return;
+          const state = (result.data && result.data.state) || {};
+          if (state.running) {
+            this.flash(`云存档备份中：${state.message || state.stage || ""}`);
+            this.pollBackupStatus(round + 1);
+            return;
+          }
+          this.flash(`云存档备份结束：${state.message || state.stage || "完成"}`);
+        } catch (_error) {
+          // 轮询失败继续重试，避免网页库关掉时留下未处理的 Promise。
+          this.pollBackupStatus(round + 1);
+        }
+      }, 2000);
+    },
+    async openDiagnostics() {
       if (this.diagnosticsBusy) return;
       this.diagnosticsBusy = true;
-      const link = document.createElement("a");
-      link.href = "/api/tianyi/diagnostics/export";
-      link.download = "freedeckcy-diagnostics.zip";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => {
-        this.diagnosticsBusy = false;
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 120000);
+      try {
+        const resp = await fetch("/api/tianyi/diagnostics/export", { signal: controller.signal });
+        if (!resp.ok) {
+          const text = await resp.text();
+          let message = `HTTP ${resp.status}`;
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed && parsed.message) message = String(parsed.message);
+          } catch (_error) {
+            if (text) message = `HTTP ${resp.status}：${text.slice(0, 160)}`;
+          }
+          throw new Error(message);
+        }
+        const blob = await resp.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = "freedeckcy-diagnostics.zip";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
         this.flash("诊断包已开始下载");
-      }, 1500);
+      } catch (error) {
+        if (error && error.name === "AbortError") {
+          this.flash("导出诊断包超时（120 秒）");
+        } else {
+          this.flash(`导出诊断包失败：${errorText(error)}`);
+        }
+      } finally {
+        window.clearTimeout(timer);
+        this.diagnosticsBusy = false;
+      }
     },
     submitGame() {
       const base = "https://github.com/hulong1989/freedeckCY/issues/new";
@@ -957,7 +1168,7 @@ createApp({
           this.flash(`已是最新版本（v${info.current}）`);
         }
       } catch (error) {
-        this.flash(String(error));
+        this.flash(`检查更新失败：${errorText(error)}`);
       } finally {
         this.updateBusy = false;
       }
@@ -1171,6 +1382,8 @@ createApp({
     },
     async openInstallConfirm(item) {
       if (!item || !item.game_id) return;
+      // 弹窗已打开时忽略重复触发，避免两个 prepare 请求互相覆盖 plan/loading。
+      if (this.installDialog.visible) return;
       const platform = String(item.platform || "pc").toLowerCase();
       const emulatorPlatforms = new Set(["pc", "gba", "psp", "nds", "ps1", "fc", "md", "3ds", "ps2", "ps3", "switch"]);
       if (!emulatorPlatforms.has(platform)) {
@@ -1183,6 +1396,7 @@ createApp({
       this.installDialog.submitting = false;
       this.installDialog.plan = null;
       this.installDialog.game = item;
+      this.installReturnIndex = this.focusedIndex;
       this.setFocusIndex(0, { scroll: false });
 
       let result;
@@ -1195,14 +1409,13 @@ createApp({
         });
       } catch (error) {
         this.installDialog.loading = false;
-        this.flash(`读取安装信息失败：${String(error && error.message ? error.message : error)}`);
+        this.flash(`读取安装信息失败：${errorText(error)}`);
         this.closeInstallDialog(true);
         return;
       }
       this.installDialog.loading = false;
       if (result.status !== "success") {
-        const errorText = this.buildPrepareInstallError(result);
-        this.flash(errorText);
+        this.flash(this.buildPrepareInstallError(result));
         this.closeInstallDialog(true);
         return;
       }
@@ -1214,15 +1427,18 @@ createApp({
     },
     closeInstallDialog(force = false) {
       if (!force && this.installDialog.submitting) return;
+      const returnIndex = Number(this.installReturnIndex || 0);
       this.installDialog.visible = false;
       this.installDialog.loading = false;
       this.installDialog.submitting = false;
       this.installDialog.plan = null;
       this.installDialog.game = null;
-      this.setFocusIndex(0, { scroll: false });
+      // 关闭后回到刚才那张卡，而不是每次都跳回搜索框。
+      this.setFocusIndex(returnIndex, { scroll: false });
     },
     async confirmInstall() {
       if (!this.installDialog.plan || !this.modalCanConfirm) return;
+      if (this.installDialog.submitting) return;
       this.installDialog.submitting = true;
       const plan = this.installDialog.plan;
       const fileIds = Array.isArray(plan.files)
@@ -1241,7 +1457,7 @@ createApp({
         });
       } catch (error) {
         this.installDialog.submitting = false;
-        this.flash(`创建安装任务失败：${String(error && error.message ? error.message : error)}`);
+        this.flash(`创建安装任务失败：${errorText(error)}`);
         return;
       }
       this.installDialog.submitting = false;

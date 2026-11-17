@@ -180,6 +180,12 @@ class Aria2Manager:
     def _write_runtime_meta(self, runtime: Aria2Runtime) -> None:
         try:
             os.makedirs(self._work_dir, exist_ok=True)
+            # 元数据里有 aria2 RPC secret（拿到后可在本机控制下载器写文件），
+            # 目录与文件都收紧到仅属主可访问。
+            try:
+                os.chmod(self._work_dir, 0o700)
+            except Exception:
+                pass
             payload = {
                 "rpc_url": runtime.rpc_url,
                 "rpc_secret": runtime.rpc_secret,
@@ -188,8 +194,16 @@ class Aria2Manager:
                 "pid": int(runtime.pid or 0),
             }
             tmp_path = f"{self._runtime_meta_path}.tmp"
-            with open(tmp_path, "w", encoding="utf-8") as handle:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+            fd = os.open(tmp_path, flags, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 json.dump(payload, handle, ensure_ascii=False)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.chmod(tmp_path, 0o600)
+            except Exception:
+                pass
             os.replace(tmp_path, self._runtime_meta_path)
         except Exception as exc:
             config.logger.warning("写入 aria2 运行时元数据失败: %s", exc)

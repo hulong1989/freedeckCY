@@ -164,3 +164,94 @@ def test_baidu_share_code_canonicalizes_surl_and_short_path(tmp_path):
         catalog_share_codes=submission.catalog_share_codes(rows),
     )
     assert any("已存在" in error for error in errors)
+
+
+def test_validate_submission_rejects_formula_injection_in_openpath():
+    # openpath 会原样写进目录 CSV，必须与 name/categories 一样做公式注入校验。
+    for bad_path in ("=HYPERLINK(\"http://evil\")", "+cmd", "-1+1", "@SUM(A1)"):
+        _normalized, errors, _warnings = submission.validate_submission(
+            _submission(openpath=bad_path),
+            catalog_share_codes=set(),
+        )
+        assert any("公式注入" in error for error in errors), bad_path
+
+
+def test_validate_submission_rejects_control_chars_and_absolute_openpath():
+    _normalized, errors, _warnings = submission.validate_submission(
+        _submission(openpath="Game/Game.7z\n=cmd"),
+        catalog_share_codes=set(),
+    )
+    assert any("控制字符" in error for error in errors)
+
+    for absolute in ("/Game/Game.7z", "C:/Games/Game.7z", "\\\\server\\share\\x.7z"):
+        _normalized, errors, _warnings = submission.validate_submission(
+            _submission(openpath=absolute),
+            catalog_share_codes=set(),
+        )
+        assert any("绝对路径" in error for error in errors), absolute
+
+
+def test_validate_submission_rejects_malformed_share_code():
+    for share_url in (
+        "https://cloud.189.cn/t/=cmd",
+        "https://cloud.189.cn/t/abc%20def",
+        "https://pan.baidu.com/s/1<script>",
+    ):
+        _normalized, errors, _warnings = submission.validate_submission(
+            _submission(share_url=share_url, access_code=""),
+            catalog_share_codes=set(),
+        )
+        assert any("share_url 无效" in error for error in errors), share_url
+
+
+def test_validate_submission_accepts_explicit_port_and_subdomain():
+    _normalized, errors, _warnings = submission.validate_submission(
+        _submission(share_url="https://cloud.189.cn:443/t/AbCdEf123456"),
+        catalog_share_codes=set(),
+    )
+    assert errors == []
+
+    normalized, errors, _warnings = submission.validate_submission(
+        _submission(share_url="https://h5.cloud.189.cn/t/AbCdEf123456"),
+        catalog_share_codes=set(),
+    )
+    assert errors == []
+    assert submission._share_provider(normalized["share_url"]) == "tianyi"
+
+
+def test_access_code_overrides_stale_pwd_in_share_url():
+    normalized, errors, _warnings = submission.validate_submission(
+        _submission(share_url="https://cloud.189.cn/t/AbCdEf123456?pwd=old0", access_code="new1"),
+        catalog_share_codes=set(),
+    )
+    assert errors == []
+    row = submission.build_catalog_row(normalized, "11")
+    assert "pwd=new1" in row["down_url"]
+    assert "old0" not in row["down_url"]
+    assert row["pwd"] == "new1"
+
+
+def test_build_catalog_row_escapes_formula_cells_for_all_text_columns():
+    data = {
+        "name": "=游戏",
+        "platform": "pc",
+        "share_url": "https://cloud.189.cn/t/AbCdEf123456",
+        "access_code": "x9k2",
+        "openpath": "=cmd|' /C calc'!A0",
+        "category_parent": "-5",
+        "list_filesize": "+SUM(A1)",
+    }
+    row = submission.build_catalog_row(data, "12")
+    for field in ("openpath", "category_parent", "list_filesize", "title"):
+        assert row[field].startswith("'"), field
+    assert row["categories"] == "未分类"
+    assert row["game_id"] == "12"
+    assert row["down_url"].startswith("https://")
+
+
+def test_catalog_share_codes_ignores_malformed_shorturl():
+    rows = [
+        {"down_url": "", "shorturl": "=cmd"},
+        {"down_url": "", "shorturl": "AbCdEf123456"},
+    ]
+    assert submission.catalog_share_codes(rows) == {"AbCdEf123456"}

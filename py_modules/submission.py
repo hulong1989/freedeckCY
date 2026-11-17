@@ -29,6 +29,16 @@ MERGED_DIRNAME = "merged"
 ALLOWED_PLATFORMS = ("pc", "gba", "psp", "nds", "ps1", "fc", "md", "3ds", "ps2", "ps3", "switch")
 PLATFORM_TOKENS = frozenset({*ALLOWED_PLATFORMS, "ns", "psx", "arcade"})
 _CATEGORY_SPLIT_RE = re.compile(r"[,，/、;；|]+")
+# CSV 公式注入前缀（Excel/LibreOffice 会把以这些字符开头的单元格当公式执行）。
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+# 目录 CSV 只接受单行纯文本：控制字符（含换行/NUL）会破坏行语义或下游路径拼接。
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+# 分享码只允许字母/数字（天翼/百度实际都是 base62，允许 _- 以兼容个别变体）。
+_SHARE_CODE_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
+# Windows 盘符/UNC 绝对路径不属于网盘分享内的相对路径。
+_ABSOLUTE_PATH_RE = re.compile(r"^(?:[A-Za-z]:/|//)")
+TIANYI_HOSTS = ("cloud.189.cn", "www.cloud.189.cn", "189.cn", "h5.cloud.189.cn")
+BAIDU_HOSTS = ("pan.baidu.com", "www.pan.baidu.com", "yun.baidu.com", "eyun.baidu.com")
 PLATFORM_ALIASES = {
     "windows": "pc",
     "win": "pc",
@@ -105,42 +115,67 @@ class ShareUrlError(ValueError):
     pass
 
 
-def _share_provider(share_url: str) -> str:
+def _url_host(parsed) -> str:
+    """取小写主机名（自动去掉端口与 userinfo）。"""
     try:
-        host = str(urlparse(str(share_url or "").strip()).hostname or "").lower()
+        host = str(parsed.hostname or "").strip().lower()
     except Exception:
         return ""
-    if host in {"cloud.189.cn", "www.cloud.189.cn"} or host.endswith(".189.cn"):
+    return host.rstrip(".")
+
+
+def _is_tianyi_host(host: str) -> bool:
+    value = str(host or "").strip().lower().rstrip(".")
+    return value in TIANYI_HOSTS or value.endswith(".189.cn")
+
+
+def _is_baidu_host(host: str) -> bool:
+    return str(host or "").strip().lower().rstrip(".") in BAIDU_HOSTS
+
+
+def _share_provider(share_url: str) -> str:
+    try:
+        host = _url_host(urlparse(str(share_url or "").strip()))
+    except Exception:
+        return ""
+    if _is_tianyi_host(host):
         return "tianyi"
-    if host in {"pan.baidu.com", "yun.baidu.com", "eyun.baidu.com"}:
+    if _is_baidu_host(host):
         return "baidu"
     return ""
+
+
+def _validate_share_code(code: str) -> str:
+    value = str(code or "").strip()
+    if not value or not _SHARE_CODE_RE.fullmatch(value):
+        raise ShareUrlError("shareCode 含非法字符（只允许字母/数字/_/-）")
+    return value
 
 
 def _parse_share_url(share_url: str) -> Tuple[str, str]:
     raw = str(share_url or "").strip()
     parsed = urlparse(raw)
-    host = (parsed.netloc or "").lower()
+    host = _url_host(parsed)
     parts = [part for part in (parsed.path or "").split("/") if part]
     query = parse_qs(parsed.query or "", keep_blank_values=True)
     pwd = str((query.get("pwd") or [""])[0] or "").strip()
-    if host in {"cloud.189.cn", "www.cloud.189.cn"}:
+    if _is_tianyi_host(host):
         if parts[:2] == ["web", "share"]:
             code = str((query.get("code") or [""])[0] or "").strip()
             if not code:
                 raise ShareUrlError("链接缺少 shareCode")
-            return code, pwd
+            return _validate_share_code(code), pwd
         if len(parts) < 2 or parts[0] != "t":
             raise ShareUrlError("链接缺少 shareCode")
-        return parts[1], pwd
-    if host in {"pan.baidu.com", "yun.baidu.com", "eyun.baidu.com"}:
+        return _validate_share_code(parts[1]), pwd
+    if _is_baidu_host(host):
         if "s" in parts:
             index = parts.index("s")
             if index + 1 < len(parts) and parts[index + 1]:
-                return parts[index + 1], pwd
+                return _validate_share_code(parts[index + 1]), pwd
         surl = str((query.get("surl") or [""])[0] or "").strip()
         if surl:
-            return surl, pwd
+            return _validate_share_code(surl), pwd
         raise ShareUrlError("百度链接缺少 shareCode/surl")
     raise ShareUrlError("仅支持 cloud.189.cn 或 pan.baidu.com 分享链接")
 
@@ -162,10 +197,50 @@ def _canonical_share_code(share_url: str) -> str:
 
 
 def _with_access_code(share_url: str, access_code: str) -> str:
-    if not access_code or "pwd=" in share_url:
+    """把提取码写入分享链接；已有 pwd 参数时以 access_code 为准覆盖。"""
+    code = _normalize_text(access_code)
+    if not code:
         return share_url
+    if re.search(r"(?i)([?&])pwd=[^&#]*", share_url):
+        return re.sub(
+            r"(?i)([?&])pwd=[^&#]*",
+            lambda match: f"{match.group(1)}pwd={code}",
+            share_url,
+            count=1,
+        )
     joiner = "&" if "?" in share_url else "?"
-    return f"{share_url}{joiner}pwd={access_code}"
+    return f"{share_url}{joiner}pwd={code}"
+
+
+def _has_formula_prefix(value: Any) -> bool:
+    return str(value or "").lstrip().startswith(_FORMULA_PREFIXES)
+
+
+def _has_control_chars(value: Any) -> bool:
+    return bool(_CONTROL_CHARS_RE.search(str(value or "")))
+
+
+def _normalize_openpath(value: Any) -> str:
+    return _normalize_text(value).replace("\\", "/")
+
+
+def _validate_openpath(raw_openpath: str, errors: List[str]) -> str:
+    """把网盘内相对路径归一化并校验；返回写入目录的 openpath。"""
+    normalized = _normalize_openpath(raw_openpath)
+    openpath = normalized.lstrip("/")
+    if not openpath:
+        errors.append("缺少 openpath（网盘内游戏文件/目录的相对路径）")
+        return ""
+    if _has_control_chars(normalized):
+        errors.append("openpath 含控制字符（换行/制表符等），请填写单行相对路径")
+        return openpath
+    if normalized.startswith("/") or _ABSOLUTE_PATH_RE.match(normalized):
+        errors.append("openpath 必须是分享内相对路径，不能是绝对路径（/ 或盘符开头）")
+    if ".." in openpath.split("/"):
+        errors.append("openpath 不能包含 ..")
+    if _has_formula_prefix(openpath):
+        errors.append("openpath 不能以 = + - @ 或制表符开头（CSV 公式注入）")
+    return openpath
 
 
 def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -197,16 +272,19 @@ def validate_submission(
     share_url = _normalize_share_url(normalized.get("share_url", ""))
     access_code = normalized.get("access_code", "")
     raw_openpath = normalized.get("openpath", "")
-    openpath = raw_openpath.replace("\\", "/").lstrip("/")
 
     if not name:
         errors.append("缺少 name（游戏名称）")
     if len(name) > 200:
         errors.append("name 过长（最多 200 字符）")
+    if _has_control_chars(name) or _has_control_chars(normalized.get("english_name", "")):
+        errors.append("name/english_name 不能包含换行或控制字符")
     if not platform:
         errors.append(f"platform 无效，可选：{', '.join(ALLOWED_PLATFORMS)}")
     if not share_url:
         errors.append("缺少 share_url（天翼云盘或百度网盘分享链接）")
+    elif _has_control_chars(share_url) or re.search(r"\s", share_url):
+        errors.append("share_url 不能包含空白或控制字符（换行/空格等）")
     else:
         try:
             _parse_share_url(share_url)
@@ -217,14 +295,16 @@ def validate_submission(
                 errors.append("access_code 应为 4–8 位字母/数字")
             if not access_code and "pwd=" not in share_url:
                 warnings.append("未填写 access_code，且链接里没有 pwd，下载时可能需要提取码")
-    if not openpath:
-        errors.append("缺少 openpath（网盘内游戏文件/目录的相对路径）")
-    elif raw_openpath.replace("\\", "/").startswith("/") or ".." in openpath.split("/"):
-        errors.append("openpath 必须是分享内相对路径，不能以 / 开头或包含 ..")
-    for field, label in (("name", "name"), ("english_name", "english_name"), ("categories", "categories"), ("notes", "notes")):
+    openpath = _validate_openpath(raw_openpath, errors)
+    for field, label in (
+        ("name", "name"),
+        ("english_name", "english_name"),
+        ("categories", "categories"),
+        ("notes", "notes"),
+    ):
         value = str(normalized.get(field, "") or "").lstrip()
-        if value.startswith(("=", "+", "@", "\t", "\r")):
-            errors.append(f"{label} 不能以 = + @ 或制表符开头（CSV 公式注入）")
+        if value.startswith(_FORMULA_PREFIXES):
+            errors.append(f"{label} 不能以 = + - @ 或制表符开头（CSV 公式注入）")
     if normalized.get("executable_name") and platform != "pc":
         warnings.append("executable_name 仅 PC 游戏需要，模拟器游戏可留空")
     filesize = normalized.get("filesize_z", "")
@@ -269,7 +349,7 @@ def catalog_share_codes(rows: Iterable[Dict[str, str]]) -> set:
             code = str(row.get("shorturl", "") or "").strip()
             if code.startswith("1") and _share_provider(str(row.get("down_url", "") or "")) == "baidu":
                 code = code[1:]
-        if code:
+        if code and _SHARE_CODE_RE.fullmatch(code):
             codes.add(code)
     return codes
 
@@ -340,17 +420,22 @@ def _next_game_id(rows: Sequence[Dict[str, str]]) -> str:
 
 def _csv_safe(value: str) -> str:
     text = str(value or "")
-    if text.lstrip().startswith(("=", "+", "@", "\t", "\r")):
+    if text.lstrip().startswith(_FORMULA_PREFIXES):
         return "'" + text
     return text
 
 
+def _clean_multiline_text(value: Any) -> str:
+    """把字段压成单行，避免换行破坏 CSV 行/日志。"""
+    return _CONTROL_CHARS_RE.sub(" ", str(value or "")).strip()
+
+
 def build_catalog_row(data: Dict[str, Any], game_id: str) -> Dict[str, str]:
-    name = _normalize_text(data.get("name"))
-    english = _normalize_text(data.get("english_name"))
+    name = _clean_multiline_text(data.get("name"))
+    english = _clean_multiline_text(data.get("english_name"))
     title = f"{name}/{english}" if english and english.lower() not in name.lower() else name
     platform = normalize_platform(data.get("platform"))
-    access_code = _normalize_text(data.get("access_code"))
+    access_code = _clean_multiline_text(data.get("access_code"))
     share_url = _with_access_code(_normalize_share_url(data.get("share_url")), access_code)
     share_code = _share_code(share_url)
     try:
@@ -358,19 +443,20 @@ def build_catalog_row(data: Dict[str, Any], game_id: str) -> Dict[str, str]:
     except ShareUrlError:
         parsed_pwd = ""
     pwd = access_code or parsed_pwd
+    openpath = _normalize_openpath(data.get("openpath")).lstrip("/")
     row = {field: "" for field in CATALOG_FIELDS}
     row.update(
         {
             "game_id": str(game_id),
-            "title": _csv_safe(title),
+            "title": title,
             "category_parent": _normalize_text(data.get("category_parent")) or "5",
-            "categories": _csv_safe(normalize_categories(data.get("categories", ""), platform) or "未分类"),
+            "categories": normalize_categories(data.get("categories", ""), platform) or "未分类",
             "package_name": "",
             "server": "b" if _share_provider(share_url) == "baidu" else "t",
             "down_url": share_url,
             "shorturl": share_code,
-            "pwd": pwd,
-            "openpath": _normalize_text(data.get("openpath")).replace("\\", "/").lstrip("/"),
+            "pwd": _clean_multiline_text(pwd),
+            "openpath": _clean_multiline_text(openpath),
             "filesize_z": _normalize_text(data.get("filesize_z")) or "0",
             "list_filesize": _normalize_text(data.get("list_filesize")),
             "platform": platform,
@@ -379,7 +465,8 @@ def build_catalog_row(data: Dict[str, Any], game_id: str) -> Dict[str, str]:
             "steam_appid": "0",
         }
     )
-    return row
+    # 统一兜底：所有写入目录 CSV 的文本列都做公式注入转义。
+    return {key: (_csv_safe(value) if isinstance(value, str) else value) for key, value in row.items()}
 
 
 def merge_submissions(

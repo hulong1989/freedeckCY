@@ -30,7 +30,7 @@ import { FaCloudDownloadAlt } from "react-icons/fa";
 type ApiStatus = "success" | "error";
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.1";
+const PLUGIN_UI_BUILD = "0.26.2";
 
 interface ApiResponse<T> {
   status: ApiStatus;
@@ -653,6 +653,19 @@ function clampProgress(progress: number): number {
   if (value < 0) return 0;
   if (value > 100) return 100;
   return value;
+}
+
+function errorText(error: unknown): string {
+  if (error && typeof error === "object") {
+    const message = String((error as { message?: unknown }).message ?? "").trim();
+    if (message) return message;
+  }
+  const text = String(error ?? "").trim();
+  return text || "操作失败";
+}
+
+function toastError(error: unknown): void {
+  toaster.toast({ title: "freedeckCY", body: errorText(error) });
 }
 
 function downloadStatusText(status: string): string {
@@ -1723,6 +1736,7 @@ function SettingsPage() {
   const [diagnosticsBusy, setDiagnosticsBusy] = useState<boolean>(false);
   const [diagnosticsExportBusy, setDiagnosticsExportBusy] = useState<boolean>(false);
   const [diagnosticsExportMessage, setDiagnosticsExportMessage] = useState<string>("");
+  const [diagnosticsError, setDiagnosticsError] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("paths");
   const [settings, setSettings] = useState<SettingsState>(EMPTY_SETTINGS);
   const [storageOptions, setStorageOptions] = useState<StorageOption[]>([]);
@@ -1843,7 +1857,7 @@ function SettingsPage() {
 
   const refreshStorageOptions = useCallback(async () => {
     try {
-      const result = await getTianyiStorageOptions();
+      const result = await withTimeout(getTianyiStorageOptions(), 10000, "读取存储信息超时");
       if (result.status === "success" && result.data) {
         setStorageOptions(Array.isArray(result.data.options) ? result.data.options : []);
       }
@@ -1870,7 +1884,7 @@ function SettingsPage() {
   }, []);
 
   const refreshCloudSaveUploadStatus = useCallback(async () => {
-    const result = await getTianyiCloudSaveUploadStatus();
+    const result = await withTimeout(getTianyiCloudSaveUploadStatus(), 10000, "读取云存档状态超时");
     if (result.status !== "success") {
       throw new Error(result.message || "读取云存档状态失败");
     }
@@ -1879,22 +1893,24 @@ function SettingsPage() {
   }, []);
 
   const refreshCloudSaveRestoreStatus = useCallback(async () => {
-    const result = await getTianyiCloudSaveRestoreStatus();
+    const result = await withTimeout(getTianyiCloudSaveRestoreStatus(), 10000, "读取恢复状态超时");
     if (result.status !== "success") {
       throw new Error(result.message || "读取恢复状态失败");
     }
     const nextState = normalizeCloudSaveRestoreState(result.data?.state);
     setCloudSaveRestoreState(nextState);
-    if (Array.isArray(nextState.selected_entry_ids) && nextState.selected_entry_ids.length > 0 && selectedRestoreEntryIds.length === 0) {
-      setSelectedRestoreEntryIds(nextState.selected_entry_ids);
+    const restorableIds = Array.isArray(nextState.selected_entry_ids) ? nextState.selected_entry_ids : [];
+    if (restorableIds.length > 0) {
+      // 函数式更新：不把当前选择写进依赖，避免初始加载 effect 因选择变化反复重跑。
+      setSelectedRestoreEntryIds((prev) => (prev.length > 0 ? prev : restorableIds));
     }
-  }, [selectedRestoreEntryIds.length]);
+  }, []);
 
   const refreshRestoreOptions = useCallback(async () => {
     if (loadingRestoreOptions) return;
     setLoadingRestoreOptions(true);
     try {
-      const result = await listTianyiCloudSaveRestoreOptions();
+      const result = await withTimeout(listTianyiCloudSaveRestoreOptions(), 20000, "读取云存档列表超时");
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "读取云存档列表失败");
       }
@@ -1906,7 +1922,7 @@ function SettingsPage() {
       }
       toaster.toast({ title: "freedeckCY", body: `已刷新云存档版本（游戏 ${games.length} 个）` });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setLoadingRestoreOptions(false);
     }
@@ -1920,7 +1936,7 @@ function SettingsPage() {
         await refreshCloudSaveUploadStatus();
         await refreshCloudSaveRestoreStatus();
       } catch (error) {
-        if (alive) toaster.toast({ title: "freedeckCY", body: String(error) });
+        if (alive) toastError(error);
       } finally {
         if (alive) setLoading(false);
       }
@@ -1978,7 +1994,7 @@ function SettingsPage() {
       setSaving(true);
       try {
         const merged = Object.assign({}, settings, patch);
-        const result = await setTianyiSettings(toPayload(merged));
+        const result = await withTimeout(setTianyiSettings(toPayload(merged)), 15000, "保存设置超时");
         if (result.status !== "success" || !result.data) {
           throw new Error(result.message || "保存设置失败");
         }
@@ -1987,7 +2003,7 @@ function SettingsPage() {
         setSplitDraft(Math.max(1, Math.min(64, Number(next.split_count || 16))));
         toaster.toast({ title: "freedeckCY", body: successMessage });
       } catch (error) {
-        toaster.toast({ title: "freedeckCY", body: String(error) });
+        toastError(error);
       } finally {
         setSaving(false);
       }
@@ -2001,7 +2017,7 @@ function SettingsPage() {
       if (!selected) return;
       await savePatch({ download_dir: selected }, `下载目录已更新：${selected}`);
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: `选择下载目录失败：${error}` });
+      toaster.toast({ title: "freedeckCY", body: `选择下载目录失败：${errorText(error)}` });
     }
   }, [savePatch, settings.download_dir]);
 
@@ -2011,7 +2027,7 @@ function SettingsPage() {
       if (!selected) return;
       await savePatch({ install_dir: selected }, `安装目录已更新：${selected}`);
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: `选择安装目录失败：${error}` });
+      toaster.toast({ title: "freedeckCY", body: `选择安装目录失败：${errorText(error)}` });
     }
   }, [savePatch, settings.download_dir, settings.install_dir]);
 
@@ -2041,7 +2057,7 @@ function SettingsPage() {
     if (clearingLogin) return;
     setClearingLogin(true);
     try {
-      const result = await clearTianyiLogin();
+      const result = await withTimeout(clearTianyiLogin(), 20000, "注销天翼云账号超时");
       if (result.status !== "success") {
         throw new Error(result.message || "注销失败");
       }
@@ -2058,7 +2074,7 @@ function SettingsPage() {
       const body = String(result.data?.message || "已注销天翼云账号");
       toaster.toast({ title: "freedeckCY", body });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setClearingLogin(false);
     }
@@ -2095,13 +2111,15 @@ function SettingsPage() {
           } catch {
             // 登录成功优先，设置刷新失败不覆盖成功状态。
           }
+          // 成功后收起二维码会话，避免「已登录」还停留在扫码成功状态。
+          if (!cancelled) setBaiduQr({ stage: "idle" });
         }
       } catch (error) {
         baiduQrPollFailuresRef.current += 1;
         if (baiduQrPollFailuresRef.current >= 3 && !cancelled) {
           setBaiduQr({
             stage: "failed",
-            message: `扫码状态连续失败：${String(error)}`,
+            message: `扫码状态连续失败：${errorText(error)}`,
           });
         }
       } finally {
@@ -2118,6 +2136,7 @@ function SettingsPage() {
     if (baiduQrBusy) return;
     baiduQrPollFailuresRef.current = 0;
     setBaiduQrBusy(true);
+    setBaiduQr({ stage: "starting" });
     toaster.toast({ title: "freedeckCY", body: "正在获取百度二维码..." });
     try {
       const result = await withTimeout(
@@ -2133,7 +2152,10 @@ function SettingsPage() {
       }
       setBaiduQr(result.data);
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      // 失败也要落到 failed，避免 UI 停留在上一轮的二维码/过期提示里没有反馈。
+      const message = errorText(error);
+      setBaiduQr({ stage: "failed", message });
+      toaster.toast({ title: "freedeckCY", body: message });
     } finally {
       setBaiduQrBusy(false);
     }
@@ -2152,13 +2174,13 @@ function SettingsPage() {
     if (baiduQrBusy) return;
     setBaiduQrBusy(true);
     try {
-      const result = await clearBaiduLogin();
+      const result = await withTimeout(clearBaiduLogin(), 15000, "退出百度网盘超时");
       if (result.status !== "success") throw new Error(result.message || "退出百度网盘失败");
       setBaiduWebLogin(result.data || EMPTY_BAIDU_WEB_STATE);
       setBaiduQr({ stage: "idle" });
       toaster.toast({ title: "freedeckCY", body: "已退出百度网盘" });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setBaiduQrBusy(false);
     }
@@ -2167,6 +2189,7 @@ function SettingsPage() {
   const onRunDiagnostics = useCallback(async () => {
     if (diagnosticsBusy) return;
     setDiagnosticsBusy(true);
+    setDiagnosticsError("");
     try {
       const result = await withTimeout(runTianyiDiagnostics(), 90000, "自检超时");
       if (result.status !== "success" || !result.data) {
@@ -2179,7 +2202,10 @@ function SettingsPage() {
         body: `OK ${summary.ok || 0} / 警告 ${summary.warn || 0} / 失败 ${summary.fail || 0}`,
       });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      // 自检失败时把原因留在页面上，toast 消失后仍能看到。
+      const message = errorText(error);
+      setDiagnosticsError(message);
+      toaster.toast({ title: "freedeckCY", body: message });
     } finally {
       setDiagnosticsBusy(false);
     }
@@ -2188,6 +2214,7 @@ function SettingsPage() {
   const onExportDiagnostics = useCallback(async () => {
     if (diagnosticsExportBusy) return;
     setDiagnosticsExportBusy(true);
+    setDiagnosticsExportMessage("");
     try {
       const result = await withTimeout(exportTianyiDiagnosticsFile(), 120000, "导出诊断包超时");
       if (result.status !== "success" || !result.data) {
@@ -2197,7 +2224,9 @@ function SettingsPage() {
       setDiagnosticsExportMessage(message);
       toaster.toast({ title: "freedeckCY 诊断包", body: message });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      const message = errorText(error);
+      setDiagnosticsExportMessage(`导出失败：${message}`);
+      toaster.toast({ title: "freedeckCY", body: message });
     } finally {
       setDiagnosticsExportBusy(false);
     }
@@ -2221,7 +2250,7 @@ function SettingsPage() {
         body: `${message}${steamAdded ? `（自动加入 Steam：${steamAdded}）` : ""}`,
       });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setScanningInstalled(false);
     }
@@ -2231,12 +2260,16 @@ function SettingsPage() {
     if (baiduBusy) return;
     setBaiduBusy(true);
     try {
-      const result = await setBaiduOpenapiApp({ app_key: baiduAppKey, secret_key: baiduSecretKey });
+      const result = await withTimeout(
+        setBaiduOpenapiApp({ app_key: baiduAppKey, secret_key: baiduSecretKey }),
+        15000,
+        "保存百度应用超时",
+      );
       if (result.status !== "success") throw new Error(result.message || "保存百度应用失败");
       setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
       toaster.toast({ title: "freedeckCY", body: "百度开放平台应用已保存" });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setBaiduBusy(false);
     }
@@ -2246,13 +2279,13 @@ function SettingsPage() {
     if (baiduBusy) return;
     setBaiduBusy(true);
     try {
-      const result = await getBaiduOpenapiAuthorizeUrl();
+      const result = await withTimeout(getBaiduOpenapiAuthorizeUrl(), 15000, "获取百度授权链接超时");
       if (result.status !== "success") throw new Error(result.message || "获取百度授权链接失败");
       const url = String(result.url || result.data?.url || "");
       if (!url) throw new Error("百度授权链接为空");
       openExternalUrl(url);
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setBaiduBusy(false);
     }
@@ -2262,13 +2295,17 @@ function SettingsPage() {
     if (baiduBusy) return;
     setBaiduBusy(true);
     try {
-      const result = await exchangeBaiduOpenapiCode({ code: baiduAuthCode });
+      const result = await withTimeout(
+        exchangeBaiduOpenapiCode({ code: baiduAuthCode }),
+        20000,
+        "百度授权超时",
+      );
       if (result.status !== "success") throw new Error(result.message || "百度授权失败");
       setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
       setBaiduAuthCode("");
       toaster.toast({ title: "freedeckCY", body: "百度网盘授权成功" });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setBaiduBusy(false);
     }
@@ -2278,12 +2315,12 @@ function SettingsPage() {
     if (baiduBusy) return;
     setBaiduBusy(true);
     try {
-      const result = await clearBaiduOpenapiLogin();
+      const result = await withTimeout(clearBaiduOpenapiLogin(), 15000, "清除百度授权超时");
       if (result.status !== "success") throw new Error(result.message || "清除百度授权失败");
       setBaiduLogin(result.data || EMPTY_BAIDU_OPENAPI_STATE);
       toaster.toast({ title: "freedeckCY", body: "已清除百度网盘授权" });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setBaiduBusy(false);
     }
@@ -2293,7 +2330,7 @@ function SettingsPage() {
     if (startingCloudSaveUpload) return;
     setStartingCloudSaveUpload(true);
     try {
-      const result = await startTianyiCloudSaveUpload();
+      const result = await withTimeout(startTianyiCloudSaveUpload(), 20000, "启动云存档上传超时");
       if (result.status !== "success") {
         throw new Error(result.message || "启动云存档上传失败");
       }
@@ -2304,7 +2341,7 @@ function SettingsPage() {
       toaster.toast({ title: "freedeckCY", body: String(data?.message || "云存档上传任务已启动") });
       await refreshCloudSaveUploadStatus();
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setStartingCloudSaveUpload(false);
     }
@@ -2318,12 +2355,16 @@ function SettingsPage() {
     }
     setLoadingRestoreEntries(true);
     try {
-      const result = await listTianyiCloudSaveRestoreEntries({
-        game_id: String(selectedRestoreGame.game_id || ""),
-        game_key: String(selectedRestoreGame.game_key || ""),
-        game_title: String(selectedRestoreGame.game_title || ""),
-        version_name: String(selectedRestoreVersion || ""),
-      });
+      const result = await withTimeout(
+        listTianyiCloudSaveRestoreEntries({
+          game_id: String(selectedRestoreGame.game_id || ""),
+          game_key: String(selectedRestoreGame.game_key || ""),
+          game_title: String(selectedRestoreGame.game_title || ""),
+          version_name: String(selectedRestoreVersion || ""),
+        }),
+        25000,
+        "读取可选存档项超时",
+      );
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "读取存档项失败");
       }
@@ -2335,7 +2376,7 @@ function SettingsPage() {
       toaster.toast({ title: "freedeckCY", body: `已读取存档项 ${rows.length} 个` });
       await refreshCloudSaveRestoreStatus();
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setLoadingRestoreEntries(false);
     }
@@ -2358,19 +2399,27 @@ function SettingsPage() {
       if (!normalizedPlanId) return;
       setApplyingRestore(true);
       try {
-        const result = await applyTianyiCloudSaveRestore({
-          plan_id: normalizedPlanId,
-          confirm_overwrite: Boolean(confirmOverwrite),
-        });
+        const result = await withTimeout(
+          applyTianyiCloudSaveRestore({
+            plan_id: normalizedPlanId,
+            confirm_overwrite: Boolean(confirmOverwrite),
+          }),
+          120000,
+          "执行恢复超时",
+        );
         if (result.status !== "success" || !result.data) {
           throw new Error(result.message || "执行恢复失败");
         }
         toaster.toast({ title: "freedeckCY", body: String(result.data.message || "恢复流程已结束") });
       } catch (error) {
-        toaster.toast({ title: "freedeckCY", body: String(error) });
+        toastError(error);
       } finally {
         setApplyingRestore(false);
-        await refreshCloudSaveRestoreStatus();
+        try {
+          await refreshCloudSaveRestoreStatus();
+        } catch {
+          // 恢复已执行；状态刷新失败不向上抛出，避免未处理的 Promise 拒绝。
+        }
       }
     },
     [refreshCloudSaveRestoreStatus],
@@ -2393,14 +2442,18 @@ function SettingsPage() {
 
     setPlanningRestore(true);
     try {
-      const result = await planTianyiCloudSaveRestore({
-        game_id: String(selectedRestoreGame.game_id || ""),
-        game_key: String(selectedRestoreGame.game_key || ""),
-        game_title: String(selectedRestoreGame.game_title || ""),
-        version_name: String(selectedRestoreVersion || ""),
-        selected_entry_ids: selectedRestoreEntryIds,
-        target_dir: String(selectedRestoreTargetDir || ""),
-      });
+      const result = await withTimeout(
+        planTianyiCloudSaveRestore({
+          game_id: String(selectedRestoreGame.game_id || ""),
+          game_key: String(selectedRestoreGame.game_key || ""),
+          game_title: String(selectedRestoreGame.game_title || ""),
+          version_name: String(selectedRestoreVersion || ""),
+          selected_entry_ids: selectedRestoreEntryIds,
+          target_dir: String(selectedRestoreTargetDir || ""),
+        }),
+        30000,
+        "生成恢复计划超时",
+      );
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "生成恢复计划失败");
       }
@@ -2448,7 +2501,7 @@ function SettingsPage() {
       }
       await refreshCloudSaveRestoreStatus();
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setPlanningRestore(false);
     }
@@ -2947,31 +3000,39 @@ function SettingsPage() {
                   {diagnosticsBusy ? "自检中..." : "运行自检"}
                 </ButtonItem>
               </PanelSectionRow>
+              {diagnosticsError ? (
+                <PanelSectionRow>
+                  <div style={{ fontSize: "12px", lineHeight: 1.6, color: "#ffb4a8", wordBreak: "break-word" }}>
+                    {`自检失败：${diagnosticsError}`}
+                  </div>
+                </PanelSectionRow>
+              ) : null}
               {diagnosticsReport ? (
                 <>
                   <PanelSectionRow>
                     <div style={{ fontSize: "12px", lineHeight: 1.6 }}>
-                      {`v${diagnosticsReport.version} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}`}
+                      {`v${diagnosticsReport.version || "?"} · ${diagnosticsReport.arch || "-"} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}`}
                     </div>
                   </PanelSectionRow>
-                  {(diagnosticsReport.checks || []).map((check) => {
+                  {(diagnosticsReport.checks || []).map((check, checkIndex) => {
+                    const status = String(check.status || "skip").toLowerCase();
                     const color =
-                      check.status === "ok"
+                      status === "ok"
                         ? "#9fe6a8"
-                        : check.status === "warn"
+                        : status === "warn"
                           ? "#ffd479"
-                          : check.status === "fail"
+                          : status === "fail"
                             ? "#ff9a8a"
                             : "#b9c0cc";
                     return (
-                      <PanelSectionRow key={check.id}>
+                      <PanelSectionRow key={check.id || `diagnostic-${checkIndex}`}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "100%" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
-                            <span style={{ fontWeight: 600 }}>{check.label}</span>
-                            <span style={{ color, fontSize: "12px" }}>{check.status.toUpperCase()}</span>
+                            <span style={{ fontWeight: 600 }}>{check.label || check.id || "-"}</span>
+                            <span style={{ color, fontSize: "12px" }}>{status.toUpperCase()}</span>
                           </div>
                           <div style={{ fontSize: "12px", opacity: 0.86, wordBreak: "break-word" }}>{check.detail}</div>
-                          {check.fix && check.status !== "ok" ? (
+                          {check.fix && status !== "ok" ? (
                             <div style={{ fontSize: "11px", opacity: 0.7 }}>{`建议：${check.fix}`}</div>
                           ) : null}
                         </div>
@@ -3024,6 +3085,8 @@ function SettingsPage() {
       settings.page_size,
       settings.download_dir,
       settings.install_dir,
+      settings.cloud_save_auto_upload,
+      settings.cloud_save_include_emulators,
       splitDraft,
       refreshRestoreOptions,
       restoreBusy,
@@ -3050,6 +3113,7 @@ function SettingsPage() {
       diagnosticsBusy,
       diagnosticsExportBusy,
       diagnosticsExportMessage,
+      diagnosticsError,
       onRunDiagnostics,
       onExportDiagnostics,
       storageOptions,
@@ -3225,7 +3289,7 @@ function Content() {
         await syncState(mode);
       } catch (error) {
         if (showErrorToast && alive) {
-          toaster.toast({ title: "freedeckCY", body: String(error) });
+          toastError(error);
         }
       } finally {
         if (firstRun) {
@@ -3276,13 +3340,13 @@ function Content() {
     if (openingLogin) return;
     setOpeningLogin(true);
     try {
-      const result = await getTianyiLoginUrl();
+      const result = await withTimeout(getTianyiLoginUrl(), 20000, "获取登录地址超时，请稍后重试");
       if (result.status !== "success") {
         throw new Error(describeOpenError(result, "获取登录地址失败"));
       }
       openExternalUrl(result.url || result.data?.url || "");
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
       setOpeningLogin(false);
     }
@@ -3315,7 +3379,7 @@ function Content() {
     try {
       Navigation.Navigate(LIBRARY_ROUTE);
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: `打开游戏库失败：${error}` });
+      toaster.toast({ title: "freedeckCY", body: `打开游戏库失败：${errorText(error)}` });
     }
   }, []);
 
@@ -3328,7 +3392,7 @@ function Content() {
     try {
       Navigation.Navigate(SETTINGS_ROUTE);
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: `打开设置失败：${error}` });
+      toaster.toast({ title: "freedeckCY", body: `打开设置失败：${errorText(error)}` });
     }
   }, []);
 
@@ -3381,12 +3445,16 @@ function Content() {
       const key = `${gameId}::${installPath}`;
       setUninstallingKey(key);
       try {
-        const result = await uninstallTianyiInstalledGame({
-          game_id: gameId,
-          install_path: installPath,
-          delete_files: true,
-          delete_compatdata: Boolean(deleteCompatdata),
-        });
+        const result = await withTimeout(
+          uninstallTianyiInstalledGame({
+            game_id: gameId,
+            install_path: installPath,
+            delete_files: true,
+            delete_compatdata: Boolean(deleteCompatdata),
+          }),
+          120000,
+          "卸载超时（大目录删除可能较慢，请稍后刷新确认）",
+        );
         if (result.status !== "success") {
           throw new Error(result.message || "卸载失败");
         }
@@ -3405,7 +3473,7 @@ function Content() {
           // 卸载已成功；列表刷新失败不再弹“卸载失败”误导用户。
         }
       } catch (error) {
-        toaster.toast({ title: "freedeckCY", body: String(error) });
+        toastError(error);
       } finally {
         setUninstallingKey("");
       }
@@ -3428,7 +3496,11 @@ function Content() {
       setPreviewingKey(key);
       let preview: UninstallPreviewData | null = null;
       try {
-        const result = await previewTianyiUninstall({ game_id: gameId, install_path: installPath });
+        const result = await withTimeout(
+          previewTianyiUninstall({ game_id: gameId, install_path: installPath }),
+          15000,
+          "读取卸载信息超时",
+        );
         if (result.status === "success") preview = result.data ?? null;
       } catch {
         preview = null;
@@ -3487,7 +3559,13 @@ function Content() {
               : action === "retry"
                 ? retryTianyiTask
                 : removeTianyiTask;
-        const result = await runner({ task_id: taskId });
+        // 重试要重新取直链/重新进入安装，给更长的超时；暂停/继续/移除通常很快。
+        const actionTimeoutMs = action === "retry" ? 60000 : 20000;
+        const result = await withTimeout(
+          runner({ task_id: taskId }),
+          actionTimeoutMs,
+          "任务操作超时，请稍后重试",
+        );
         if (result.status !== "success") {
           throw new Error(result.message || "任务操作失败");
         }
@@ -3509,7 +3587,7 @@ function Content() {
           // 操作已成功；刷新失败不覆盖成功提示。
         }
       } catch (error) {
-        toaster.toast({ title: "freedeckCY", body: String(error) });
+        toastError(error);
       } finally {
         setTaskActionKey("");
       }
@@ -3739,13 +3817,31 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
   const [page, setPage] = useState<number>(1);
   const [catalog, setCatalog] = useState<CatalogPage>({ total: 0, page: 1, page_size: 20, items: [] });
   const [installed, setInstalled] = useState<InstalledList>({ total: 0, items: [] });
-  const [loadingCatalog, setLoadingCatalog] = useState<boolean>(false);
+  const [loadingCatalog, setLoadingCatalog] = useState<boolean>(true);
+  const [reloadNonce, setReloadNonce] = useState<number>(0);
   const [loadingInstalled, setLoadingInstalled] = useState<boolean>(false);
   const [busyKey, setBusyKey] = useState<string>("");
+  const catalogRequestRef = useRef<number>(0);
+  const installedRequestRef = useRef<number>(0);
+  const busyRef = useRef<string>("");
   const pageSize = 20;
+
+  // 用 ref 做同步锁：state 更新有延迟，快速连点会绕过 busyKey 判断导致重复请求/互相清 busy。
+  const beginBusy = useCallback((key: string): boolean => {
+    if (busyRef.current) return false;
+    busyRef.current = key;
+    setBusyKey(key);
+    return true;
+  }, []);
+  const endBusy = useCallback(() => {
+    busyRef.current = "";
+    setBusyKey("");
+  }, []);
 
   const loadCatalog = useCallback(
     async (targetPage: number) => {
+      const requestSeq = catalogRequestRef.current + 1;
+      catalogRequestRef.current = requestSeq;
       setLoadingCatalog(true);
       try {
         const result = await withTimeout(
@@ -3760,40 +3856,67 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
           15000,
           "读取游戏列表超时",
         );
+        // 过滤条件/翻页可能并发触发多个请求：只让最后一次请求的结果落地，避免旧响应覆盖新列表。
+        if (catalogRequestRef.current !== requestSeq) return;
         if (result.status !== "success" || !result.data) {
           throw new Error(result.message || "读取游戏列表失败");
         }
+        const data = result.data;
         setCatalog({
-          total: Number(result.data.total || 0),
-          page: Number(result.data.page || 1),
-          page_size: Number(result.data.page_size || pageSize),
-          platforms: result.data.platforms || [],
-          categories: result.data.categories || [],
-          items: result.data.items || [],
+          total: Number(data.total || 0),
+          page: Number(data.page || 1),
+          page_size: Number(data.page_size || pageSize),
+          platforms: Array.isArray(data.platforms) ? data.platforms : [],
+          categories: Array.isArray(data.categories) ? data.categories : [],
+          items: Array.isArray(data.items) ? data.items : [],
         });
-        setPage(Number(result.data.page || 1));
+        setPage(Number(data.page || 1));
       } catch (error) {
-        toaster.toast({ title: "freedeckCY", body: String(error) });
+        if (catalogRequestRef.current === requestSeq) toastError(error);
       } finally {
-        setLoadingCatalog(false);
+        if (catalogRequestRef.current === requestSeq) setLoadingCatalog(false);
       }
     },
-    [activeQuery, platform, category, sort],
+    [activeQuery, platform, category, sort, reloadNonce],
   );
 
   const loadInstalled = useCallback(async () => {
+    const requestSeq = installedRequestRef.current + 1;
+    installedRequestRef.current = requestSeq;
     setLoadingInstalled(true);
     try {
       const result = await withTimeout(listTianyiInstalledGames(), 15000, "读取已安装列表超时");
+      if (installedRequestRef.current !== requestSeq) return;
       if (result.status !== "success" || !result.data) {
         throw new Error(result.message || "读取已安装列表失败");
       }
-      setInstalled(result.data);
+      const data = result.data;
+      setInstalled({
+        total: Number(data.total || 0),
+        items: Array.isArray(data.items) ? data.items : [],
+      });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      if (installedRequestRef.current === requestSeq) toastError(error);
     } finally {
-      setLoadingInstalled(false);
+      if (installedRequestRef.current === requestSeq) setLoadingInstalled(false);
     }
+  }, []);
+
+  // 搜索词/筛选没变时（例如同一个词再按一次回车）也要能刷新：用 nonce 触发 effect 重新拉取。
+  const submitSearch = useCallback(() => {
+    setActiveQuery(query.trim());
+    setPage(1);
+    setReloadNonce((value) => value + 1);
+  }, [query]);
+
+  const resetSearch = useCallback(() => {
+    setQuery("");
+    setActiveQuery("");
+    setPlatform("");
+    setCategory("");
+    setSort("");
+    setPage(1);
+    setReloadNonce((value) => value + 1);
   }, []);
 
   useEffect(() => {
@@ -3829,8 +3952,7 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
   );
 
   const onPrepareInstall = useCallback(async (item: CatalogItem) => {
-    if (busyKey) return;
-    setBusyKey(item.game_id);
+    if (!beginBusy(item.game_id)) return;
     try {
       const result = await withTimeout(
         prepareTianyiInstall({ game_id: item.game_id }),
@@ -3869,7 +3991,7 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
                 }
                 toaster.toast({ title: "freedeckCY", body: "已加入下载队列，可在插件主页查看任务进度" });
               } catch (error) {
-                toaster.toast({ title: "freedeckCY", body: String(error) });
+                toastError(error);
               }
             })();
           }}
@@ -3877,40 +3999,39 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
         />,
       );
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
-      setBusyKey("");
+      endBusy();
     }
-  }, [busyKey, loadInstalled]);
+  }, [beginBusy, endBusy]);
 
   const onLaunchInstalled = useCallback(async (item: InstalledItem) => {
-    if (busyKey) return;
-    setBusyKey(item.game_id);
+    if (!beginBusy(item.game_id)) return;
     try {
       const result = await withTimeout(launchTianyiInstalledGame(item.game_id), 20000, "启动游戏超时");
       if (result.status !== "success") throw new Error(result.message || "启动失败");
       toaster.toast({ title: "freedeckCY", body: `正在启动 ${item.title}` });
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
-      setBusyKey("");
+      endBusy();
     }
-  }, [busyKey]);
+  }, [beginBusy, endBusy]);
 
   const onOpenFolder = useCallback(async (item: InstalledItem) => {
-    if (busyKey) return;
-    setBusyKey(item.game_id);
+    if (!beginBusy(item.game_id)) return;
     try {
       const result = await withTimeout(openTianyiInstalledFolder(item.game_id), 20000, "打开目录超时");
       if (result.status !== "success") throw new Error(result.message || "打开目录失败");
     } catch (error) {
-      toaster.toast({ title: "freedeckCY", body: String(error) });
+      toastError(error);
     } finally {
-      setBusyKey("");
+      endBusy();
     }
-  }, [busyKey]);
+  }, [beginBusy, endBusy]);
 
   const onUninstall = useCallback((item: InstalledItem) => {
+    if (busyRef.current) return;
     showModal(
       <ConfirmModal
         strTitle={`卸载 ${item.title}`}
@@ -3919,24 +4040,27 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
         strCancelButtonText="取消"
         onOK={() => {
           void (async () => {
+            if (!beginBusy(item.game_id)) return;
             try {
               const result = await withTimeout(uninstallTianyiInstalled({
                 game_id: item.game_id,
                 install_path: item.install_path,
                 delete_files: true,
-              }), 30000, "卸载超时");
+              }), 120000, "卸载超时（大目录删除可能较慢，请稍后刷新确认）");
               if (result.status !== "success") throw new Error(result.message || "卸载失败");
-              toaster.toast({ title: "freedeckCY", body: "已卸载" });
+              toaster.toast({ title: "freedeckCY", body: `已卸载：${item.title || item.game_id}` });
               await loadInstalled();
             } catch (error) {
-              toaster.toast({ title: "freedeckCY", body: String(error) });
+              toastError(error);
+            } finally {
+              endBusy();
             }
           })();
         }}
         onCancel={() => {}}
       />,
     );
-  }, [loadInstalled]);
+  }, [beginBusy, endBusy, loadInstalled]);
 
   const handleClose = useCallback(() => {
     if (onClose) {
@@ -3959,14 +4083,25 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
   }, [onClose]);
 
   const handleSteamLibrary = useCallback(() => {
+    // modal 模式先关弹层；路由模式先留在插件页，导航失败再回退。
     try {
       onClose?.();
     } catch {
       // 忽略关闭失败。
     }
     try {
-      Router.NavigateToLibraryTab?.();
+      Navigation.NavigateToLibraryTab();
+      return;
     } catch {
+      // 继续尝试旧接口。
+    }
+    try {
+      Router.NavigateToLibraryTab?.();
+      return;
+    } catch {
+      // 继续尝试返回。
+    }
+    if (!onClose) {
       try {
         Navigation.NavigateBack();
       } catch {
@@ -3996,7 +4131,11 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
           <DialogButton onClick={handleClose} style={{ padding: "6px 12px" }}>返回</DialogButton>
           <DialogButton onClick={handleSteamLibrary} style={{ padding: "6px 12px" }}>Steam 库</DialogButton>
         </div>
-        <DialogButton onClick={() => { if (tab === "catalog") void loadCatalog(page); else void loadInstalled(); }} style={{ padding: "6px 12px" }}>刷新</DialogButton>
+        <DialogButton
+          onClick={() => { if (tab === "catalog") void loadCatalog(page); else void loadInstalled(); }}
+          disabled={loadingCatalog || loadingInstalled}
+          style={{ padding: "6px 12px" }}
+        >{loadingCatalog || loadingInstalled ? "刷新中..." : "刷新"}</DialogButton>
       </div>
       <PanelSection>
         <PanelSectionRow>
@@ -4017,8 +4156,9 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
               >已安装{installed.total ? `(${installed.total})` : ""}</DialogButton>
               <DialogButton
                 onClick={() => { if (tab === "catalog") void loadCatalog(page); else void loadInstalled(); }}
+                disabled={loadingCatalog || loadingInstalled}
                 style={{ padding: "6px 12px" }}
-              >刷新</DialogButton>
+              >{loadingCatalog || loadingInstalled ? "刷新中..." : "刷新"}</DialogButton>
             </Focusable>
           </div>
         </PanelSectionRow>
@@ -4034,8 +4174,7 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
                 onChange={(event) => setQuery(getTextFieldValue(event))}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
-                    setActiveQuery(query.trim());
-                    setPage(1);
+                    submitSearch();
                   }
                 }}
               />
@@ -4043,11 +4182,11 @@ function LibraryPage({ onClose }: { onClose?: () => void }) {
             <PanelSectionRow>
               <Focusable style={{ display: "flex", gap: "6px" }}>
                 <DialogButton
-                  onClick={() => { setActiveQuery(query.trim()); setPage(1); }}
+                  onClick={submitSearch}
                   style={{ padding: "6px 12px" }}
                 >搜索</DialogButton>
                 <DialogButton
-                  onClick={() => { setQuery(""); setActiveQuery(""); setPlatform(""); setCategory(""); setSort(""); setPage(1); }}
+                  onClick={resetSearch}
                   style={{ padding: "6px 12px" }}
                 >重置</DialogButton>
               </Focusable>

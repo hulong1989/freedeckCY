@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from typing import Any
@@ -15,10 +16,37 @@ import tianyi_http
 import utils
 
 
-# 本地服务只服务本机页面：Host 必须是回环地址，跨站写请求直接拒绝。
+# 本地服务只服务本机页面：Host 必须是回环地址，跨站请求（含带副作用的 GET）直接拒绝。
 _ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"}
 _ALLOWED_ORIGIN_PORTS = {int(config.DEFAULT_SERVER_PORT)}
-_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _set_allowed_origin_port(port: int) -> None:
+    """只信任**当前**实际监听端口上的本机页面。
+
+    以前只往集合里 add 端口，换端口后旧端口页面仍被视为可信来源（可跨源读写
+    新端口的 API）；这里改成跟随当前监听端口重置。
+    """
+    _ALLOWED_ORIGIN_PORTS.clear()
+    _ALLOWED_ORIGIN_PORTS.add(int(port))
+
+
+def _server_lifecycle_lock(plugin: Any) -> "asyncio.Lock":
+    """同一插件的本地服务启停串行锁。
+
+    并发 start（双击/前端重复调用）会让两个 runner 抢同一个端口，失败方在
+    _cleanup_server 里把 plugin.runner 清空，可能把仍在服务的实例丢掉（服务
+    成孤儿，之后既停不掉也起不来）。锁挂在插件实例上，避免跨事件循环复用。
+    """
+    lock = getattr(plugin, "_freedeckcy_server_lifecycle_lock", None)
+    if lock is None:
+        lock = asyncio.Lock()
+        try:
+            setattr(plugin, "_freedeckcy_server_lifecycle_lock", lock)
+        except Exception:
+            # 不可写属性的宿主对象退回无锁（保持旧行为，不影响功能）。
+            return lock
+    return lock
 
 
 def _host_only(value: str) -> str:
@@ -61,7 +89,8 @@ async def cors_middleware(request: web.Request, handler):
     """本地 API 的安全边界与 CORS 头。
 
     - Host 必须是回环地址（挡住 DNS rebinding）
-    - 写请求若带 Origin，必须是本机页面（挡住任意网页 POST 改设置/下单）
+    - 任意跨站请求直接拒绝：写接口不用说，导出诊断包等带副作用的 GET
+      也能被任意网页用 <img>/fetch 触发，不能只保护 POST
     - 不再返回 `Access-Control-Allow-Origin: *`
     """
     try:
@@ -73,15 +102,12 @@ async def cors_middleware(request: web.Request, handler):
 
     origin = str(request.headers.get("Origin", "") or "").strip()
     fetch_site = str(request.headers.get("Sec-Fetch-Site", "") or "").strip().lower()
-    if request.method in _MUTATING_METHODS:
-        if fetch_site == "cross-site":
-            return _forbidden("拒绝跨站写入请求")
-        if origin and not _origin_allowed(origin):
-            return _forbidden("拒绝来自非本机页面的写入请求")
+    if fetch_site == "cross-site":
+        return _forbidden("拒绝跨站请求")
+    if origin and not _origin_allowed(origin):
+        return _forbidden("拒绝来自非本机页面的请求")
 
     if request.method == "OPTIONS":
-        if origin and not _origin_allowed(origin):
-            return _forbidden("拒绝跨站预检请求")
         response = web.Response(status=204)
     else:
         try:
@@ -155,6 +181,14 @@ async def start_server(plugin: Any, port: int = config.DEFAULT_SERVER_PORT) -> d
     except Exception as exc:
         return {"status": "error", "message": str(exc)}
 
+    # 并发 start（双击/两个入口同时拉起）会各自创建 runner 抢同一端口，
+    # 失败方清理时可能把成功方的 runner/site 引用清掉，留下无法停止的孤儿服务。
+    async with _server_lifecycle_lock(plugin):
+        return await _start_server_locked(plugin, target_port)
+
+
+async def _start_server_locked(plugin: Any, target_port: int) -> dict:
+    """start_server 的实际实现（调用方需持有服务启停锁）。"""
     if bool(getattr(plugin, "server_running", False)) and getattr(plugin, "runner", None) is not None:
         if int(getattr(plugin, "server_port", target_port)) == target_port:
             return {
@@ -172,7 +206,6 @@ async def start_server(plugin: Any, port: int = config.DEFAULT_SERVER_PORT) -> d
 
     try:
         plugin.server_port = target_port
-        _ALLOWED_ORIGIN_PORTS.add(int(target_port))
         plugin.app = web.Application(
             middlewares=[cors_middleware],
             # 本地 API 只需要传路径/ID/小 JSON，不需要 1GB 上限。
@@ -187,6 +220,8 @@ async def start_server(plugin: Any, port: int = config.DEFAULT_SERVER_PORT) -> d
         await plugin.site.start()
 
         plugin.server_running = True
+        # 只有真正监听成功后才把信任来源切到新端口。
+        _set_allowed_origin_port(plugin.server_port)
         await save_settings(plugin)
 
         url = f"http://127.0.0.1:{plugin.server_port}"
@@ -208,16 +243,17 @@ async def start_server(plugin: Any, port: int = config.DEFAULT_SERVER_PORT) -> d
 
 async def stop_server(plugin: Any) -> dict:
     """停止本地 HTTP 服务。"""
-    await _cleanup_server(plugin)
-    plugin.server_running = False
+    async with _server_lifecycle_lock(plugin):
+        await _cleanup_server(plugin)
+        plugin.server_running = False
 
-    try:
-        await utils.wait_for_port_release(int(getattr(plugin, "server_port", config.DEFAULT_SERVER_PORT)))
-    except Exception:
-        pass
+        try:
+            await utils.wait_for_port_release(int(getattr(plugin, "server_port", config.DEFAULT_SERVER_PORT)))
+        except Exception:
+            pass
 
-    await save_settings(plugin)
-    return {"status": "success", "message": "服务器已停止"}
+        await save_settings(plugin)
+        return {"status": "success", "message": "服务器已停止"}
 
 
 async def get_server_status(plugin: Any) -> dict:
