@@ -25,6 +25,7 @@ def _service(tmp_path):
     state_dir.mkdir(parents=True)
     service = TianyiService.__new__(TianyiService)
     service.store = TianyiStateStore(str(state_dir / "state.json"))
+    service.store.settings.catalog_url = "https://example.com/catalog.csv"
     service.catalog = type(
         "Catalog",
         (),

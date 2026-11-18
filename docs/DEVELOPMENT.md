@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.26.28**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.26.29**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -336,7 +336,7 @@ make test
 
 - `requirements-dev.txt` 在仓库根目录，只需 `pytest` / `pytest-asyncio` / `aiohttp` 等开发依赖；**运行期依赖以 Decky 自带 Python 为准**，不要装进插件环境。
 - 系统 Python 太老（如 3.9）时请用 `python3.12 -m venv .venv`（CI 使用 3.12）。`package.json` 里的 `test` 脚本也是 `python3 -m pytest -q`。
-- 当前共 **541 个用例**（`make test` 实测 `541 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
+- 当前共 **541 个用例**（`make test` 实测 `543 passed`）。`tests/test_droiddeck.py` 覆盖 DroidDeck 检测、ARM Proton 解析、双 Steam 根排序与设置项读写；`tests/test_utils.py` 的端口相关用例依赖真实 socket 与计时，在机器高负载时可能偶发超时失败，重跑即可。
 - CI 在 `.github/workflows/ci.yml` 中运行两个 job：`python`（3.12，pytest）与 `ui`（Node 20 + pnpm，`pnpm build` 并校验 `dist/index.js` 存在），触发条件为 push / pull_request。
 - 新增改动建议：改 `tianyi_service.py` 的恢复/分组逻辑时，优先复用 `tests/test_install_pipeline.py` 里已有的假 aria2 脚手架。
 
@@ -866,7 +866,7 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 
 **入口（v0.23.0）**：QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)`**，失败才 `Navigation.Navigate("/freedeckcy/library")`；`routerHook.addRoute` 仍注册全屏入口，卸载移除。旧的网页库（`defaults/tianyi_library_ui/`）保留为备用（桌面浏览器/回退），两者共用同一后端。
 
-**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。当前源码 `PLUGIN_UI_BUILD` 与 `package.json` 均为 `0.26.28`。
+**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。当前源码 `PLUGIN_UI_BUILD` 与 `package.json` 均为 `0.26.29`。
 
 **返回/关闭测试（v0.24.0）**：
 

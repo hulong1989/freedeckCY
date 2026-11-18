@@ -1,6 +1,6 @@
 {
   "name": "freedeckcy",
-  "version": "0.26.28",
+  "version": "0.26.36",
   "description": "Steam Deck 天翼云盘游戏下载/安装/云存档（Decky 插件）",
   "type": "module",
   "scripts": {
@@ -19,7 +19,7 @@
   "license": "BSD-3-Clause",
   "devDependencies": {
     "@decky/rollup": "^1.0.2",
-    "@decky/ui": "^4.11.0",
+    "@decky/ui": "^4.16.5",
     "@rollup/rollup-linux-x64-musl": "^4.53.3",
     "@types/react": "19.1.1",
     "@types/react-dom": "19.1.1",

@@ -65,7 +65,9 @@ DOWNLOADS_DIR = str(Path.home() / "Downloads")
 SHARE_DIR = str(Path.home() / ".local" / "share")
 DECKY_SEND_DIR = os.path.join(SHARE_DIR, "freedeckCY")
 # 内置目录服务器：插件启动自动检查，有更新才下载到本地。
-DEFAULT_CATALOG_CSV_URL = "http://171.215.30.40:8088/catalog.csv"
+# 目录服务器地址不内置，用户在插件设置里填写自己的地址。
+# 可通过 FREEDECKCY_CATALOG_CSV_URL 环境变量或 catalog_url 设置覆盖。
+DEFAULT_CATALOG_CSV_URL = ""
 
 # 服务配置
 # 仅监听回环地址，禁止局域网访问。

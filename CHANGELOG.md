@@ -2,6 +2,89 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.36
+
+### 修复百度扫码后无法登录
+
+- 轮询先判断 `channel_v.status`：
+  - `status=1` 只表示已扫码，不再提前换 BDUSS；
+  - `status=0` 才算手机确认。
+- `qrbdusslogin` 响应同时从 JSON `data.session` 和 `Set-Cookie` 读取 `BDUSS/STOKEN/PTOKEN`。
+- auth hop 补充 `BDUSS` Cookie，确保拿到 pan.baidu.com 的 `STOKEN`。
+- 新增扫码状态回归测试；测试 543 passed。
+
+## v0.26.35
+
+### 移除内置服务器地址
+
+- 插件不再内置真实服务器地址。
+- 目录地址改为在 设置 → 路径 → 游戏目录 中填写。
+- `FREEDECKCY_CATALOG_CSV_URL` 仍可作为无头环境覆盖。
+- 客户端会保留已保存的 `catalog_url`；没有配置时跳过自动检查。
+
+### 恢复设置面板
+
+- 重新加回百度登录健康检查、插件内更新入口。
+- 修复设置页 `batchBusy is not defined` 后，面板依赖仅引用 SettingsPage 变量。
+- 测试 541 passed。
+
+## v0.26.34
+
+### 恢复百度健康检查与插件更新面板
+
+- 设置页 ReferenceError 修复后，重新加回：
+  - 百度登录健康检查
+  - 插件内更新
+- 新增 state/useCallback 只加入 SettingsPage 自己的依赖数组，避免再次混入 Content 变量。
+- 测试 541 passed。
+
+## v0.26.33
+
+### 修复设置页 ReferenceError
+
+- 修复 `SettingsPage` 的 tabs useMemo 依赖数组误混入 Content 变量：
+  `batchBusy` / `speedDraft` / `onPauseAllTasks` / `onResumeAllTasks` / `onApplySpeedLimit`
+- 该问题导致打开设置页报：
+  `ReferenceError: batchBusy is not defined`
+- 恢复正常 SettingsPage 路由，移除诊断 ErrorBoundary。
+- 测试 541 passed。
+
+## v0.26.32
+
+### 设置页错误边界
+
+- 恢复真实 SettingsPage 路由。
+- 外层增加 React ErrorBoundary：
+  - 捕获渲染错误
+  - 在设置页直接显示 error.message / stack
+  - 不再只显示 Decky Shared SteamUI 通用错误
+- 用于精确定位设置页崩溃组件。
+
+## v0.26.31
+
+### 设置页最小诊断
+
+- 设置路由临时替换为一行纯文本 `freedeckCY settings diagnostic`。
+- 用于判断崩溃来自 SettingsPage 内部，还是插件路由/注入。
+- 其他路由与功能保留。
+
+## v0.26.30
+
+### Decky 3.3.1 兼容性测试
+
+- 设置页保持 v0.26.29 的 v0.26.25 结构。
+- `@decky/ui` 从 4.11.0 升级到 4.16.5 重建。
+- 用于验证 Decky/SteamUI 新版本兼容性。
+
+## v0.26.29
+
+### 设置页完全回退验证
+
+- 完整删除 v0.26.26/27 新增的设置页 state/useCallback，而不只是隐藏 UI。
+- 设置页 Hook 结构恢复为 v0.26.25。
+- 百度健康检查、插件更新后端逻辑保留。
+- 用于确认设置页 React 异常是否由新增 Hook 引起。
+
 ## v0.26.28
 
 ### 设置页稳定模式
@@ -66,7 +149,7 @@
 ### 内置目录服务器
 
 - 插件内置默认目录地址：
-  `http://171.215.30.40:8088/catalog.csv`
+  `https://你的目录服务器/catalog.csv`
 - 启动时自动检查该地址，有更新才下载，失败回退本地 CSV。
 - 设置页 `catalog_url` 为空时显示内置地址；仍可手动覆盖。
 - 最近更新 shelf、新增提示继续生效。

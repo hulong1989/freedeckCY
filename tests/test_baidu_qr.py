@@ -253,3 +253,14 @@ def test_openapi_error_message_redacts_cookie_and_device_code():
     message = str(error)
     for secret in ("SECRET", "DEVCODE1234567890", "RANDSK"):
         assert secret not in message
+
+
+def test_qr_poll_scanned_with_token_is_not_confirmed():
+    payload = {"errno": 0, "channel_v": json.dumps({"status": 1, "v": "temporary-token"})}
+    assert parse_qr_poll_payload(json.dumps(payload))["status"] == "scanned"
+
+
+def test_qr_poll_confirmed_status_zero():
+    payload = {"errno": 0, "channel_v": json.dumps({"status": 0, "v": "confirmed-token"})}
+    result = parse_qr_poll_payload(json.dumps(payload))
+    assert result == {"status": "confirmed", "v": "confirmed-token"}

@@ -250,11 +250,20 @@ def parse_qr_poll_payload(text: str) -> Dict[str, Any]:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
+    try:
+        status = int(payload.get("status", -1))
+    except Exception:
+        status = -1
     value = str(payload.get("v", "") or "").strip()
+    # 先看 status：status=1 是“已扫码未确认”，此时 channel_v 也可能带临时 v，
+    # 绝不能提前当 confirmed 去换 BDUSS（会让扫码后直接登录失败）。
+    if status == 1:
+        return {"status": "scanned"}
+    if status == 0:
+        return {"status": "confirmed", "v": value} if value else {"status": "waiting"}
+    # 兼容没有 status 字段、只返回 v 的历史响应。
     if value:
         return {"status": "confirmed", "v": value}
-    if int(payload.get("status", -1) or 0) == 1:
-        return {"status": "scanned"}
     return {"status": "waiting"}
 
 
@@ -280,6 +289,7 @@ async def poll_qr(
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
     text = ""
     last_error = ""
+    login_cookies: Dict[str, str] = {}
     attempts = [True]
     for verify in attempts:
         try:
@@ -356,6 +366,8 @@ async def _fetch_pan_stoken(bduss: str, cookies: Optional[Dict[str, str]] = None
     jar = aiohttp.CookieJar(unsafe=True)
     if cookies:
         jar.update_cookies(cookies)
+    if bduss:
+        jar.update_cookies({"BDUSS": bduss})
     try:
         connector = aiohttp.TCPConnector(ssl=_ssl_context())
         async with aiohttp.ClientSession(
@@ -416,6 +428,7 @@ async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) ->
                         last_error = f"HTTP {response.status}: {_safe_detail(text, 200)}"
                         text = ""
                         break
+                    login_cookies = {str(cookie.key): str(cookie.value) for cookie in jar}
                     break
         except aiohttp.ConnectionTimeoutError as exc:
             raise BaiduQrError("百度登录连接超时（网络不可达），请检查网络后重新扫码") from exc
@@ -427,7 +440,7 @@ async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) ->
             break
     if not text.strip():
         try:
-            text, _cookies = await asyncio.to_thread(
+            text, login_cookies = await asyncio.to_thread(
                 _urllib_get_text, QR_LOGIN_URL, params, timeout=15
             )
         except Exception as exc:
@@ -439,9 +452,9 @@ async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) ->
     session_data = data.get("data", {}).get("session") if isinstance(data.get("data"), dict) else {}
     if not isinstance(session_data, dict):
         session_data = {}
-    bduss = str(session_data.get("bduss", "") or "").strip()
-    stoken = str(session_data.get("stoken", "") or "").strip()
-    ptoken = str(session_data.get("ptoken", "") or "").strip()
+    bduss = str(session_data.get("bduss", "") or "").strip() or str(login_cookies.get("BDUSS", "") or "").strip()
+    stoken = str(session_data.get("stoken", "") or "").strip() or str(login_cookies.get("STOKEN", "") or "").strip()
+    ptoken = str(session_data.get("ptoken", "") or "").strip() or str(login_cookies.get("PTOKEN", "") or "").strip()
     if not bduss:
         message = ""
         if isinstance(data.get("errInfo"), dict):
