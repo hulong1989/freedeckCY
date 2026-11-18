@@ -2,7 +2,7 @@
 
 # freedeckCY Development Guide
 
-This document is for secondary developers and corresponds to freedeckCY **v0.28.7**: how to run it locally, change code, apply patches, and troubleshoot. For installing, building, and troubleshooting DroidDeck (Android/ARM64), see [DROIDDECK.en.md](DROIDDECK.en.md) separately. For architecture and protocol details see [ARCHITECTURE.en.md](ARCHITECTURE.en.md); for a capability comparison with the author's v0.6 see [ARCHITECTURE.en.md](ARCHITECTURE.en.md) §13; for follow-up work see [ROADMAP.en.md](ROADMAP.en.md).
+This document is for secondary developers and corresponds to freedeckCY **v0.28.9**: how to run it locally, change code, apply patches, and troubleshoot. For installing, building, and troubleshooting DroidDeck (Android/ARM64), see [DROIDDECK.en.md](DROIDDECK.en.md) separately. For architecture and protocol details see [ARCHITECTURE.en.md](ARCHITECTURE.en.md); for a capability comparison with the author's v0.6 see [ARCHITECTURE.en.md](ARCHITECTURE.en.md) §13; for follow-up work see [ROADMAP.en.md](ROADMAP.en.md).
 
 > Prerequisite: this project supports **SteamOS / Linux** only. The development machine can be a Steam Deck, or a Linux desktop with Decky Loader installed; on Windows / macOS you can only edit code, not run it fully.
 
@@ -290,7 +290,7 @@ make package PACKAGE_ARGS="--out-dir /tmp/freedeckcy-build"
 bash scripts/package.sh --help          # view all options
 ```
 
-- The version comes from the `version` field in `package.json` (currently `0.28.7`);
+- The version comes from the `version` field in `package.json` (currently `0.28.9`);
 - The zip's **top-level directory must be the plugin directory `freedeckCY/`** (Decky local install looks for `top-level-dir/plugin.json`; files placed directly at the root are silently ignored); underneath are `main.py`, `plugin.json`, `package.json`, `LICENSE`, `README.md`, plus `dist/`, `py_modules/`, `backend/`, `defaults/`;
 - The packaging script excludes `__pycache__`, `*.pyc`, `.DS_Store`, `node_modules`, `.git`, `tests`, `scripts`, `.github`, `docs`, `gl`, `dist-artifacts` (anything outside the whitelist is not packaged);
 - By default it reuses the committed `dist/index.js` and does not force a `pnpm build`; use `bash scripts/package.sh --build-ui` when the frontend needs rebuilding (requires pnpm on PATH);
@@ -932,14 +932,16 @@ Checklist:
 | Update buttons misaligned / left-right doesn't work | The two buttons must share one `Focusable flow-children="row"` + DialogButton, not two ButtonItems |
 | Search/filter buttons sit lower | Use a placeholder in the search box, not a label; buttons use `align-items:center` |
 
-### 6.14.1 Bilingual UI Debugging (v0.28.7)
+### 6.14.1 Bilingual UI Debugging (v0.28.9)
 
 - Language key: `localStorage["freedeckcy.language"]`, value `zh` or `en`; on first open with no value, the language picker is shown first.
 - Reset the language for retesting: run `localStorage.removeItem("freedeckcy.language")` in CEF, then reload the plugin.
 - Translation scope: root nodes carrying `data-fdc-i18n` (QAM content, settings, native library, details); remember to add the attribute when creating a new root node, otherwise it will not be translated.
 - After changing copy, update the corresponding key in `src/i18n.en.ts`; run `pnpm build` and reload the plugin.
 - Debugging: in CEF run `localStorage.setItem("freedeckcy.language","en")` + reload, then check the four places: QAM/settings/game library/details.
+- Language switches are available on both the QAM home page and Settings; switching applies immediately (translate/restore).
 - Diagnostic attribute: `document.documentElement[data-fdc-i18n-observer]` should be `ready`; if absent, check whether `useI18nRoot` is attached to the real root node and whether the root's `ownerDocument` is the QAM/BigPicture document.
+- Toasts: `toaster.toast` translates title/body, so update-check/download/diagnostics popups should be English.
 - Glossary has 434 entries (`src/i18n.en.ts` + `src/i18n.missing.ts`); after adding Chinese UI, add glossary entries at the same time, otherwise only the phrase fallback applies.
 
 ### 6.15 Diagnostics Self-Check (v0.22.0)

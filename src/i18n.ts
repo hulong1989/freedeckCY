@@ -99,7 +99,7 @@ export function translateString(value: string): string {
 
 function inScope(element: Element | null): boolean {
     try {
-        return Boolean(element && element.closest("[data-fdc-i18n]"));
+        return Boolean(element && element.closest("[data-fdc-i18n]") && !element.closest("[data-fdc-i18n-skip]"));
     }
     catch {
         return false;

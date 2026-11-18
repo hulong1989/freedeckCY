@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **About this project**: freedeckCY is a derivative fork of [Freedeck](https://github.com/panyiwei-home/Freedeck);
-> its version numbers start at **0.1.0** and are currently at **0.28.7**, which is not continuous with the original repository's 0.2–0.3 versions; the upstream author has stopped maintaining the project.
+> its version numbers start at **0.1.0** and are currently at **0.28.9**, which is not continuous with the original repository's 0.2–0.3 versions; the upstream author has stopped maintaining the project.
 > Differences from upstream (already aligned / stronger here / not adopted) are documented in [docs/ARCHITECTURE.en.md](docs/ARCHITECTURE.en.md) §13.
 >
 > QQ group: **1136434612** (usage discussion / issue reports; please mention freedeckCY when joining)
@@ -23,7 +23,7 @@ A **Decky Loader plugin** for the Steam Deck: using resource catalogs from Tiany
 
 | | Description |
 |---|---|
-| Current version | **0.28.7** (see [CHANGELOG.md](CHANGELOG.md) / [English summary](CHANGELOG.en.md)) |
+| Current version | **0.28.9** (see [CHANGELOG.md](CHANGELOG.md) / [English summary](CHANGELOG.en.md)) |
 | Code baseline | Forked from upstream Freedeck's early version (0.2) dated 2026-02; upstream is no longer maintained |
 | Tests | **555 passed**, covering offline logic for catalog, installation, cloud saves, Baidu, emulators, storage, updates and more |
 | CI | Python tests / UI build / frontend hooks scope check / x86_64 and aarch64 runtime smoke tests |
@@ -48,7 +48,7 @@ A **Decky Loader plugin** for the Steam Deck: using resource catalogs from Tiany
 
 - **Decky native game library**: browse, search, platform/category filtering, sorting, pagination, load more and an installed page inside the plugin, with no web page required.
 - **Three-stage visual overhaul of the game library**: responsive cover grid, Hero recommendation area, card source/installed badges, collapsible filter toolbar, category shelves, poster-style detail page, installed cards, skeleton screens and focus animations.
-- **Bilingual UI**: choose Chinese / English on first launch, and the choice is stored locally; it can be switched at any time from the QAM home page, and QAM, settings, library, details, and common dynamic states go through the English translation layer; Steam-owned/backend dynamic messages may still appear in Chinese.
+- **Bilingual UI**: choose Chinese / English on first launch, and the choice is stored locally; it can be switched at any time from the QAM home page or Settings, and QAM, settings, library, details, common dynamic states, and update-check toasts go through the English translation layer; Steam-owned/backend dynamic messages may still appear in Chinese.
 - **Steam Deck native input**: D-pad/left-stick focus navigation, A to select, B to close details/library, L1/R1 to switch pages, L2/R2 to scroll about 0.8 screen; touchpad/touch scrolling for vertical lists and horizontal shelves; the focused card automatically scrolls into view, with the focus ring/top safe area fully visible.
 - **Single/dual cloud-drive resources**:
   - A single Tianyi entry or a single Baidu entry can both go directly into the catalog.
@@ -135,8 +135,8 @@ Releases provide installation packages with bundled runtime binaries:
 
 | Package | Applicable device |
 |---|---|
-| `freedeckCY-v0.28.7.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.28.7-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.28.9.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.28.9-arm64.zip` | DroidDeck / Android ARM64 |
 
 After downloading, use **Decky → Developer → Install plugin from file**, select the corresponding zip, and restart Decky Loader.
 Checksums are available in the `.sha256` files attached to the Release.
@@ -146,7 +146,7 @@ Checksums are available in the `.sha256` files attached to the Release.
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime              # download aria2c / 7zz / node to defaults/runtime/
-make package              # produces dist-artifacts/freedeckCY-v0.28.7.zip
+make package              # produces dist-artifacts/freedeckCY-v0.28.9.zip
 ```
 
 ### Option C: DroidDeck / ARM64

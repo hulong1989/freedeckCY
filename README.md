@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.28.7**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.28.9**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -23,7 +23,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 | | 说明 |
 |---|---|
-| 当前版本 | **0.28.7**（见 [CHANGELOG.md](CHANGELOG.md) / [English](CHANGELOG.en.md)） |
+| 当前版本 | **0.28.9**（见 [CHANGELOG.md](CHANGELOG.md) / [English](CHANGELOG.en.md)） |
 | 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork；上游已停止维护 |
 | 测试 | **555 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
 | CI | Python 测试 / UI 构建 / 前端 hooks 作用域检查 / x86_64 与 aarch64 运行时冒烟 |
@@ -48,7 +48,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 - **Decky 原生游戏库**：插件内浏览、搜索、平台/分类筛选、排序、分页、加载更多、已安装页，不依赖网页。
 - **游戏库三阶段视觉改版**：响应式封面网格、Hero 推荐区、卡片来源/已安装角标、折叠筛选工具栏、分类货架、海报式详情页、已安装卡片、骨架屏与焦点动效。
-- **双语界面**：首次打开选择中文 / English，选择结果本地保存；QAM 主页可随时切换；QAM、设置、游戏库、详情及常用动态状态走英文翻译层；Steam 自身/后端动态消息可能仍为中文。
+- **双语界面**：首次打开选择中文 / English，选择结果本地保存；QAM 主页和设置页都可随时切换，立即生效；QAM、设置、游戏库、详情、常用动态状态和检查更新弹窗走英文翻译层；Steam 自身/后端动态消息可能仍为中文。
 - **Steam Deck 原生输入**：D-pad/左摇杆焦点导航、A 选择、B 关闭详情/游戏库、L1/R1 切页、L2/R2 约 0.8 屏滚动；触控板/触摸纵向列表与横向货架滚动；焦点卡片自动滚入可视区，焦点环/顶部安全区完整可见。
 - **单/双网盘资源**：
   - 单天翼条目、单百度条目都可直接入目录。
@@ -135,8 +135,8 @@ Releases 提供带运行时二进制的安装包：
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.28.7.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.28.7-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.28.9.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.28.9-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后使用 **Decky → 开发者 → 从文件安装插件**，选择对应 zip，重启 Decky Loader。
 校验值见 Release 中的 `.sha256` 文件。
@@ -146,7 +146,7 @@ Releases 提供带运行时二进制的安装包：
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime              # 下载 aria2c / 7zz / node 到 defaults/runtime/
-make package              # 产出 dist-artifacts/freedeckCY-v0.28.7.zip
+make package              # 产出 dist-artifacts/freedeckCY-v0.28.9.zip
 ```
 
 ### 方式 C：DroidDeck / ARM64
