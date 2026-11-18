@@ -69,11 +69,13 @@ def test_update_settings_forwards_cloud_and_proton_flags(tmp_path):
             proton_tool="proton_experimental",
             cloud_save_auto_upload=False,
             cloud_save_include_emulators=False,
+            catalog_url="https://submit.example.com/catalog.csv",
         )
     )
     assert service.store.settings.proton_tool == "proton_experimental"
     assert service.store.settings.cloud_save_auto_upload is False
     assert service.store.settings.cloud_save_include_emulators is False
+    assert service.store.settings.catalog_url == "https://submit.example.com/catalog.csv"
 
 
 def test_update_settings_rejects_empty_directory(tmp_path):

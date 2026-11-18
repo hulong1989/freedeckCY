@@ -1,4 +1,8 @@
-const manifest = {"name":"freedeckCY"};
+// @ts-nocheck
+
+
+const _local_SP_JSX = { jsx: SP_JSX.jsx, jsxs: SP_JSX.jsxs, Fragment: SP_JSX.Fragment };
+const manifest = { "name": "freedeckCY" };
 const API_VERSION = 2;
 const internalAPIConnection = window.__DECKY_SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED_deckyLoaderAPIInit;
 if (!internalAPIConnection) {
@@ -24,77 +28,114 @@ const definePlugin = (fn) => {
         return fn(...args);
     };
 };
-
 var DefaultContext = {
-  color: undefined,
-  size: undefined,
-  className: undefined,
-  style: undefined,
-  attr: undefined
+    color: undefined,
+    size: undefined,
+    className: undefined,
+    style: undefined,
+    attr: undefined
 };
-var IconContext = SP_REACT.createContext && /*#__PURE__*/SP_REACT.createContext(DefaultContext);
-
+var IconContext = SP_REACT.createContext && /*#__PURE__*/ SP_REACT.createContext(DefaultContext);
 var _excluded = ["attr", "size", "title"];
-function _objectWithoutProperties(source, excluded) { if (source == null) return {}; var target = _objectWithoutPropertiesLoose(source, excluded); var key, i; if (Object.getOwnPropertySymbols) { var sourceSymbolKeys = Object.getOwnPropertySymbols(source); for (i = 0; i < sourceSymbolKeys.length; i++) { key = sourceSymbolKeys[i]; if (excluded.indexOf(key) >= 0) continue; if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue; target[key] = source[key]; } } return target; }
-function _objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } } return target; }
-function _extends() { _extends = Object.assign ? Object.assign.bind() : function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; }; return _extends.apply(this, arguments); }
-function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
-function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), true).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
-function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _objectWithoutProperties(source, excluded) { if (source == null)
+    return {}; var target = _objectWithoutPropertiesLoose(source, excluded); var key, i; if (Object.getOwnPropertySymbols) {
+    var sourceSymbolKeys = Object.getOwnPropertySymbols(source);
+    for (i = 0; i < sourceSymbolKeys.length; i++) {
+        key = sourceSymbolKeys[i];
+        if (excluded.indexOf(key) >= 0)
+            continue;
+        if (!Object.prototype.propertyIsEnumerable.call(source, key))
+            continue;
+        target[key] = source[key];
+    }
+} return target; }
+function _objectWithoutPropertiesLoose(source, excluded) { if (source == null)
+    return {}; var target = {}; for (var key in source) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+        if (excluded.indexOf(key) >= 0)
+            continue;
+        target[key] = source[key];
+    }
+} return target; }
+function _extends() { _extends = Object.assign ? Object.assign.bind() : function (target) { for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i];
+    for (var key in source) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+            target[key] = source[key];
+        }
+    }
+} return target; }; return _extends.apply(this, arguments); }
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) {
+    var o = Object.getOwnPropertySymbols(e);
+    r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o);
+} return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) {
+    var t = null != arguments[r] ? arguments[r] : {};
+    r % 2 ? ownKeys(Object(t), true).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); });
+} return e; }
+function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) {
+    Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true });
+}
+else {
+    obj[key] = value;
+} return obj; }
 function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == typeof i ? i : i + ""; }
-function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r); if ("object" != typeof i) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+function _toPrimitive(t, r) { if ("object" != typeof t || !t)
+    return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) {
+    var i = e.call(t, r);
+    if ("object" != typeof i)
+        return i;
+    throw new TypeError("@@toPrimitive must return a primitive value.");
+} return ("string" === r ? String : Number)(t); }
 function Tree2Element(tree) {
-  return tree && tree.map((node, i) => /*#__PURE__*/SP_REACT.createElement(node.tag, _objectSpread({
-    key: i
-  }, node.attr), Tree2Element(node.child)));
+    return tree && tree.map((node, i) => /*#__PURE__*/ SP_REACT.createElement(node.tag, _objectSpread({
+        key: i
+    }, node.attr), Tree2Element(node.child)));
 }
 function GenIcon(data) {
-  return props => /*#__PURE__*/SP_REACT.createElement(IconBase, _extends({
-    attr: _objectSpread({}, data.attr)
-  }, props), Tree2Element(data.child));
+    return props => /*#__PURE__*/ SP_REACT.createElement(IconBase, _extends({
+        attr: _objectSpread({}, data.attr)
+    }, props), Tree2Element(data.child));
 }
 function IconBase(props) {
-  var elem = conf => {
-    var {
-        attr,
-        size,
-        title
-      } = props,
-      svgProps = _objectWithoutProperties(props, _excluded);
-    var computedSize = size || conf.size || "1em";
-    var className;
-    if (conf.className) className = conf.className;
-    if (props.className) className = (className ? className + " " : "") + props.className;
-    return /*#__PURE__*/SP_REACT.createElement("svg", _extends({
-      stroke: "currentColor",
-      fill: "currentColor",
-      strokeWidth: "0"
-    }, conf.attr, attr, svgProps, {
-      className: className,
-      style: _objectSpread(_objectSpread({
-        color: props.color || conf.color
-      }, conf.style), props.style),
-      height: computedSize,
-      width: computedSize,
-      xmlns: "http://www.w3.org/2000/svg"
-    }), title && /*#__PURE__*/SP_REACT.createElement("title", null, title), props.children);
-  };
-  return IconContext !== undefined ? /*#__PURE__*/SP_REACT.createElement(IconContext.Consumer, null, conf => elem(conf)) : elem(DefaultContext);
+    var elem = conf => {
+        var { attr, size, title } = props, svgProps = _objectWithoutProperties(props, _excluded);
+        var computedSize = size || conf.size || "1em";
+        var className;
+        if (conf.className)
+            className = conf.className;
+        if (props.className)
+            className = (className ? className + " " : "") + props.className;
+        return /*#__PURE__*/ SP_REACT.createElement("svg", _extends({
+            stroke: "currentColor",
+            fill: "currentColor",
+            strokeWidth: "0"
+        }, conf.attr, attr, svgProps, {
+            className: className,
+            style: _objectSpread(_objectSpread({
+                color: props.color || conf.color
+            }, conf.style), props.style),
+            height: computedSize,
+            width: computedSize,
+            xmlns: "http://www.w3.org/2000/svg"
+        }), title && /*#__PURE__*/ SP_REACT.createElement("title", null, title), props.children);
+    };
+    return IconContext !== undefined ? /*#__PURE__*/ SP_REACT.createElement(IconContext.Consumer, null, conf => elem(conf)) : elem(DefaultContext);
 }
-
 // THIS FILE IS AUTO GENERATED
-function FaCloudDownloadAlt (props) {
-  return GenIcon({"attr":{"viewBox":"0 0 640 512"},"child":[{"tag":"path","attr":{"d":"M537.6 226.6c4.1-10.7 6.4-22.4 6.4-34.6 0-53-43-96-96-96-19.7 0-38.1 6-53.3 16.2C367 64.2 315.3 32 256 32c-88.4 0-160 71.6-160 160 0 2.7.1 5.4.2 8.1C40.2 219.8 0 273.2 0 336c0 79.5 64.5 144 144 144h368c70.7 0 128-57.3 128-128 0-61.9-44-113.6-102.4-125.4zm-132.9 88.7L299.3 420.7c-6.2 6.2-16.4 6.2-22.6 0L171.3 315.3c-10.1-10.1-2.9-27.3 11.3-27.3H248V176c0-8.8 7.2-16 16-16h48c8.8 0 16 7.2 16 16v112h65.4c14.2 0 21.4 17.2 11.3 27.3z"},"child":[]}]})(props);
+function FaCloudDownloadAlt(props) {
+    return GenIcon({ "attr": { "viewBox": "0 0 640 512" }, "child": [{ "tag": "path", "attr": { "d": "M537.6 226.6c4.1-10.7 6.4-22.4 6.4-34.6 0-53-43-96-96-96-19.7 0-38.1 6-53.3 16.2C367 64.2 315.3 32 256 32c-88.4 0-160 71.6-160 160 0 2.7.1 5.4.2 8.1C40.2 219.8 0 273.2 0 336c0 79.5 64.5 144 144 144h368c70.7 0 128-57.3 128-128 0-61.9-44-113.6-102.4-125.4zm-132.9 88.7L299.3 420.7c-6.2 6.2-16.4 6.2-22.6 0L171.3 315.3c-10.1-10.1-2.9-27.3 11.3-27.3H248V176c0-8.8 7.2-16 16-16h48c8.8 0 16 7.2 16 16v112h65.4c14.2 0 21.4 17.2 11.3 27.3z" }, "child": [] }] })(props);
 }
-
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.11";
+const PLUGIN_UI_BUILD = "0.26.19";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const restartSteamBackend = callable("restart_steam");
 const clearSteamRestartPending = callable("clear_steam_restart_pending");
 const getTianyiStorageOptions = callable("get_tianyi_storage_options");
 const listTianyiCatalog = callable("list_tianyi_catalog");
+const refreshTianyiCatalog = callable("refresh_tianyi_catalog");
+const updateTianyiCatalog = callable("update_tianyi_catalog");
 const prepareTianyiInstall = callable("prepare_tianyi_install");
 const startTianyiInstall = callable("start_tianyi_install");
 const listTianyiInstalledGames = callable("list_tianyi_installed_games");
@@ -146,6 +187,7 @@ const EMPTY_SETTINGS = {
     auto_install: true,
     cloud_save_auto_upload: true,
     cloud_save_include_emulators: true,
+    catalog_url: "",
 };
 const EMPTY_CLOUD_SAVE_STATE = {
     stage: "idle",
@@ -346,13 +388,13 @@ function TaskProgressRow(task) {
     const installStatus = String(task.install_status || "").trim();
     const installMessage = String(task.install_message || "").trim();
     const errorReason = String(task.error_reason || "").trim();
-    return (SP_JSX.jsxs("div", { style: {
+    return (_local_SP_JSX.jsxs("div", { style: {
             width: "100%",
             padding: "8px 0",
             display: "flex",
             flexDirection: "column",
             gap: "6px",
-        }, children: [SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }, children: [SP_JSX.jsx("div", { style: {
+        }, children: [_local_SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }, children: [_local_SP_JSX.jsx("div", { style: {
                             fontSize: "14px",
                             fontWeight: 600,
                             lineHeight: 1.35,
@@ -360,19 +402,19 @@ function TaskProgressRow(task) {
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                             maxWidth: "70%",
-                        }, title: title, children: title }), SP_JSX.jsx("div", { style: { fontSize: "11px", color: colors.label }, children: downloadStatusText(task.status) })] }), SP_JSX.jsx("div", { style: {
+                        }, title: title, children: title }), _local_SP_JSX.jsx("div", { style: { fontSize: "11px", color: colors.label }, children: downloadStatusText(task.status) })] }), _local_SP_JSX.jsx("div", { style: {
                     width: "100%",
                     height: "8px",
                     borderRadius: "999px",
                     background: colors.track,
                     overflow: "hidden",
-                }, children: SP_JSX.jsx("div", { style: {
+                }, children: _local_SP_JSX.jsx("div", { style: {
                         width: `${progress.toFixed(1)}%`,
                         height: "100%",
                         borderRadius: "999px",
                         background: colors.fill,
                         transition: "width 860ms linear",
-                    } }) }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "11px", color: "#c9c9c9" }, children: [SP_JSX.jsx("span", { children: `进度 ${progress.toFixed(1)}%` }), SP_JSX.jsx("span", { children: `速度 ${formatSpeed(task.speed)}` })] }), installStatus ? (SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#bcbcbc", lineHeight: 1.4 }, children: `安装：${installStatusText(installStatus)}${installMessage ? ` | ${installMessage}` : ""}` })) : null, errorReason ? (SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#ff8e8e", lineHeight: 1.4 }, children: `错误：${errorReason}` })) : null] }));
+                    } }) }), _local_SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "11px", color: "#c9c9c9" }, children: [_local_SP_JSX.jsx("span", { children: `进度 ${progress.toFixed(1)}%` }), _local_SP_JSX.jsx("span", { children: `速度 ${formatSpeed(task.speed)}` })] }), installStatus ? (_local_SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#bcbcbc", lineHeight: 1.4 }, children: `安装：${installStatusText(installStatus)}${installMessage ? ` | ${installMessage}` : ""}` })) : null, errorReason ? (_local_SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#ff8e8e", lineHeight: 1.4 }, children: `错误：${errorReason}` })) : null] }));
 }
 function getTextFieldValue(eventOrValue) {
     if (typeof eventOrValue === "string")
@@ -432,6 +474,7 @@ function toPayload(settings) {
         auto_install: true,
         cloud_save_auto_upload: Boolean(settings.cloud_save_auto_upload),
         cloud_save_include_emulators: Boolean(settings.cloud_save_include_emulators),
+        catalog_url: String(settings.catalog_url || "").trim(),
     };
 }
 function normalizeCloudSaveUploadState(raw) {
@@ -1089,7 +1132,7 @@ function LibraryTimeBlock({ appId, title }) {
     const mainStory = normalizeHoursText(data.main_story_hours, data.main_story_time_text);
     const totalTime = normalizeHoursText(data.total_hours, data.total_time_text);
     const activeSuffix = data.my_playtime_active ? "（进行中）" : "";
-    return (SP_JSX.jsx("div", { id: LIBRARY_TIME_BLOCK_ID, style: {
+    return (_local_SP_JSX.jsx("div", { id: LIBRARY_TIME_BLOCK_ID, style: {
             position: "absolute",
             top: "14px",
             left: "360px",
@@ -1103,7 +1146,7 @@ function LibraryTimeBlock({ appId, title }) {
             border: "none",
             boxShadow: "none",
             pointerEvents: "none",
-        }, children: SP_JSX.jsxs("div", { style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)", gap: "10px" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: `${myPlaytime}${activeSuffix}` }), SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.84 }, children: "\u5DF2\u73A9\u65F6\u957F" })] }), SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: mainStory }), SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.84 }, children: "\u4E3B\u7EBF\u65F6\u957F" })] }), SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: totalTime }), SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.84 }, children: "\u603B\u65F6\u957F" })] })] }) }));
+        }, children: _local_SP_JSX.jsxs("div", { style: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)", gap: "10px" }, children: [_local_SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [_local_SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: `${myPlaytime}${activeSuffix}` }), _local_SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.84 }, children: "\u5DF2\u73A9\u65F6\u957F" })] }), _local_SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [_local_SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: mainStory }), _local_SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.84 }, children: "\u4E3B\u7EBF\u65F6\u957F" })] }), _local_SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [_local_SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: totalTime }), _local_SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.84 }, children: "\u603B\u65F6\u957F" })] })] }) }));
 }
 function installLibraryPlaytimePatch() {
     const hookApi = routerHook;
@@ -1162,7 +1205,7 @@ function installLibraryPlaytimePatch() {
                 const runtimeTitle = String(dynamicType.__FREDECK_LIBRARY_GAME_TITLE || gameTitle).trim();
                 if (!runtimeAppId)
                     return ret2;
-                const nextComponent = (SP_JSX.jsx(LibraryTimeBlock, { appId: runtimeAppId, title: runtimeTitle }, `freedeckcy-library-times-${runtimeAppId}`));
+                const nextComponent = (_local_SP_JSX.jsx(LibraryTimeBlock, { appId: runtimeAppId, title: runtimeTitle }, `freedeckcy-library-times-${runtimeAppId}`));
                 const overlayHost = resolveLibraryOverlayHost(ret2);
                 if (overlayHost) {
                     const hostChildren = ensureNodeChildrenArray(overlayHost);
@@ -1283,6 +1326,8 @@ function SettingsPage() {
     const [saving, setSaving] = SP_REACT.useState(false);
     const [clearingLogin, setClearingLogin] = SP_REACT.useState(false);
     const [scanningInstalled, setScanningInstalled] = SP_REACT.useState(false);
+    const [updatingCatalog, setUpdatingCatalog] = SP_REACT.useState(false);
+    const [catalogUpdateMessage, setCatalogUpdateMessage] = SP_REACT.useState("");
     const [diagnosticsReport, setDiagnosticsReport] = SP_REACT.useState(null);
     const [diagnosticsBusy, setDiagnosticsBusy] = SP_REACT.useState(false);
     const [diagnosticsExportBusy, setDiagnosticsExportBusy] = SP_REACT.useState(false);
@@ -2029,7 +2074,7 @@ function SettingsPage() {
             }
             if (plan.requires_confirmation) {
                 const samples = Array.isArray(plan.conflict_samples) ? plan.conflict_samples.slice(0, 5) : [];
-                DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u786E\u8BA4\u8986\u76D6\u5B58\u6863", strDescription: `检测到 ${Number(plan.conflict_count || 0)} 个冲突文件，确认后会覆盖原有存档。` +
+                DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u786E\u8BA4\u8986\u76D6\u5B58\u6863", strDescription: `检测到 ${Number(plan.conflict_count || 0)} 个冲突文件，确认后会覆盖原有存档。` +
                         (samples.length ? `\n\n示例：\n${samples.join("\n")}` : ""), strOKButtonText: "\u786E\u8BA4\u8986\u76D6", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
                         void runRestoreApply(planId, true);
                     }, onCancel: () => {
@@ -2096,55 +2141,85 @@ function SettingsPage() {
         planningRestore ||
         applyingRestore ||
         cloudSaveRestoreState.running;
+    const onUpdateCatalog = SP_REACT.useCallback(async () => {
+        if (updatingCatalog)
+            return;
+        setUpdatingCatalog(true);
+        setCatalogUpdateMessage("正在下载服务器最新目录...");
+        try {
+            const result = await withTimeout(updateTianyiCatalog(), 90000, "更新游戏列表超时");
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "更新游戏列表失败");
+            }
+            const total = Number(result.data.total || 0);
+            if (result.data.updated === false) {
+                setCatalogUpdateMessage(`已是最新：${total} 条（服务器没有更新）`);
+                toaster.toast({ title: "freedeckCY", body: "游戏列表已是最新，无需下载" });
+            }
+            else {
+                setCatalogUpdateMessage(`已更新：${total} 条（${result.data.source || "csv"}）`);
+                toaster.toast({ title: "freedeckCY", body: `游戏列表已更新：${total} 条` });
+            }
+            await refreshSettings();
+        }
+        catch (error) {
+            const message = errorText(error);
+            setCatalogUpdateMessage(`更新失败：${message}`);
+            toastError(error);
+        }
+        finally {
+            setUpdatingCatalog(false);
+        }
+    }, [refreshSettings, updatingCatalog]);
     const tabs = SP_REACT.useMemo(() => [
         {
             id: "paths",
             title: "路径",
-            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E0B\u8F7D\u76EE\u5F55", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.download_dir || "未设置" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickDownloadDir, disabled: saving, children: "\u9009\u62E9\u4E0B\u8F7D\u76EE\u5F55" }) }), storageOptions.filter((item) => item.kind === "external").map((item) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "download_dir"), disabled: saving, children: ["\u4E0B\u8F7D\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `download-${item.mount}`))), !storageOptions.some((item) => item.kind === "external") ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.75 }, children: "\u672A\u68C0\u6D4B\u5230\u53EF\u5199 SD \u5361/\u5916\u7F6E\u5B58\u50A8\uFF08\u8BF7\u5148\u5728 SteamOS/\u7CFB\u7EDF\u4E2D\u6302\u8F7D\uFF09" }) })) : null] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u76EE\u5F55", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.install_dir || "未设置" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickInstallDir, disabled: saving, children: "\u9009\u62E9\u5B89\u88C5\u76EE\u5F55" }) }), storageOptions.filter((item) => item.kind === "external").map((item) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "install_dir"), disabled: saving, children: ["\u5B89\u88C5\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `install-${item.mount}`)))] })] })),
+            content: (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u6E38\u620F\u76EE\u5F55", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: "\u4ECE\u670D\u52A1\u5668\u4E0B\u8F7D\u6700\u65B0\u7684\u6E38\u620F\u76EE\u5F55 CSV \u5230\u672C\u5730\uFF1B\u4E0B\u8F7D\u6210\u529F\u540E\u4F1A\u7ACB\u5373\u91CD\u65B0\u52A0\u8F7D\u3002" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.TextField, { label: "\u76EE\u5F55\u670D\u52A1\u5668 CSV \u5730\u5740\uFF08\u7559\u7A7A\u7528\u9ED8\u8BA4 GitHub\uFF09", value: settings.catalog_url, onChange: (event) => setSettings((prev) => ({ ...prev, catalog_url: getTextFieldValue(event) })) }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => savePatch({ catalog_url: settings.catalog_url }), disabled: saving, children: "\u4FDD\u5B58\u76EE\u5F55\u5730\u5740" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onUpdateCatalog(), disabled: updatingCatalog || saving, children: updatingCatalog ? "正在检查..." : "检查并更新游戏列表" }) }), catalogUpdateMessage ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.45, opacity: 0.8 }, children: catalogUpdateMessage }) })) : null] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E0B\u8F7D\u76EE\u5F55", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.download_dir || "未设置" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickDownloadDir, disabled: saving, children: "\u9009\u62E9\u4E0B\u8F7D\u76EE\u5F55" }) }), storageOptions.filter((item) => item.kind === "external").map((item) => (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "download_dir"), disabled: saving, children: ["\u4E0B\u8F7D\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `download-${item.mount}`))), !storageOptions.some((item) => item.kind === "external") ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.75 }, children: "\u672A\u68C0\u6D4B\u5230\u53EF\u5199 SD \u5361/\u5916\u7F6E\u5B58\u50A8\uFF08\u8BF7\u5148\u5728 SteamOS/\u7CFB\u7EDF\u4E2D\u6302\u8F7D\uFF09" }) })) : null] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u76EE\u5F55", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.install_dir || "未设置" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickInstallDir, disabled: saving, children: "\u9009\u62E9\u5B89\u88C5\u76EE\u5F55" }) }), storageOptions.filter((item) => item.kind === "external").map((item) => (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "install_dir"), disabled: saving, children: ["\u5B89\u88C5\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `install-${item.mount}`)))] })] })),
         },
         {
             id: "install",
             title: "安装",
-            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u884C\u4E3A", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "\u5B89\u88C5\u540E\u81EA\u52A8\u5220\u9664\u538B\u7F29\u5305", description: "\u4EC5\u5728\u81EA\u52A8\u5B89\u88C5\u6210\u529F\u540E\u751F\u6548", checked: Boolean(settings.auto_delete_package), onChange: (value) => savePatch({ auto_delete_package: value }), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }, children: "\u4E0B\u8F7D\u5B8C\u6210\u540E\u81EA\u52A8\u5B89\u88C5\u5DF2\u56FA\u5B9A\u5F00\u542F\u3002" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u626B\u63CF\u5DF2\u5B89\u88C5", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }, children: "\u626B\u63CF\u8BBE\u7F6E\u91CC\u7684\u5B89\u88C5\u76EE\u5F55\u4E00\u5C42\uFF0C\u628A\u76EE\u5F55\u540D\u5339\u914D\u6807\u9898\u7684\u6E38\u620F\u8865\u56DE\u5217\u8868\uFF1BSteam \u91CC\u6CA1\u6709\u7684\u4F1A\u81EA\u52A8\u521B\u5EFA\u5FEB\u6377\u65B9\u5F0F\u3002" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onScanInstalledSettings, disabled: scanningInstalled || saving, children: scanningInstalled ? "扫描中..." : "扫描已安装游戏" }) })] })] })),
+            content: (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u884C\u4E3A", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ToggleField, { label: "\u5B89\u88C5\u540E\u81EA\u52A8\u5220\u9664\u538B\u7F29\u5305", description: "\u4EC5\u5728\u81EA\u52A8\u5B89\u88C5\u6210\u529F\u540E\u751F\u6548", checked: Boolean(settings.auto_delete_package), onChange: (value) => savePatch({ auto_delete_package: value }), disabled: saving }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }, children: "\u4E0B\u8F7D\u5B8C\u6210\u540E\u81EA\u52A8\u5B89\u88C5\u5DF2\u56FA\u5B9A\u5F00\u542F\u3002" }) })] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u626B\u63CF\u5DF2\u5B89\u88C5", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }, children: "\u626B\u63CF\u8BBE\u7F6E\u91CC\u7684\u5B89\u88C5\u76EE\u5F55\u4E00\u5C42\uFF0C\u628A\u76EE\u5F55\u540D\u5339\u914D\u6807\u9898\u7684\u6E38\u620F\u8865\u56DE\u5217\u8868\uFF1BSteam \u91CC\u6CA1\u6709\u7684\u4F1A\u81EA\u52A8\u521B\u5EFA\u5FEB\u6377\u65B9\u5F0F\u3002" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onScanInstalledSettings, disabled: scanningInstalled || saving, children: scanningInstalled ? "扫描中..." : "扫描已安装游戏" }) })] })] })),
         },
         {
             id: "download",
             title: "下载",
-            content: (SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E0B\u8F7D\u53C2\u6570", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.SliderField, { label: "aria2 \u5206\u7247\u6570", description: "\u5EFA\u8BAE 8~32\uFF0C\u8303\u56F4 1~64", value: Math.max(1, Math.min(64, Number(splitDraft || 16))), min: 1, max: 64, step: 1, showValue: true, editableValue: true, onChange: (value) => setSplitDraft(Math.max(1, Math.min(64, Number(value || 1)))), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5206\u9875\u6570\u91CF", description: "\u6E38\u620F\u5217\u8868\u6BCF\u9875\u663E\u793A\u6761\u6570", rgOptions: PAGE_SIZE_OPTIONS, selectedOption: Math.max(10, Math.min(200, Number(settings.page_size || 50))), disabled: saving, onChange: (option) => {
+            content: (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E0B\u8F7D\u53C2\u6570", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.SliderField, { label: "aria2 \u5206\u7247\u6570", description: "\u5EFA\u8BAE 8~32\uFF0C\u8303\u56F4 1~64", value: Math.max(1, Math.min(64, Number(splitDraft || 16))), min: 1, max: 64, step: 1, showValue: true, editableValue: true, onChange: (value) => setSplitDraft(Math.max(1, Math.min(64, Number(value || 1)))), disabled: saving }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.DropdownItem, { label: "\u5206\u9875\u6570\u91CF", description: "\u6E38\u620F\u5217\u8868\u6BCF\u9875\u663E\u793A\u6761\u6570", rgOptions: PAGE_SIZE_OPTIONS, selectedOption: Math.max(10, Math.min(200, Number(settings.page_size || 50))), disabled: saving, onChange: (option) => {
                                 const nextValue = Math.max(10, Math.min(200, Number(option?.data || 50)));
                                 if (nextValue === Number(settings.page_size || 50))
                                     return;
                                 void savePatch({ page_size: nextValue }, `分页数量已更新：${nextValue} / 页`);
-                            } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onSaveSplit, disabled: saving, children: "\u4FDD\u5B58\u4E0B\u8F7D\u53C2\u6570" }) })] })),
+                            } }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onSaveSplit, disabled: saving, children: "\u4FDD\u5B58\u4E0B\u8F7D\u53C2\u6570" }) })] })),
         },
         {
             id: "account",
             title: "账号",
-            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u5929\u7FFC\u4E91\u8D26\u53F7", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: login.logged_in
+            content: (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u5929\u7FFC\u4E91\u8D26\u53F7", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: login.logged_in
                                         ? `当前已登录：${login.user_account || "未知账号"}`
-                                        : "当前未登录" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8\uFF08\u626B\u7801\u767B\u5F55\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduWebLogin.logged_in
+                                        : "当前未登录" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8\uFF08\u626B\u7801\u767B\u5F55\uFF09", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduWebLogin.logged_in
                                         ? `已登录：${baiduWebLogin.user_account || "百度账号"}`
-                                        : "未登录（扫码后使用 BDUSS/Cookie，无需开放平台 App Key）" }) }), baiduQr.stage === "failed" || baiduQr.stage === "expired" ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#ffb4a8", lineHeight: 1.5 }, children: baiduQr.message || "扫码失败，请重试" }) })) : null, baiduQr.stage === "waiting" || baiduQr.stage === "scanned" ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }, children: [baiduQr.qr_data_url ? (SP_JSX.jsx("img", { src: baiduQr.qr_data_url, alt: "\u767E\u5EA6\u626B\u7801\u767B\u5F55", style: { width: "180px", height: "180px", background: "#fff", padding: "8px", borderRadius: "8px" } })) : (SP_JSX.jsxs("div", { style: { fontSize: "12px" }, children: ["\u4E8C\u7EF4\u7801\u56FE\u7247\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u6253\u5F00\uFF1A", SP_JSX.jsx("div", { style: { wordBreak: "break-all" }, children: baiduQr.qrcode_url })] })), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: baiduQr.message || "请用百度 App 扫码" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onCancelBaiduQr, children: "\u53D6\u6D88\u626B\u7801" })] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartBaiduQr, disabled: baiduQrBusy, children: baiduQrBusy ? "获取中..." : "扫码登录百度网盘" }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearBaiduWeb, disabled: baiduQrBusy || !baiduWebLogin.logged_in, children: "\u9000\u51FA\u767E\u5EA6\u7F51\u76D8" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8 OpenAPI\uFF08\u53EF\u9009\uFF0C\u9700\u5F00\u53D1\u8005\u8D44\u8D28\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduLogin.logged_in
+                                        : "未登录（扫码后使用 BDUSS/Cookie，无需开放平台 App Key）" }) }), baiduQr.stage === "failed" || baiduQr.stage === "expired" ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#ffb4a8", lineHeight: 1.5 }, children: baiduQr.message || "扫码失败，请重试" }) })) : null, baiduQr.stage === "waiting" || baiduQr.stage === "scanned" ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }, children: [baiduQr.qr_data_url ? (_local_SP_JSX.jsx("img", { src: baiduQr.qr_data_url, alt: "\u767E\u5EA6\u626B\u7801\u767B\u5F55", style: { width: "180px", height: "180px", background: "#fff", padding: "8px", borderRadius: "8px" } })) : (_local_SP_JSX.jsxs("div", { style: { fontSize: "12px" }, children: ["\u4E8C\u7EF4\u7801\u56FE\u7247\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u6253\u5F00\uFF1A", _local_SP_JSX.jsx("div", { style: { wordBreak: "break-all" }, children: baiduQr.qrcode_url })] })), _local_SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: baiduQr.message || "请用百度 App 扫码" }), _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onCancelBaiduQr, children: "\u53D6\u6D88\u626B\u7801" })] }) })) : (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartBaiduQr, disabled: baiduQrBusy, children: baiduQrBusy ? "获取中..." : "扫码登录百度网盘" }) })), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearBaiduWeb, disabled: baiduQrBusy || !baiduWebLogin.logged_in, children: "\u9000\u51FA\u767E\u5EA6\u7F51\u76D8" }) })] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8 OpenAPI\uFF08\u53EF\u9009\uFF0C\u9700\u5F00\u53D1\u8005\u8D44\u8D28\uFF09", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduLogin.logged_in
                                         ? `已授权：${baiduLogin.user_account || "百度账号"}`
                                         : baiduLogin.configured
                                             ? "已配置应用，待授权"
-                                            : "未配置（去百度网盘开放平台创建应用）" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "App Key", value: baiduAppKey, onChange: (event) => setBaiduAppKey(getTextFieldValue(event)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "Secret Key", value: baiduSecretKey, bIsPassword: true, onChange: (event) => setBaiduSecretKey(getTextFieldValue(event)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onSaveBaiduApp, disabled: baiduBusy, children: "\u4FDD\u5B58\u5E94\u7528" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onBaiduAuthorize, disabled: baiduBusy || !baiduLogin.configured, children: "\u83B7\u53D6\u6388\u6743\u94FE\u63A5" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u6388\u6743\u7801", description: "\u7C98\u8D34\u767E\u5EA6\u8FD4\u56DE\u7684\u6388\u6743\u7801", value: baiduAuthCode, onChange: (event) => setBaiduAuthCode(getTextFieldValue(event)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onExchangeBaiduCode, disabled: baiduBusy || !baiduAuthCode.trim(), children: "\u5B8C\u6210\u6388\u6743" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearBaiduLogin, disabled: baiduBusy || !baiduLogin.logged_in, children: "\u6E05\u9664\u767E\u5EA6\u6388\u6743" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E91\u5B58\u6863\u4E0A\u4F20", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "\u6E38\u620F\u9000\u51FA\u540E\u81EA\u52A8\u4E0A\u4F20", description: "\u540E\u53F0\u68C0\u6D4B\u6E38\u620F\u8FDB\u7A0B\uFF0C\u9000\u51FA\u540E\u81EA\u52A8\u6253\u5305\u4E0A\u4F20\uFF1B\u9ED8\u8BA4\u5F00\u542F", checked: Boolean(settings.cloud_save_auto_upload), onChange: (value) => savePatch({ cloud_save_auto_upload: value }), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "\u5305\u542B\u6A21\u62DF\u5668\u5B58\u6863", description: "GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch \u7684\u5B58\u6863\u4E0E\u8BB0\u5FC6\u5361", checked: Boolean(settings.cloud_save_include_emulators), onChange: (value) => savePatch({ cloud_save_include_emulators: value }), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveUpload, disabled: saving || clearingLogin || startingCloudSaveUpload || !login.logged_in || cloudSaveUploadState.running, children: startingCloudSaveUpload
+                                            : "未配置（去百度网盘开放平台创建应用）" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.TextField, { label: "App Key", value: baiduAppKey, onChange: (event) => setBaiduAppKey(getTextFieldValue(event)) }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.TextField, { label: "Secret Key", value: baiduSecretKey, bIsPassword: true, onChange: (event) => setBaiduSecretKey(getTextFieldValue(event)) }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onSaveBaiduApp, disabled: baiduBusy, children: "\u4FDD\u5B58\u5E94\u7528" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onBaiduAuthorize, disabled: baiduBusy || !baiduLogin.configured, children: "\u83B7\u53D6\u6388\u6743\u94FE\u63A5" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.TextField, { label: "\u6388\u6743\u7801", description: "\u7C98\u8D34\u767E\u5EA6\u8FD4\u56DE\u7684\u6388\u6743\u7801", value: baiduAuthCode, onChange: (event) => setBaiduAuthCode(getTextFieldValue(event)) }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onExchangeBaiduCode, disabled: baiduBusy || !baiduAuthCode.trim(), children: "\u5B8C\u6210\u6388\u6743" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearBaiduLogin, disabled: baiduBusy || !baiduLogin.logged_in, children: "\u6E05\u9664\u767E\u5EA6\u6388\u6743" }) })] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E91\u5B58\u6863\u4E0A\u4F20", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ToggleField, { label: "\u6E38\u620F\u9000\u51FA\u540E\u81EA\u52A8\u4E0A\u4F20", description: "\u540E\u53F0\u68C0\u6D4B\u6E38\u620F\u8FDB\u7A0B\uFF0C\u9000\u51FA\u540E\u81EA\u52A8\u6253\u5305\u4E0A\u4F20\uFF1B\u9ED8\u8BA4\u5F00\u542F", checked: Boolean(settings.cloud_save_auto_upload), onChange: (value) => savePatch({ cloud_save_auto_upload: value }), disabled: saving }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ToggleField, { label: "\u5305\u542B\u6A21\u62DF\u5668\u5B58\u6863", description: "GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch \u7684\u5B58\u6863\u4E0E\u8BB0\u5FC6\u5361", checked: Boolean(settings.cloud_save_include_emulators), onChange: (value) => savePatch({ cloud_save_include_emulators: value }), disabled: saving }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveUpload, disabled: saving || clearingLogin || startingCloudSaveUpload || !login.logged_in || cloudSaveUploadState.running, children: startingCloudSaveUpload
                                         ? "启动中..."
                                         : cloudSaveUploadState.running
                                             ? "上传进行中..."
-                                            : "上传云存档" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: cloudSaveSummaryText }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, opacity: 0.88 }, children: `${cloudSaveUploadState.message || "未开始"} | ${clampProgress(cloudSaveUploadState.progress).toFixed(1)}%` }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E91\u5B58\u6863\u4E0B\u8F7D\u6062\u590D", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: refreshRestoreOptions, disabled: !login.logged_in || restoreBusy, children: loadingRestoreOptions ? "刷新中..." : "刷新云存档列表" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u9009\u62E9\u6E38\u620F", description: "\u6309\u6E38\u620F\u5206\u7EC4\u663E\u793A\u4E91\u7AEF\u7248\u672C", rgOptions: restoreGameOptions, selectedOption: selectedRestoreGameKey, disabled: !login.logged_in || restoreBusy || restoreGameOptions.length <= 0, onChange: (option) => setSelectedRestoreGameKey(String(option?.data || "")) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u9009\u62E9\u7248\u672C\u65F6\u95F4", description: "\u6309\u65F6\u95F4\u5012\u5E8F", rgOptions: restoreVersionOptions, selectedOption: selectedRestoreVersion, disabled: !login.logged_in || restoreBusy || !selectedRestoreGame || restoreVersionOptions.length <= 0, onChange: (option) => setSelectedRestoreVersion(String(option?.data || "")) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLoadRestoreEntries, disabled: !login.logged_in || restoreBusy || !selectedRestoreGame || !selectedRestoreVersion, children: loadingRestoreEntries ? "读取中..." : "读取可选存档项" }) }), restoreEntries.length > 0 &&
+                                            : "上传云存档" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: cloudSaveSummaryText }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, opacity: 0.88 }, children: `${cloudSaveUploadState.message || "未开始"} | ${clampProgress(cloudSaveUploadState.progress).toFixed(1)}%` }) })] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E91\u5B58\u6863\u4E0B\u8F7D\u6062\u590D", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: refreshRestoreOptions, disabled: !login.logged_in || restoreBusy, children: loadingRestoreOptions ? "刷新中..." : "刷新云存档列表" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.DropdownItem, { label: "\u9009\u62E9\u6E38\u620F", description: "\u6309\u6E38\u620F\u5206\u7EC4\u663E\u793A\u4E91\u7AEF\u7248\u672C", rgOptions: restoreGameOptions, selectedOption: selectedRestoreGameKey, disabled: !login.logged_in || restoreBusy || restoreGameOptions.length <= 0, onChange: (option) => setSelectedRestoreGameKey(String(option?.data || "")) }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.DropdownItem, { label: "\u9009\u62E9\u7248\u672C\u65F6\u95F4", description: "\u6309\u65F6\u95F4\u5012\u5E8F", rgOptions: restoreVersionOptions, selectedOption: selectedRestoreVersion, disabled: !login.logged_in || restoreBusy || !selectedRestoreGame || restoreVersionOptions.length <= 0, onChange: (option) => setSelectedRestoreVersion(String(option?.data || "")) }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLoadRestoreEntries, disabled: !login.logged_in || restoreBusy || !selectedRestoreGame || !selectedRestoreVersion, children: loadingRestoreEntries ? "读取中..." : "读取可选存档项" }) }), restoreEntries.length > 0 &&
                                 restoreEntries.map((entry) => {
                                     const entryId = String(entry.entry_id || "");
                                     const checked = selectedRestoreEntryIds.includes(entryId);
-                                    return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: `${entry.entry_name || entryId}${entry.file_count ? `（${entry.file_count} 文件）` : ""}`, checked: checked, onChange: (value) => toggleRestoreEntry(entryId, value), disabled: restoreBusy }) }, `restore_entry_${entryId}`));
-                                }), restoreEntries.length > 0 && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => {
+                                    return (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ToggleField, { label: `${entry.entry_name || entryId}${entry.file_count ? `（${entry.file_count} 文件）` : ""}`, checked: checked, onChange: (value) => toggleRestoreEntry(entryId, value), disabled: restoreBusy }) }, `restore_entry_${entryId}`));
+                                }), restoreEntries.length > 0 && (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => {
                                                 setSelectedRestoreEntryIds(restoreEntries.map((item) => String(item.entry_id || "")).filter(Boolean));
-                                            }, disabled: restoreBusy, children: "\u5168\u9009" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => setSelectedRestoreEntryIds([]), disabled: restoreBusy, children: "\u6E05\u7A7A" })] }) })), targetCandidates.length > 1 && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u6062\u590D\u76EE\u6807\u76EE\u5F55", description: "\u68C0\u6D4B\u5230\u591A\u4E2A\u5019\u9009\u76EE\u5F55\uFF0C\u8BF7\u660E\u786E\u9009\u62E9", rgOptions: targetCandidates.map((path) => ({ data: path, label: path })), selectedOption: selectedRestoreTargetDir, disabled: restoreBusy, onChange: (option) => setSelectedRestoreTargetDir(String(option?.data || "")) }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveRestore, disabled: !login.logged_in || restoreBusy || !selectedRestoreGame || !selectedRestoreVersion || !selectedRestoreEntryIds.length, children: planningRestore ? "规划中..." : applyingRestore ? "恢复中..." : "下载并恢复云存档" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: cloudSaveRestoreSummaryText }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, opacity: 0.88 }, children: `${cloudSaveRestoreState.message || "未开始"} | ${clampProgress(cloudSaveRestoreState.progress).toFixed(1)}%` }) })] })] })),
+                                            }, disabled: restoreBusy, children: "\u5168\u9009" }), _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => setSelectedRestoreEntryIds([]), disabled: restoreBusy, children: "\u6E05\u7A7A" })] }) })), targetCandidates.length > 1 && (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.DropdownItem, { label: "\u6062\u590D\u76EE\u6807\u76EE\u5F55", description: "\u68C0\u6D4B\u5230\u591A\u4E2A\u5019\u9009\u76EE\u5F55\uFF0C\u8BF7\u660E\u786E\u9009\u62E9", rgOptions: targetCandidates.map((path) => ({ data: path, label: path })), selectedOption: selectedRestoreTargetDir, disabled: restoreBusy, onChange: (option) => setSelectedRestoreTargetDir(String(option?.data || "")) }) })), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartCloudSaveRestore, disabled: !login.logged_in || restoreBusy || !selectedRestoreGame || !selectedRestoreVersion || !selectedRestoreEntryIds.length, children: planningRestore ? "规划中..." : applyingRestore ? "恢复中..." : "下载并恢复云存档" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: cloudSaveRestoreSummaryText }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, opacity: 0.88 }, children: `${cloudSaveRestoreState.message || "未开始"} | ${clampProgress(cloudSaveRestoreState.progress).toFixed(1)}%` }) })] })] })),
         },
         {
             id: "diagnostics",
             title: "诊断",
-            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u81EA\u68C0", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u68C0\u67E5\u63D2\u4EF6\u7248\u672C\u3001\u72B6\u6001/\u4E0B\u8F7D/\u5B89\u88C5\u76EE\u5F55\u3001aria2/7zz/node\u3001Steam \u5FEB\u6377\u65B9\u5F0F\u3001SD \u5361\u3001\u7F51\u7EDC\u4E0E\u767E\u5EA6\u626B\u7801\u63A5\u53E3\u3002" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onRunDiagnostics(), disabled: diagnosticsBusy, children: diagnosticsBusy ? "自检中..." : "运行自检" }) }), diagnosticsError ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, color: "#ffb4a8", wordBreak: "break-word" }, children: `自检失败：${diagnosticsError}` }) })) : null, diagnosticsReport ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6 }, children: `v${diagnosticsReport.version || "?"} · ${diagnosticsReport.arch || "-"} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}` }) }), (diagnosticsReport.checks || []).map((check, checkIndex) => {
+            content: (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u81EA\u68C0", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u68C0\u67E5\u63D2\u4EF6\u7248\u672C\u3001\u72B6\u6001/\u4E0B\u8F7D/\u5B89\u88C5\u76EE\u5F55\u3001aria2/7zz/node\u3001Steam \u5FEB\u6377\u65B9\u5F0F\u3001SD \u5361\u3001\u7F51\u7EDC\u4E0E\u767E\u5EA6\u626B\u7801\u63A5\u53E3\u3002" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onRunDiagnostics(), disabled: diagnosticsBusy, children: diagnosticsBusy ? "自检中..." : "运行自检" }) }), diagnosticsError ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, color: "#ffb4a8", wordBreak: "break-word" }, children: `自检失败：${diagnosticsError}` }) })) : null, diagnosticsReport ? (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6 }, children: `v${diagnosticsReport.version || "?"} · ${diagnosticsReport.arch || "-"} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}` }) }), (diagnosticsReport.checks || []).map((check, checkIndex) => {
                                         const status = String(check.status || "skip").toLowerCase();
                                         const color = status === "ok"
                                             ? "#9fe6a8"
@@ -2153,8 +2228,8 @@ function SettingsPage() {
                                                 : status === "fail"
                                                     ? "#ff9a8a"
                                                     : "#b9c0cc";
-                                        return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontWeight: 600 }, children: check.label || check.id || "-" }), SP_JSX.jsx("span", { style: { color, fontSize: "12px" }, children: status.toUpperCase() })] }), SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.86, wordBreak: "break-word" }, children: check.detail }), check.fix && status !== "ok" ? (SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.7 }, children: `建议：${check.fix}` })) : null] }) }, check.id || `diagnostic-${checkIndex}`));
-                                    })] })) : null] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u8BCA\u65AD\u5305", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u5BFC\u51FA diagnostics.json\u3001self-check.json\u3001\u6700\u65B0 300 \u884C\u65E5\u5FD7\uFF1Bcookie/token \u5DF2\u8131\u654F\uFF0C\u5199\u5230\u4E0B\u8F7D\u76EE\u5F55\u3002" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onExportDiagnostics(), disabled: diagnosticsExportBusy, children: diagnosticsExportBusy ? "打包中..." : "导出诊断包" }) }), diagnosticsExportMessage ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.82, wordBreak: "break-all" }, children: diagnosticsExportMessage }) })) : null] })] })),
+                                        return (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%" }, children: [_local_SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px" }, children: [_local_SP_JSX.jsx("span", { style: { fontWeight: 600 }, children: check.label || check.id || "-" }), _local_SP_JSX.jsx("span", { style: { color, fontSize: "12px" }, children: status.toUpperCase() })] }), _local_SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.86, wordBreak: "break-word" }, children: check.detail }), check.fix && status !== "ok" ? (_local_SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.7 }, children: `建议：${check.fix}` })) : null] }) }, check.id || `diagnostic-${checkIndex}`));
+                                    })] })) : null] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u8BCA\u65AD\u5305", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u5BFC\u51FA diagnostics.json\u3001self-check.json\u3001\u6700\u65B0 300 \u884C\u65E5\u5FD7\uFF1Bcookie/token \u5DF2\u8131\u654F\uFF0C\u5199\u5230\u4E0B\u8F7D\u76EE\u5F55\u3002" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onExportDiagnostics(), disabled: diagnosticsExportBusy, children: diagnosticsExportBusy ? "打包中..." : "导出诊断包" }) }), diagnosticsExportMessage ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.82, wordBreak: "break-all" }, children: diagnosticsExportMessage }) })) : null] })] })),
         },
     ], [
         clearingLogin,
@@ -2179,6 +2254,7 @@ function SettingsPage() {
         settings.install_dir,
         settings.cloud_save_auto_upload,
         settings.cloud_save_include_emulators,
+        settings.catalog_url,
         splitDraft,
         refreshRestoreOptions,
         restoreBusy,
@@ -2280,15 +2356,15 @@ function SettingsPage() {
         window.requestAnimationFrame(() => focusSettingsTabRow(tabId));
     }, [focusSettingsTabRow]);
     if (loading) {
-        return (SP_JSX.jsx(DFL.PanelSection, { title: "freedeckCY \u8BBE\u7F6E", children: SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
+        return (_local_SP_JSX.jsx(DFL.PanelSection, { title: "freedeckCY \u8BBE\u7F6E", children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
     }
-    return (SP_JSX.jsxs("div", { ref: settingsContainerRef, className: "freedeckcy-settings-root", style: {
+    return (_local_SP_JSX.jsxs("div", { ref: settingsContainerRef, className: "freedeckcy-settings-root", style: {
             paddingTop: 48,
             paddingBottom: 24,
             minHeight: "100%",
             boxSizing: "border-box",
             overflowX: "hidden",
-        }, children: [SP_JSX.jsx("style", { children: tabStabilityCss }), SP_JSX.jsx(DFL.Tabs, { tabs: tabs, activeTab: activeTab, onShowTab: onShowSettingsTab, autoFocusContents: false })] }));
+        }, children: [_local_SP_JSX.jsx("style", { children: tabStabilityCss }), _local_SP_JSX.jsx(DFL.Tabs, { tabs: tabs, activeTab: activeTab, onShowTab: onShowSettingsTab, autoFocusContents: false })] }));
 }
 function tryRestartSteamViaClient() {
     try {
@@ -2463,7 +2539,7 @@ function Content() {
         // 优先用 QAM 原生 Modal，避免路由未注册时被 Steam 当成网页路径。
         try {
             let modal = null;
-            modal = DFL.showModal(SP_JSX.jsx(LibraryPage, { onClose: () => {
+            modal = DFL.showModal(_local_SP_JSX.jsx(LibraryPage, { onClose: () => {
                     try {
                         modal?.Close();
                     }
@@ -2607,7 +2683,7 @@ function Content() {
         if (compatBytes > 0) {
             lines.push("", `Proton 前缀（compatdata）另占 ${formatBytesText(compatBytes)}，可选择一并删除。`);
         }
-        DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u786E\u8BA4\u5378\u8F7D", strDescription: lines.join("\n"), strOKButtonText: compatBytes > 0 ? "仅删游戏文件" : "确认卸载", strMiddleButtonText: compatBytes > 0 ? `连 Proton 前缀一起删（${formatBytesText(compatBytes)}）` : undefined, onMiddleButton: compatBytes > 0
+        DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u786E\u8BA4\u5378\u8F7D", strDescription: lines.join("\n"), strOKButtonText: compatBytes > 0 ? "仅删游戏文件" : "确认卸载", strMiddleButtonText: compatBytes > 0 ? `连 Proton 前缀一起删（${formatBytesText(compatBytes)}）` : undefined, onMiddleButton: compatBytes > 0
                 ? () => {
                     void performUninstallInstalledGame(item, true);
                 }
@@ -2666,7 +2742,7 @@ function Content() {
         if (!taskId || taskActionKey)
             return;
         const title = task.game_title || task.file_name || "该任务";
-        DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u786E\u8BA4\u79FB\u9664\u4EFB\u52A1", strDescription: `确定移除「${title}」吗？\n\n只移除任务记录，不删除已下载文件。`, strOKButtonText: "\u786E\u8BA4\u79FB\u9664", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
+        DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "\u786E\u8BA4\u79FB\u9664\u4EFB\u52A1", strDescription: `确定移除「${title}」吗？\n\n只移除任务记录，不删除已下载文件。`, strOKButtonText: "\u786E\u8BA4\u79FB\u9664", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
                 void performTaskAction("remove", task);
             }, onCancel: () => { } }));
     }, [performTaskAction, taskActionKey]);
@@ -2721,14 +2797,14 @@ function Content() {
         }
     }, [restartingSteam, state.steam_restart]);
     if (loading) {
-        return (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
+        return (_local_SP_JSX.jsx(DFL.PanelSection, { children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
     }
-    return (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
+    return (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: {
                                 width: "100%",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
-                            }, title: loginStatusText, children: loginStatusText }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.55 }, children: `QAM 原生 UI v${PLUGIN_UI_BUILD}` }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [!state.login.logged_in && (SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLogin, disabled: openingLogin, children: openingLogin ? "登录入口准备中..." : "登录" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenLibrary, disabled: openingLogin, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenSettings, children: "\u8BBE\u7F6E" })] })] }), state.steam_restart?.pending && (SP_JSX.jsxs(DFL.PanelSection, { title: "Steam \u5FEB\u6377\u65B9\u5F0F\u5DF2\u5199\u5165", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.45 }, children: `「${state.steam_restart.title || "游戏"}」已安装并写入 Steam 快捷方式。重启 Steam 后才会显示在库中。` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void restartSteamNow(), disabled: restartingSteam, style: { flex: 1 }, children: restartingSteam ? "正在重启..." : "现在重启" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void dismissSteamRestart(), disabled: restartingSteam, style: { flex: 1 }, children: "\u7A0D\u540E" })] }) })] })), visibleTasks.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `下载列表（${visibleTasks.length}）`, children: visibleTasks.slice(0, 20).map((task) => {
+                            }, title: loginStatusText, children: loginStatusText }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.55 }, children: `QAM 原生 UI v${PLUGIN_UI_BUILD}` }) }), _local_SP_JSX.jsxs(DFL.PanelSectionRow, { children: [!state.login.logged_in && (_local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLogin, disabled: openingLogin, children: openingLogin ? "登录入口准备中..." : "登录" })), _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenLibrary, disabled: openingLogin, children: "\u6E38\u620F\u5E93" }), _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenSettings, children: "\u8BBE\u7F6E" })] })] }), state.steam_restart?.pending && (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "Steam \u5FEB\u6377\u65B9\u5F0F\u5DF2\u5199\u5165", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.45 }, children: `「${state.steam_restart.title || "游戏"}」已安装并写入 Steam 快捷方式。重启 Steam 后才会显示在库中。` }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void restartSteamNow(), disabled: restartingSteam, style: { flex: 1 }, children: restartingSteam ? "正在重启..." : "现在重启" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void dismissSteamRestart(), disabled: restartingSteam, style: { flex: 1 }, children: "\u7A0D\u540E" })] }) })] })), visibleTasks.length > 0 && (_local_SP_JSX.jsx(DFL.PanelSection, { title: `下载列表（${visibleTasks.length}）`, children: visibleTasks.slice(0, 20).map((task) => {
                     const taskId = String(task.task_id || "");
                     const status = String(task.status || "");
                     const canPause = status === "active" || status === "waiting";
@@ -2744,32 +2820,32 @@ function Content() {
                         background: "rgba(255, 255, 255, 0.12)",
                         color: "#f2f2f2",
                     };
-                    return (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [TaskProgressRow(task), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%", marginTop: "4px" }, children: [canPause && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("pause", task), onOKButton: () => void performTaskAction("pause", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "暂停" }) })), canResume && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("resume", task), onOKButton: () => void performTaskAction("resume", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "继续" }) })), canRetry && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("retry", task), onOKButton: () => void performTaskAction("retry", task), disabled: Boolean(taskActionKey), style: {
+                    return (_local_SP_JSX.jsxs(DFL.PanelSectionRow, { children: [TaskProgressRow(task), _local_SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%", marginTop: "4px" }, children: [canPause && (_local_SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("pause", task), onOKButton: () => void performTaskAction("pause", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "暂停" }) })), canResume && (_local_SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("resume", task), onOKButton: () => void performTaskAction("resume", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "继续" }) })), canRetry && (_local_SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("retry", task), onOKButton: () => void performTaskAction("retry", task), disabled: Boolean(taskActionKey), style: {
                                                 minWidth: "76px",
                                                 borderRadius: "10px",
                                                 border: "1px solid rgba(120, 200, 255, 0.45)",
                                                 background: "rgba(120, 200, 255, 0.16)",
                                                 color: "#dff4ff",
-                                            }, children: busy ? "重试中..." : "重试" }) })), SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => onRemoveTask(task), onOKButton: () => onRemoveTask(task), disabled: Boolean(taskActionKey), style: {
+                                            }, children: busy ? "重试中..." : "重试" }) })), _local_SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => onRemoveTask(task), onOKButton: () => onRemoveTask(task), disabled: Boolean(taskActionKey), style: {
                                                 minWidth: "76px",
                                                 borderRadius: "10px",
                                                 border: "1px solid rgba(255, 106, 106, 0.4)",
                                                 background: "rgba(255, 106, 106, 0.16)",
                                                 color: "#ffe8e8",
                                             }, children: "\u79FB\u9664" }) })] })] }, task.task_id));
-                }) })), sortedInstalledGames.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `游戏预览（已安装 ${state.installed.total || sortedInstalledGames.length}）`, children: sortedInstalledGames.map((item, index) => {
+                }) })), sortedInstalledGames.length > 0 && (_local_SP_JSX.jsx(DFL.PanelSection, { title: `游戏预览（已安装 ${state.installed.total || sortedInstalledGames.length}）`, children: sortedInstalledGames.map((item, index) => {
                     const uninstallKey = `${item.game_id || ""}::${item.install_path || ""}`;
                     const uninstalling = uninstallingKey === uninstallKey;
-                    return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0, flex: 1 }, children: [SP_JSX.jsx("div", { style: {
+                    return (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%" }, children: [_local_SP_JSX.jsxs("div", { style: { minWidth: 0, flex: 1 }, children: [_local_SP_JSX.jsx("div", { style: {
                                                 overflow: "hidden",
                                                 textOverflow: "ellipsis",
                                                 whiteSpace: "nowrap",
-                                            }, title: item.title || "未命名游戏", children: item.title || "未命名游戏" }), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: `${item.size_text || "-"}${item.status ? ` | ${item.status}` : ""}` }), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: `游玩时长：${formatPlaytimeText(item.playtime_seconds || 0, item.playtime_text)}${item.playtime_active ? "（进行中）" : ""}` }), SP_JSX.jsx("div", { style: {
+                                            }, title: item.title || "未命名游戏", children: item.title || "未命名游戏" }), _local_SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: `${item.size_text || "-"}${item.status ? ` | ${item.status}` : ""}` }), _local_SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: `游玩时长：${formatPlaytimeText(item.playtime_seconds || 0, item.playtime_text)}${item.playtime_active ? "（进行中）" : ""}` }), _local_SP_JSX.jsx("div", { style: {
                                                 fontSize: "12px",
                                                 overflow: "hidden",
                                                 textOverflow: "ellipsis",
                                                 whiteSpace: "nowrap",
-                                            }, title: item.install_path || "-", children: item.install_path || "-" })] }), SP_JSX.jsx(DFL.Focusable, { style: { flex: "0 0 auto" }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstallInstalledGame(item), onOKButton: () => onUninstallInstalledGame(item), disabled: Boolean(uninstallingKey) || uninstalling, style: {
+                                            }, title: item.install_path || "-", children: item.install_path || "-" })] }), _local_SP_JSX.jsx(DFL.Focusable, { style: { flex: "0 0 auto" }, children: _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstallInstalledGame(item), onOKButton: () => onUninstallInstalledGame(item), disabled: Boolean(uninstallingKey) || uninstalling, style: {
                                             minWidth: "88px",
                                             borderRadius: "10px",
                                             border: "1px solid rgba(255, 255, 255, 0.26)",
@@ -2777,6 +2853,28 @@ function Content() {
                                             color: "#ffe8e8",
                                         }, children: uninstalling ? "卸载中..." : "卸载" }) })] }) }, `${item.game_id || item.title || "game"}_${index}`));
                 }) }))] }));
+}
+function GameDetailModal(props) {
+    const [imageFailed, setImageFailed] = SP_REACT.useState(false);
+    const coverUrl = imageFailed ? "" : String(props.item.cover_portrait_url || props.item.cover_url || "").trim();
+    const title = props.item.title || "未命名游戏";
+    const parts = title.split("/");
+    const primaryTitle = (parts[0] || title).trim();
+    const secondaryTitle = parts.slice(1).join(" / ").trim();
+    const categoryTags = String(props.item.categories || "")
+        .split(/[,，、|/]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 6);
+    return (_local_SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "14px", width: "min(560px, 90vw)", maxHeight: "78vh", overflowY: "auto" }, children: [_local_SP_JSX.jsxs("div", { style: { display: "grid", gridTemplateColumns: "156px minmax(0, 1fr)", gap: "16px", alignItems: "start" }, children: [_local_SP_JSX.jsxs("div", { style: {
+                            position: "relative",
+                            width: "156px",
+                            height: "234px",
+                            overflow: "hidden",
+                            background: libraryCoverGradient(props.item.platform),
+                            border: "1px solid rgba(255,255,255,0.10)",
+                            boxShadow: "0 14px 34px rgba(0,0,0,0.34)",
+                        }, children: [coverUrl ? (_local_SP_JSX.jsx("img", { src: String(coverUrl).replace(/_2x(\.(?:jpg|jpeg|png|webp))/i, "$1"), alt: title, referrerPolicy: "no-referrer", decoding: "async", loading: "lazy", onError: () => setImageFailed(true), style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } })) : (_local_SP_JSX.jsx("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100%", padding: "16px", textAlign: "center", fontSize: "15px", fontWeight: 700, color: "#eef5fb" }, children: primaryTitle })), props.installed ? (_local_SP_JSX.jsx("div", { style: { position: "absolute", top: "8px", right: "8px", padding: "2px 7px", fontSize: "10px", fontWeight: 700, color: "#dff7e4", background: "rgba(20,105,56,0.92)", border: "1px solid rgba(160,255,190,0.45)" }, children: "\u5DF2\u5B89\u88C5" })) : null] }), _local_SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }, children: [_local_SP_JSX.jsx("div", { style: { fontSize: "24px", lineHeight: 1.2, fontWeight: 800, color: "#f2f6fb", wordBreak: "break-word" }, children: primaryTitle }), secondaryTitle ? (_local_SP_JSX.jsx("div", { style: { fontSize: "13px", lineHeight: 1.4, color: "rgba(236,241,246,0.68)", wordBreak: "break-word" }, children: secondaryTitle })) : null, _local_SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: [_local_SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#eaf2fa", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }, children: String(props.item.platform || "pc").toUpperCase() }), _local_SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#eaf2fa", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }, children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (_local_SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#dcefff", background: "rgba(83,181,255,0.12)", border: "1px solid rgba(83,181,255,0.22)" }, children: tag }, tag)))] }), _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.55, color: "rgba(220,230,240,0.72)" }, children: "\u4E0B\u8F7D\u5B8C\u6210\u540E\u4F1A\u81EA\u52A8\u89E3\u538B\u5E76\u5199\u5165 Steam \u5FEB\u6377\u65B9\u5F0F\uFF1B\u9996\u6B21\u5B89\u88C5\u540E\u6309\u63D0\u793A\u91CD\u542F Steam \u5373\u53EF\u5728\u5E93\u4E2D\u770B\u5230\u3002" })] })] }), _local_SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "10px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: props.onInstall, disabled: props.busy || props.installed, style: { flex: 1, minHeight: "42px", background: "rgba(67,181,129,0.24)", border: "1px solid rgba(120,255,180,0.42)", color: "#eafff3" }, children: props.installed ? "已安装" : props.busy ? "处理中..." : "安装" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: props.onClose, style: { flex: 1, minHeight: "42px" }, children: "\u9000\u51FA" })] })] }));
 }
 const LIBRARY_CARD_WIDTH = 133;
 const LIBRARY_CARD_HEIGHT = 200;
@@ -2802,7 +2900,59 @@ function LibraryCoverCard(props) {
     const [imageFailed, setImageFailed] = SP_REACT.useState(false);
     const coverUrl = imageFailed ? "" : String(props.coverUrl || "").trim();
     const title = props.title || "未命名游戏";
-    return (SP_JSX.jsxs("div", { style: { width: `${LIBRARY_CARD_WIDTH}px`, display: "flex", flexDirection: "column", gap: "6px" }, children: [SP_JSX.jsxs(DFL.DialogButton, { onClick: props.onPress, disabled: Boolean(props.disabled), style: {
+    const cardRef = SP_REACT.useRef(null);
+    SP_REACT.useEffect(() => {
+        const node = cardRef.current;
+        if (!node)
+            return;
+        if (!document.getElementById("freedeckcy-cover-focus-style")) {
+            const style = document.createElement("style");
+            style.id = "freedeckcy-cover-focus-style";
+            style.textContent = ".freedeckcy-cover-card:focus,.freedeckcy-cover-card:focus-within{outline:3px solid #65b8ff!important;outline-offset:3px;filter:brightness(1.08)}";
+            document.head.appendChild(style);
+        }
+        const showHint = () => {
+            let hint = document.getElementById("freedeckcy-focus-hint");
+            if (!hint) {
+                hint = document.createElement("div");
+                hint.id = "freedeckcy-focus-hint";
+                hint.style.cssText = "position:fixed;left:12px;right:12px;bottom:80px;z-index:9999;display:none;align-items:center;gap:12px;padding:9px 12px;background:rgba(18,24,32,.96);border:1px solid rgba(101,184,255,.35);box-shadow:0 6px 20px rgba(0,0,0,.4);pointer-events:none;font-family:inherit";
+                document.body.appendChild(hint);
+            }
+            hint.replaceChildren();
+            const left = document.createElement("div");
+            left.style.cssText = "min-width:0;flex:1";
+            const name = document.createElement("div");
+            name.textContent = title;
+            name.style.cssText = "font-size:13px;font-weight:700;color:#f2f6fb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+            const meta = document.createElement("div");
+            meta.textContent = `${String(props.platform || "pc").toUpperCase()} · ${props.meta || "大小未知"}`;
+            meta.style.cssText = "font-size:11px;color:#9eacbb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+            left.append(name, meta);
+            const hintText = document.createElement("div");
+            hintText.textContent = "A 选择 / B 返回";
+            hintText.style.cssText = "flex:0 0 auto;font-size:11px;color:#b9c9d8";
+            hint.append(left, hintText);
+            hint.style.display = "flex";
+        };
+        const hideHint = () => {
+            const hint = document.getElementById("freedeckcy-focus-hint");
+            if (hint)
+                hint.style.display = "none";
+        };
+        node.addEventListener("focus", showHint, true);
+        node.addEventListener("mouseenter", showHint);
+        node.addEventListener("blur", hideHint, true);
+        node.addEventListener("mouseleave", hideHint);
+        return () => {
+            node.removeEventListener("focus", showHint, true);
+            node.removeEventListener("mouseenter", showHint);
+            node.removeEventListener("blur", hideHint, true);
+            node.removeEventListener("mouseleave", hideHint);
+            hideHint();
+        };
+    }, [title, props.platform, props.meta]);
+    return (_local_SP_JSX.jsxs("div", { style: { width: `${LIBRARY_CARD_WIDTH}px`, display: "flex", flexDirection: "column", gap: "6px" }, children: [_local_SP_JSX.jsxs(DFL.DialogButton, { ref: cardRef, className: "freedeckcy-cover-card", onClick: props.onPress, disabled: Boolean(props.disabled), style: {
                     position: "relative",
                     width: `${LIBRARY_CARD_WIDTH}px`,
                     height: `${LIBRARY_CARD_HEIGHT}px`,
@@ -2813,7 +2963,7 @@ function LibraryCoverCard(props) {
                     display: "block",
                     background: libraryCoverGradient(props.platform),
                     boxShadow: "0 12px 28px rgba(0,0,0,0.36)",
-                }, children: [coverUrl ? (SP_JSX.jsx("img", { src: coverUrl, alt: title, referrerPolicy: "no-referrer", decoding: "async", onError: () => setImageFailed(true), style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" } })) : (SP_JSX.jsx("div", { style: {
+                }, children: [coverUrl ? (_local_SP_JSX.jsx("img", { src: String(coverUrl).replace(/_2x(\.(?:jpg|jpeg|png|webp))/i, "$1"), alt: title, referrerPolicy: "no-referrer", decoding: "async", loading: "lazy", onError: () => setImageFailed(true), style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" } })) : (_local_SP_JSX.jsx("div", { style: {
                             position: "absolute",
                             inset: 0,
                             display: "flex",
@@ -2826,7 +2976,7 @@ function LibraryCoverCard(props) {
                             fontWeight: 700,
                             color: "rgba(242,246,251,0.88)",
                             textShadow: "0 2px 10px rgba(0,0,0,0.45)",
-                        }, children: title })), props.installed ? (SP_JSX.jsx("div", { style: {
+                        }, children: title })), props.installed ? (_local_SP_JSX.jsx("div", { style: {
                             position: "absolute",
                             top: "7px",
                             right: "7px",
@@ -2838,7 +2988,7 @@ function LibraryCoverCard(props) {
                             color: "#dff7e4",
                             background: "rgba(20,105,56,0.92)",
                             border: "1px solid rgba(160,255,190,0.45)",
-                        }, children: "\u5DF2\u5B89\u88C5" })) : null, SP_JSX.jsxs("div", { style: {
+                        }, children: "\u5DF2\u5B89\u88C5" })) : null, _local_SP_JSX.jsxs("div", { style: {
                             position: "absolute",
                             left: 0,
                             right: 0,
@@ -2846,7 +2996,7 @@ function LibraryCoverCard(props) {
                             zIndex: 2,
                             padding: "28px 9px 9px",
                             background: "linear-gradient(to top, rgba(8,10,14,0.96), rgba(8,10,14,0.72) 55%, rgba(8,10,14,0))",
-                        }, children: [SP_JSX.jsx("div", { style: {
+                        }, children: [_local_SP_JSX.jsx("div", { style: {
                                     fontSize: "12px",
                                     lineHeight: 1.3,
                                     fontWeight: 700,
@@ -2856,7 +3006,7 @@ function LibraryCoverCard(props) {
                                     WebkitBoxOrient: "vertical",
                                     overflow: "hidden",
                                     wordBreak: "break-word",
-                                }, children: title }), SP_JSX.jsxs("div", { style: { marginTop: "3px", fontSize: "10px", lineHeight: 1.25, color: "rgba(220,230,240,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: [String(props.platform || "pc").toUpperCase(), props.meta ? ` · ${props.meta}` : ""] })] }), props.busyLabel ? (SP_JSX.jsx("div", { style: {
+                                }, children: title }), _local_SP_JSX.jsxs("div", { style: { marginTop: "3px", fontSize: "10px", lineHeight: 1.25, color: "rgba(220,230,240,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: [String(props.platform || "pc").toUpperCase(), props.meta ? ` · ${props.meta}` : ""] })] }), props.busyLabel ? (_local_SP_JSX.jsx("div", { style: {
                             position: "absolute",
                             inset: 0,
                             zIndex: 4,
@@ -2867,7 +3017,7 @@ function LibraryCoverCard(props) {
                             fontSize: "12px",
                             fontWeight: 700,
                             color: "#fff",
-                        }, children: props.busyLabel })) : null] }), props.actions ? (SP_JSX.jsx(DFL.Focusable, { style: { display: "flex", gap: "4px", width: `${LIBRARY_CARD_WIDTH}px` }, children: props.actions })) : null] }));
+                        }, children: props.busyLabel })) : null] }), props.actions ? (_local_SP_JSX.jsx(DFL.Focusable, { style: { display: "flex", gap: "4px", width: `${LIBRARY_CARD_WIDTH}px` }, children: props.actions })) : null] }));
 }
 function LibraryPage({ onClose }) {
     const [tab, setTab] = SP_REACT.useState("catalog");
@@ -2879,6 +3029,15 @@ function LibraryPage({ onClose }) {
     const [page, setPage] = SP_REACT.useState(1);
     const [catalog, setCatalog] = SP_REACT.useState({ total: 0, page: 1, page_size: 20, items: [] });
     const [installed, setInstalled] = SP_REACT.useState({ total: 0, items: [] });
+    const installedGameIds = SP_REACT.useMemo(() => {
+        const ids = new Set();
+        for (const item of installed.items || []) {
+            const gameId = String(item.game_id || "").trim();
+            if (gameId)
+                ids.add(gameId);
+        }
+        return ids;
+    }, [installed.items]);
     const [loadingCatalog, setLoadingCatalog] = SP_REACT.useState(true);
     const [reloadNonce, setReloadNonce] = SP_REACT.useState(0);
     const [loadingInstalled, setLoadingInstalled] = SP_REACT.useState(false);
@@ -2899,7 +3058,7 @@ function LibraryPage({ onClose }) {
         busyRef.current = "";
         setBusyKey("");
     }, []);
-    const loadCatalog = SP_REACT.useCallback(async (targetPage) => {
+    const loadCatalog = SP_REACT.useCallback(async (targetPage, append = false) => {
         const requestSeq = catalogRequestRef.current + 1;
         catalogRequestRef.current = requestSeq;
         setLoadingCatalog(true);
@@ -2919,14 +3078,23 @@ function LibraryPage({ onClose }) {
                 throw new Error(result.message || "读取游戏列表失败");
             }
             const data = result.data;
-            setCatalog({
+            const nextPage = {
                 total: Number(data.total || 0),
                 page: Number(data.page || 1),
                 page_size: Number(data.page_size || pageSize),
                 platforms: Array.isArray(data.platforms) ? data.platforms : [],
                 categories: Array.isArray(data.categories) ? data.categories : [],
                 items: Array.isArray(data.items) ? data.items : [],
-            });
+            };
+            if (append) {
+                setCatalog((prev) => ({
+                    ...nextPage,
+                    items: [...prev.items, ...nextPage.items],
+                }));
+            }
+            else {
+                setCatalog(nextPage);
+            }
             setPage(Number(data.page || 1));
         }
         catch (error) {
@@ -2979,6 +3147,43 @@ function LibraryPage({ onClose }) {
         setPage(1);
         setReloadNonce((value) => value + 1);
     }, []);
+    const loadMore = SP_REACT.useCallback(() => {
+        if (loadingCatalog)
+            return;
+        if (catalog.items.length >= catalog.total)
+            return;
+        void loadCatalog(page + 1, true);
+    }, [catalog.items.length, catalog.total, loadCatalog, loadingCatalog, page]);
+    const refreshCatalog = SP_REACT.useCallback(async () => {
+        if (tab === "installed") {
+            await loadInstalled();
+            return;
+        }
+        if (loadingCatalog)
+            return;
+        setLoadingCatalog(true);
+        try {
+            const result = await withTimeout(refreshTianyiCatalog(), 45000, "刷新远程目录超时");
+            if (result.status !== "success") {
+                throw new Error(result.message || "刷新远程目录失败");
+            }
+            setPage(1);
+            await loadCatalog(1);
+            toaster.toast({
+                title: "freedeckCY",
+                body: `目录已刷新：${result.data?.total ?? 0} 条（${result.data?.source || "unknown"}）`,
+            });
+        }
+        catch (error) {
+            toastError(error);
+        }
+        finally {
+            setLoadingCatalog(false);
+        }
+    }, [loadCatalog, loadInstalled, loadingCatalog, tab]);
+    SP_REACT.useEffect(() => {
+        void loadCatalog(1);
+    }, [loadCatalog]);
     SP_REACT.useEffect(() => {
         void loadCatalog(1);
     }, [loadCatalog]);
@@ -2986,20 +3191,53 @@ function LibraryPage({ onClose }) {
         if (tab === "installed")
             void loadInstalled();
     }, [tab, loadInstalled]);
-    const platformOptions = SP_REACT.useMemo(() => [{ data: "", label: "全部平台" }, ...(catalog.platforms || []).map((item) => ({
-            data: String(item.value || ""),
-            label: `${item.label || item.value}（${item.count || 0}）`,
-        }))], [catalog.platforms]);
-    const categoryOptions = SP_REACT.useMemo(() => [{ data: "", label: "全部分类" }, ...(catalog.categories || []).slice(0, 30).map((item) => ({
-            data: String(item.value || ""),
-            label: String(item.label || item.value || ""),
-        }))], [catalog.categories]);
     const sortOptions = SP_REACT.useMemo(() => [
         { data: "", label: "默认排序" },
         { data: "title", label: "名称" },
         { data: "size_desc", label: "大小从大到小" },
         { data: "size_asc", label: "大小从小到大" },
     ], []);
+    const platformChips = SP_REACT.useMemo(() => [
+        { value: "", label: "全部" },
+        ...(catalog.platforms || []).map((item) => ({
+            value: String(item.value || ""),
+            label: String(item.label || item.value || "").toUpperCase(),
+        })),
+    ], [catalog.platforms]);
+    const categoryChips = SP_REACT.useMemo(() => {
+        const items = (catalog.categories || []).slice(0, 14).map((item) => ({
+            value: String(item.value || ""),
+            label: String(item.label || item.value || ""),
+        }));
+        if (category && !items.some((item) => item.value === category)) {
+            items.unshift({ value: category, label: category });
+        }
+        return items;
+    }, [catalog.categories, category]);
+    const hasActiveFilters = Boolean(activeQuery || platform || category || sort);
+    const categorySections = SP_REACT.useMemo(() => {
+        const buckets = new Map();
+        for (const item of catalog.items) {
+            const firstTag = String(item.categories || "")
+                .split(/[,，、|/]+/)
+                .map((tag) => tag.trim())
+                .find(Boolean);
+            const title = firstTag || "其他";
+            const bucket = buckets.get(title) || [];
+            bucket.push(item);
+            buckets.set(title, bucket);
+        }
+        const sections = Array.from(buckets.entries())
+            .filter(([, items]) => items.length >= 2)
+            .sort((a, b) => b[1].length - a[1].length)
+            .slice(0, 8);
+        const sectionIds = new Set(sections.flatMap(([, items]) => items.map((item) => item.game_id)));
+        const rest = catalog.items.filter((item) => !sectionIds.has(item.game_id));
+        if (rest.length > 0)
+            sections.push(["其他", rest]);
+        return sections;
+    }, [catalog.items]);
+    const showShelves = !hasActiveFilters && !activeQuery;
     const onPrepareInstall = SP_REACT.useCallback(async (item) => {
         if (!beginBusy(item.game_id))
             return;
@@ -3014,7 +3252,7 @@ function LibraryPage({ onClose }) {
             }
             const emulatorText = plan.emulator_info?.name ? `模拟器：${plan.emulator_info.name}` : "PC / Proton";
             const setupText = plan.emulator_info?.setup_hint ? `\n提示：${plan.emulator_info.setup_hint}` : "";
-            DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `安装 ${plan.game_title || item.title}`, strDescription: `下载：${plan.required_download_human || "未知"} → ${plan.download_dir || "-"}\n` +
+            DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `安装 ${plan.game_title || item.title}`, strDescription: `下载：${plan.required_download_human || "未知"} → ${plan.download_dir || "-"}\n` +
                     `安装：${plan.required_install_human || "未知"} → ${plan.install_dir || "-"}\n` +
                     `${emulatorText}${setupText}`, strOKButtonText: "\u5F00\u59CB\u4E0B\u8F7D", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
                     void (async () => {
@@ -3072,7 +3310,7 @@ function LibraryPage({ onClose }) {
     const onUninstall = SP_REACT.useCallback((item) => {
         if (busyRef.current)
             return;
-        DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `卸载 ${item.title}`, strDescription: "\u5C06\u5220\u9664\u5B89\u88C5\u76EE\u5F55\u5E76\u79FB\u9664\u8BB0\u5F55\uFF0C\u662F\u5426\u7EE7\u7EED\uFF1F", strOKButtonText: "\u5378\u8F7D", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
+        DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `卸载 ${item.title}`, strDescription: "\u5C06\u5220\u9664\u5B89\u88C5\u76EE\u5F55\u5E76\u79FB\u9664\u8BB0\u5F55\uFF0C\u662F\u5426\u7EE7\u7EED\uFF1F", strOKButtonText: "\u5378\u8F7D", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
                 void (async () => {
                     if (!beginBusy(item.game_id))
                         return;
@@ -3149,8 +3387,37 @@ function LibraryPage({ onClose }) {
             }
         }
     }, [onClose]);
-    const totalPages = Math.max(1, Math.ceil(catalog.total / Math.max(1, catalog.page_size || pageSize)));
-    return (SP_JSX.jsxs(DFL.Focusable, { noFocusRing: true, onCancel: handleClose, style: {
+    const onOpenDetail = SP_REACT.useCallback((item) => {
+        let modal = null;
+        try {
+            modal = DFL.showModal(_local_SP_JSX.jsx(GameDetailModal, { item: item, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busy: Boolean(busyKey), onInstall: () => {
+                    try {
+                        modal?.Close();
+                    }
+                    catch {
+                        // 忽略关闭失败。
+                    }
+                    void onPrepareInstall(item);
+                }, onClose: () => {
+                    try {
+                        modal?.Close();
+                    }
+                    catch {
+                        // 忽略关闭失败。
+                    }
+                } }), undefined, {
+                strTitle: "游戏详情",
+                bNeverPopOut: true,
+                fnOnClose: () => {
+                    modal = null;
+                },
+            });
+        }
+        catch (error) {
+            toastError(error);
+        }
+    }, [busyKey, installedGameIds, onPrepareInstall]);
+    return (_local_SP_JSX.jsxs(DFL.Focusable, { noFocusRing: true, onCancel: handleClose, style: {
             height: "100%",
             overflowY: "auto",
             boxSizing: "border-box",
@@ -3159,7 +3426,7 @@ function LibraryPage({ onClose }) {
             padding: "72px 8px 160px",
             background: "#0e1116",
             color: "#f2f6fb",
-        }, children: [SP_JSX.jsx("div", { "aria-hidden": "true", style: {
+        }, children: [_local_SP_JSX.jsx("div", { "aria-hidden": "true", style: {
                     position: "fixed",
                     top: 0,
                     left: 0,
@@ -3168,7 +3435,7 @@ function LibraryPage({ onClose }) {
                     background: "#0e1116",
                     zIndex: 15,
                     pointerEvents: "none",
-                } }), SP_JSX.jsx("div", { "aria-hidden": "true", style: {
+                } }), _local_SP_JSX.jsx("div", { "aria-hidden": "true", style: {
                     position: "fixed",
                     bottom: 0,
                     left: 0,
@@ -3177,7 +3444,7 @@ function LibraryPage({ onClose }) {
                     background: "#0e1116",
                     zIndex: 15,
                     pointerEvents: "none",
-                } }), SP_JSX.jsxs("div", { style: {
+                } }), _local_SP_JSX.jsxs("div", { style: {
                     position: "relative",
                     zIndex: 20,
                     display: "flex",
@@ -3186,26 +3453,49 @@ function LibraryPage({ onClose }) {
                     padding: "8px 0",
                     boxSizing: "border-box",
                     background: "#0e1116",
-                }, children: [SP_JSX.jsxs(DFL.Focusable, { onCancel: handleClose, style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "78px" }, children: "\u8FD4\u56DE" }), SP_JSX.jsx(DFL.DialogButton, { onClick: handleSteamLibrary, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "92px" }, children: "Steam \u5E93" })] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => { if (tab === "catalog")
-                            void loadCatalog(page);
-                        else
-                            void loadInstalled(); }, disabled: loadingCatalog || loadingInstalled, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "76px" }, children: loadingCatalog || loadingInstalled ? "刷新中..." : "刷新" })] }), SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column" }, children: [SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65 }, children: `原生 UI · v${PLUGIN_UI_BUILD}` })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] })] })] }) }) }), tab === "catalog" ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u641C\u7D22\u4E0E\u7B5B\u9009", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u641C\u7D22\u6E38\u620F", value: query, onChange: (event) => setQuery(getTextFieldValue(event)), onKeyDown: (event) => {
-                                        if (event.key === "Enter") {
-                                            submitSearch();
-                                        }
-                                    } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: submitSearch, style: { padding: "6px 12px" }, children: "\u641C\u7D22" }), SP_JSX.jsx(DFL.DialogButton, { onClick: resetSearch, style: { padding: "6px 12px" }, children: "\u91CD\u7F6E" })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5E73\u53F0", rgOptions: platformOptions, selectedOption: platform, onChange: (option) => { setPlatform(String(option?.data || "")); setPage(1); } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5206\u7C7B", rgOptions: categoryOptions, selectedOption: category, onChange: (option) => { setCategory(String(option?.data || "")); setPage(1); } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u6392\u5E8F", rgOptions: sortOptions, selectedOption: sort, onChange: (option) => { setSort(String(option?.data || "")); setPage(1); } }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: `游戏列表（${catalog.total}）`, children: [loadingCatalog ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) })) : catalog.items.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u6CA1\u6709\u5339\u914D\u6E38\u620F" }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Focusable, { style: {
-                                        display: "grid",
-                                        gridTemplateColumns: `repeat(5, ${LIBRARY_CARD_WIDTH}px)`,
-                                        columnGap: "33px",
-                                        rowGap: "37px",
-                                        justifyContent: "center",
-                                        justifyItems: "center",
+                }, children: [_local_SP_JSX.jsxs(DFL.Focusable, { onCancel: handleClose, style: { display: "flex", gap: "6px" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "78px" }, children: "\u8FD4\u56DE" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: handleSteamLibrary, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "92px" }, children: "Steam \u5E93" })] }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void refreshCatalog(), disabled: loadingCatalog || loadingInstalled, style: { width: "auto", flex: "0 0 auto", padding: "8px 16px", minHeight: "38px", minWidth: "76px" }, children: loadingCatalog || loadingInstalled ? "刷新中..." : "刷新" })] }), _local_SP_JSX.jsx(DFL.PanelSection, { children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column" }, children: [_local_SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700 }, children: "freedeckCY \u6E38\u620F\u5E93" }), _local_SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65 }, children: `原生 UI · v${PLUGIN_UI_BUILD}` })] }), _local_SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "6px" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setTab("catalog"), style: { padding: "6px 12px", background: tab === "catalog" ? "rgba(255,255,255,0.22)" : undefined }, children: "\u6E38\u620F\u5E93" }), _local_SP_JSX.jsxs(DFL.DialogButton, { onClick: () => setTab("installed"), style: { padding: "6px 12px", background: tab === "installed" ? "rgba(255,255,255,0.22)" : undefined }, children: ["\u5DF2\u5B89\u88C5", installed.total ? `(${installed.total})` : ""] })] })] }) }) }), tab === "catalog" ? (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx("div", { style: { flex: 1, minWidth: 0 }, children: _local_SP_JSX.jsx(DFL.TextField, { label: "\u641C\u7D22\u6E38\u620F", value: query, onChange: (event) => setQuery(getTextFieldValue(event)), onKeyDown: (event) => {
+                                                    if (event.key === "Enter")
+                                                        submitSearch();
+                                                } }) }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: submitSearch, style: { width: "auto", flex: "0 0 auto", padding: "7px 14px" }, children: "\u641C\u7D22" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: resetSearch, style: { width: "auto", flex: "0 0 auto", padding: "7px 14px" }, children: "\u91CD\u7F6E" })] }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.Focusable, { style: { display: "flex", gap: "7px", width: "100%", overflowX: "auto", padding: "2px 0 4px" }, children: platformChips.map((item) => (_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => { setPlatform(item.value); setPage(1); }, style: {
+                                            width: "auto",
+                                            flex: "0 0 auto",
+                                            padding: "6px 13px",
+                                            minHeight: "32px",
+                                            background: platform === item.value ? "rgba(106,181,255,0.28)" : undefined,
+                                            border: platform === item.value ? "1px solid rgba(140,210,255,0.55)" : undefined,
+                                        }, children: item.label }, `platform:${item.value || "all"}`))) }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "7px", width: "100%", overflowX: "auto", padding: "2px 0 4px" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => { setCategory(""); setPage(1); }, style: { width: "auto", flex: "0 0 auto", padding: "6px 12px", minHeight: "32px", background: !category ? "rgba(255,255,255,0.18)" : undefined }, children: "\u5168\u90E8\u5206\u7C7B" }), categoryChips.map((item) => (_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => { setCategory(item.value); setPage(1); }, style: {
+                                                width: "auto",
+                                                flex: "0 0 auto",
+                                                padding: "6px 12px",
+                                                minHeight: "32px",
+                                                background: category === item.value ? "rgba(255,255,255,0.18)" : undefined,
+                                            }, children: item.label }, `category:${item.value}`)))] }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.Focusable, { style: { display: "flex", gap: "7px", width: "100%", overflowX: "auto", padding: "2px 0 4px" }, children: sortOptions.map((item) => (_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => { setSort(item.data); setPage(1); }, style: {
+                                            width: "auto",
+                                            flex: "0 0 auto",
+                                            padding: "5px 11px",
+                                            minHeight: "30px",
+                                            fontSize: "11px",
+                                            background: sort === item.data ? "rgba(255,255,255,0.16)" : undefined,
+                                        }, children: item.label }, `sort:${item.data || "default"}`))) }) })] }), loadingCatalog && catalog.items.length === 0 ? (_local_SP_JSX.jsx(DFL.PanelSection, { children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) }) })) : catalog.items.length === 0 ? (_local_SP_JSX.jsx(DFL.PanelSection, { children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u6CA1\u6709\u5339\u914D\u6E38\u620F" }) }) })) : showShelves ? (_local_SP_JSX.jsx(_local_SP_JSX.Fragment, { children: categorySections.map(([sectionTitle, items]) => (_local_SP_JSX.jsx(DFL.PanelSection, { title: `${sectionTitle}（${items.length}）`, children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.Focusable, { style: {
+                                        display: "flex",
+                                        gap: "20px",
                                         width: "100%",
-                                        maxWidth: "806px",
-                                        margin: "0 auto",
-                                        padding: "6px 0 20px",
                                         overflowX: "auto",
-                                    }, children: catalog.items.map((item) => (SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.size_text || "-", coverUrl: item.cover_portrait_url || item.cover_url, busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), onPress: () => void onPrepareInstall(item) }, item.game_id))) }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void loadCatalog(page - 1), disabled: loadingCatalog || page <= 1, style: { padding: "6px 12px" }, children: "\u4E0A\u4E00\u9875" }), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: `${page} / ${totalPages}` }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void loadCatalog(page + 1), disabled: loadingCatalog || page >= totalPages, style: { padding: "6px 12px" }, children: "\u4E0B\u4E00\u9875" })] }) })] })] })) : (SP_JSX.jsxs(DFL.PanelSection, { title: `已安装（${installed.total}）`, children: [loadingInstalled ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) })) : null, installed.items.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u8FD8\u6CA1\u6709\u5DF2\u5B89\u88C5\u6E38\u620F" }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Focusable, { style: {
+                                        padding: "4px 0 12px",
+                                        alignItems: "flex-start",
+                                    }, children: items.map((item) => (_local_SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.size_text || "-", coverUrl: item.cover_portrait_url || item.cover_url, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), onPress: () => onOpenDetail(item) }, item.game_id))) }) }) }, `shelf:${sectionTitle}`))) })) : (_local_SP_JSX.jsx(DFL.PanelSection, { title: `游戏列表（${catalog.total}）`, children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.Focusable, { style: {
+                                    display: "grid",
+                                    gridTemplateColumns: `repeat(5, ${LIBRARY_CARD_WIDTH}px)`,
+                                    columnGap: "33px",
+                                    rowGap: "37px",
+                                    justifyContent: "center",
+                                    justifyItems: "center",
+                                    width: "100%",
+                                    maxWidth: "806px",
+                                    margin: "0 auto",
+                                    padding: "6px 0 20px",
+                                    overflowX: "auto",
+                                }, children: catalog.items.map((item) => (_local_SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.size_text || "-", coverUrl: item.cover_portrait_url || item.cover_url, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), onPress: () => onOpenDetail(item) }, item.game_id))) }) }) })), catalog.items.length < catalog.total ? (_local_SP_JSX.jsx(DFL.PanelSection, { children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: loadMore, disabled: loadingCatalog, style: { width: "auto", padding: "7px 18px" }, children: loadingCatalog ? "加载中..." : "加载更多" }), _local_SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.65 }, children: `已显示 ${catalog.items.length} / ${catalog.total}` })] }) }) })) : null] })) : (_local_SP_JSX.jsxs(DFL.PanelSection, { title: `已安装（${installed.total}）`, children: [loadingInstalled ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u52A0\u8F7D\u4E2D..." }) })) : null, installed.items.length === 0 ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: "\u8FD8\u6CA1\u6709\u5DF2\u5B89\u88C5\u6E38\u620F" }) })) : (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.Focusable, { style: {
                                 display: "grid",
                                 gridTemplateColumns: `repeat(5, ${LIBRARY_CARD_WIDTH}px)`,
                                 columnGap: "33px",
@@ -3217,7 +3507,7 @@ function LibraryPage({ onClose }) {
                                 margin: "0 auto",
                                 padding: "6px 0 20px",
                                 overflowX: "auto",
-                            }, children: installed.items.map((item) => (SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.playtime_text ? `${item.size_text || "-"} · ${item.playtime_text}` : (item.size_text || "-"), coverUrl: item.cover_portrait_url || item.cover_url, installed: true, disabled: Boolean(busyKey), onPress: () => void onLaunchInstalled(item), actions: SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onOpenFolder(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "4px 2px", fontSize: "11px" }, children: "\u76EE\u5F55" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstall(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "4px 2px", fontSize: "11px", background: "rgba(255,106,106,0.22)" }, children: "\u5378\u8F7D" })] }) }, item.game_id))) }) }))] }))] }));
+                            }, children: installed.items.map((item) => (_local_SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.playtime_text ? `${item.size_text || "-"} · ${item.playtime_text}` : (item.size_text || "-"), coverUrl: item.cover_portrait_url || item.cover_url, installed: true, disabled: Boolean(busyKey), onPress: () => void onLaunchInstalled(item), actions: _local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onOpenFolder(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "4px 2px", fontSize: "11px" }, children: "\u76EE\u5F55" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstall(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "4px 2px", fontSize: "11px", background: "rgba(255,106,106,0.22)" }, children: "\u5378\u8F7D" })] }) }, item.game_id))) }) }))] }))] }));
 }
 var index = definePlugin(() => {
     routerHook.addRoute(SETTINGS_ROUTE, SettingsPage);
@@ -3232,9 +3522,9 @@ var index = definePlugin(() => {
     }
     return {
         name: "freedeckCY",
-        titleView: SP_JSX.jsx("div", { className: DFL.staticClasses.Title, children: "freedeckCY" }),
-        content: SP_JSX.jsx(Content, {}),
-        icon: SP_JSX.jsx(FaCloudDownloadAlt, {}),
+        titleView: _local_SP_JSX.jsx("div", { className: DFL.staticClasses.Title, children: "freedeckCY" }),
+        content: _local_SP_JSX.jsx(Content, {}),
+        icon: _local_SP_JSX.jsx(FaCloudDownloadAlt, {}),
         onDismount() {
             uninstallGameActionReporter();
             unpatchLibraryPlaytime();

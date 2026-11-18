@@ -2231,6 +2231,222 @@ class TianyiService:
         """读取当前自动采集状态。"""
         return dict(self._capture_state)
 
+    @staticmethod
+    def _validate_catalog_csv(data: bytes) -> Dict[str, Any]:
+        """校验服务器目录 CSV，返回 (ok, message, row_count)。"""
+        if not data:
+            return {"ok": False, "message": "服务器返回空文件"}
+        if len(data) > 64 * 1024 * 1024:
+            return {"ok": False, "message": "目录 CSV 超过 64MB 限制"}
+        try:
+            text = data.decode("utf-8-sig")
+        except Exception as exc:
+            return {"ok": False, "message": f"目录 CSV 不是 UTF-8: {exc}"}
+        import csv as _csv
+        import io as _io
+
+        reader = _csv.DictReader(_io.StringIO(text))
+        required = {"game_id", "title", "down_url", "openpath"}
+        fields = set(reader.fieldnames or [])
+        missing = required - fields
+        if missing:
+            return {"ok": False, "message": f"目录 CSV 缺少字段: {', '.join(sorted(missing))}"}
+        count = 0
+        for row in reader:
+            if not str(row.get("game_id", "") or "").strip():
+                continue
+            if not str(row.get("title", "") or "").strip():
+                return {"ok": False, "message": f"第 {count + 2} 行标题为空"}
+            if not str(row.get("down_url", "") or "").strip().startswith(("http://", "https://")):
+                return {"ok": False, "message": f"第 {count + 2} 行分享链接非法"}
+            count += 1
+        if count < 10:
+            return {"ok": False, "message": f"目录 CSV 有效条目过少（{count}）"}
+        return {"ok": True, "message": "", "row_count": count}
+
+    async def _fetch_catalog_csv(
+        self, url: str, *, etag: str = "", last_modified: str = ""
+    ) -> tuple[Optional[bytes], Dict[str, str], int]:
+        """条件下载目录 CSV；304 时 data=None。"""
+        headers: Dict[str, str] = {}
+        if etag:
+            headers["If-None-Match"] = etag
+        if last_modified:
+            headers["If-Modified-Since"] = last_modified
+        timeout = aiohttp.ClientTimeout(total=60, connect=15)
+        connector = aiohttp.TCPConnector(ssl=build_tls_context())
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            async with session.get(url, headers=headers) as response:
+                response_headers = {str(k): str(v) for k, v in response.headers.items()}
+                if response.status == 304:
+                    return None, response_headers, 304
+                if response.status >= 400:
+                    raise RuntimeError(f"下载目录失败 HTTP {response.status}")
+                data = await response.read()
+        return data, response_headers, 200
+
+    async def _download_catalog_csv(self, url: str) -> bytes:
+        """兼容旧调用：无条件下载。"""
+        data, _headers, _status = await self._fetch_catalog_csv(url)
+        if data is None:
+            raise RuntimeError("服务器返回 304 但没有本地目录")
+        return data
+
+    async def update_catalog_csv(self, url: str = "") -> Dict[str, Any]:
+        """检查服务器目录是否比本地新，只有变化才下载替换。"""
+        target_url = str(url or "").strip()
+        if not target_url:
+            target_url = str(getattr(self.store.settings, "catalog_url", "") or "").strip()
+        if not target_url:
+            target_url = str(os.environ.get("FREEDECKCY_CATALOG_CSV_URL", "") or "").strip()
+        if not target_url:
+            target_url = str(getattr(config, "DEFAULT_CATALOG_CSV_URL", "") or "").strip()
+        if not target_url.startswith(("http://", "https://")):
+            raise ValueError("目录 CSV 下载地址无效")
+
+        state_dir = os.path.dirname(self.store.state_file)
+        os.makedirs(state_dir, exist_ok=True)
+        target_path = os.path.join(state_dir, "catalog.csv")
+        meta_path = f"{target_path}.meta.json"
+        local_meta: Dict[str, Any] = {}
+        if os.path.isfile(meta_path):
+            try:
+                with open(meta_path, "r", encoding="utf-8") as fh:
+                    loaded = json.load(fh)
+                if isinstance(loaded, dict):
+                    local_meta = loaded
+            except Exception:
+                local_meta = {}
+
+        local_exists = os.path.isfile(target_path)
+        etag = str(local_meta.get("etag", "") or "") if local_exists else ""
+        last_modified = str(local_meta.get("last_modified", "") or "") if local_exists else ""
+        data, headers, status = await self._fetch_catalog_csv(
+            target_url, etag=etag, last_modified=last_modified
+        )
+        local_sha = str(local_meta.get("sha256", "") or "")
+        if not local_sha and local_exists:
+            try:
+                local_sha = hashlib.sha256(Path(target_path).read_bytes()).hexdigest()
+            except Exception:
+                local_sha = ""
+
+        if status == 304 and local_exists:
+            return {
+                "updated": False,
+                "reason": "not_modified",
+                "path": _redact_text(target_path),
+                "total": len(getattr(self.catalog, "entries", []) or []),
+                "source": str(getattr(self.catalog, "source", "") or "csv"),
+                "server_last_modified": headers.get("Last-Modified", last_modified),
+                "local_updated_at": int(os.path.getmtime(target_path)),
+                "message": "服务器目录未变化",
+            }
+
+        if data is None:
+            raise RuntimeError("服务器返回 304 但没有本地目录")
+        validation = self._validate_catalog_csv(data)
+        if not validation.get("ok"):
+            raise ValueError(str(validation.get("message") or "目录 CSV 校验失败"))
+        server_sha = hashlib.sha256(data).hexdigest()
+        if local_exists and local_sha and server_sha == local_sha:
+            new_meta = {
+                "url": target_url,
+                "etag": headers.get("ETag", ""),
+                "last_modified": headers.get("Last-Modified", ""),
+                "sha256": server_sha,
+                "updated_at": int(time.time()),
+                "rows": int(validation.get("row_count", 0) or 0),
+            }
+            self._write_catalog_meta(meta_path, new_meta)
+            return {
+                "updated": False,
+                "reason": "already_latest",
+                "path": _redact_text(target_path),
+                "total": len(getattr(self.catalog, "entries", []) or []),
+                "source": str(getattr(self.catalog, "source", "") or "csv"),
+                "server_last_modified": headers.get("Last-Modified", ""),
+                "local_updated_at": int(os.path.getmtime(target_path)),
+                "message": "本地已是最新目录",
+            }
+
+        fd, temp_path = tempfile.mkstemp(prefix=".catalog_", suffix=".csv", dir=state_dir)
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temp_path, target_path)
+        except Exception:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+            raise
+        try:
+            os.chmod(target_path, 0o644)
+        except Exception:
+            pass
+        new_meta = {
+            "url": target_url,
+            "etag": headers.get("ETag", ""),
+            "last_modified": headers.get("Last-Modified", ""),
+            "sha256": server_sha,
+            "updated_at": int(time.time()),
+            "rows": int(validation.get("row_count", 0) or 0),
+        }
+        self._write_catalog_meta(meta_path, new_meta)
+        # 本地下载的 CSV 优先；清掉内存中的 JSON 覆盖，立即生效。
+        self.catalog.csv_path = target_path
+        self.catalog.json_path = ""
+        await asyncio.to_thread(self.catalog.load)
+        self._invalidate_panel_cache()
+        return {
+            "updated": True,
+            "reason": "updated",
+            "path": _redact_text(target_path),
+            "total": len(getattr(self.catalog, "entries", []) or []),
+            "source": str(getattr(self.catalog, "source", "") or "csv"),
+            "rows": int(validation.get("row_count", 0) or 0),
+            "updated_at": int(time.time()),
+            "server_last_modified": headers.get("Last-Modified", ""),
+            "sha256": server_sha,
+            "url": target_url,
+            "message": "已下载服务器最新目录",
+        }
+
+    @staticmethod
+    def _write_catalog_meta(path: str, payload: Dict[str, Any]) -> None:
+        temp_path = f"{path}.tmp"
+        try:
+            with open(temp_path, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, ensure_ascii=False, indent=2)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temp_path, path)
+        except Exception as exc:
+            config.logger.warning("写入目录元数据失败 %s: %s", path, exc)
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+    async def refresh_catalog(self) -> Dict[str, Any]:
+        """强制刷新游戏目录（删除远程缓存后重新加载）。"""
+        cache_path = str(getattr(self.catalog, "json_cache_path", "") or "").strip()
+        if cache_path and os.path.isfile(cache_path):
+            try:
+                os.remove(cache_path)
+            except Exception as exc:
+                config.logger.warning("删除目录远程缓存失败 %s: %s", cache_path, exc)
+        await asyncio.to_thread(self.catalog.load)
+        self._invalidate_panel_cache()
+        return {
+            "source": str(getattr(self.catalog, "source", "") or ""),
+            "total": len(getattr(self.catalog, "entries", []) or []),
+            "invalid": int(getattr(self.catalog, "invalid_rows", 0) or 0),
+        }
+
     async def list_catalog(
         self,
         query: str,
@@ -2554,7 +2770,7 @@ class TianyiService:
         if _safe_int(app_id, 0) <= 0:
             return ""
         app = _safe_int(app_id, 0)
-        return f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app}/library_600x900_2x.jpg"
+        return f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app}/library_600x900.jpg"
 
     async def _fetch_protondb_summary(self, *, session: aiohttp.ClientSession, app_id: int) -> Dict[str, Any]:
         """读取 ProtonDB 摘要信息。"""
@@ -5882,6 +6098,7 @@ class TianyiService:
         proton_tool: Optional[str] = None,
         cloud_save_auto_upload: Optional[bool] = None,
         cloud_save_include_emulators: Optional[bool] = None,
+        catalog_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """更新下载设置。"""
         if download_dir is not None:
@@ -5916,6 +6133,7 @@ class TianyiService:
             proton_tool=proton_tool,
             cloud_save_auto_upload=cloud_save_auto_upload,
             cloud_save_include_emulators=cloud_save_include_emulators,
+            catalog_url=catalog_url,
         )
         self._invalidate_panel_cache(all_data=True)
         return asdict(self.store.settings)

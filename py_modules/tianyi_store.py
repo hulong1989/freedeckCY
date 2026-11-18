@@ -106,6 +106,8 @@ class TianyiSettings:
     cloud_save_auto_upload: bool = True
     # 云存档上传时是否包含模拟器存档（GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch）
     cloud_save_include_emulators: bool = True
+    # 自定义目录服务器 CSV 地址（留空使用默认 GitHub raw）
+    catalog_url: str = ""
 
 
 @dataclass
@@ -325,6 +327,7 @@ class TianyiStateStore:
                     proton_tool=str(settings_raw.get("proton_tool", "auto") or "auto").strip() or "auto",
                     cloud_save_auto_upload=_to_bool(settings_raw.get("cloud_save_auto_upload", True), True),
                     cloud_save_include_emulators=_to_bool(settings_raw.get("cloud_save_include_emulators", True), True),
+                    catalog_url=str(settings_raw.get("catalog_url", "") or "").strip(),
                 )
 
             next_tasks: List[TianyiTaskRecord] = []
@@ -454,6 +457,7 @@ class TianyiStateStore:
         proton_tool: Optional[str] = None,
         cloud_save_auto_upload: Optional[bool] = None,
         cloud_save_include_emulators: Optional[bool] = None,
+        catalog_url: Optional[str] = None,
     ) -> None:
         """更新设置。"""
         with self._lock:
@@ -475,6 +479,8 @@ class TianyiStateStore:
                 self.settings.cloud_save_auto_upload = bool(cloud_save_auto_upload)
             if cloud_save_include_emulators is not None:
                 self.settings.cloud_save_include_emulators = bool(cloud_save_include_emulators)
+            if catalog_url is not None:
+                self.settings.catalog_url = str(catalog_url).strip()
             self.save()
 
     def upsert_tasks(self, records: List[TianyiTaskRecord]) -> None:

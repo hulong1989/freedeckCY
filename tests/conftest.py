@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import types
 from pathlib import Path
@@ -69,6 +70,9 @@ def _build_fake_decky() -> types.ModuleType:
     fake.emit_error = lambda *args, **kwargs: None
     return fake
 
+
+# 单元测试禁用默认远程目录，避免联网；远程加载测试会显式打桩/设 env。
+os.environ.setdefault("FREEDECKCY_CATALOG_REMOTE", "0")
 
 _ensure_sys_path()
 # setdefault：若真实环境已注入 decky（理论上不会），优先复用。

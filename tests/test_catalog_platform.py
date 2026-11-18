@@ -202,7 +202,7 @@ def test_static_cover_from_catalog_appid(tmp_path):
     assert cover["source"] == "catalog"
     assert cover["app_id"] == 777
     assert cover["cover_url"].endswith("/777/header.jpg")
-    assert cover["square_cover_url"].endswith("/777/library_600x900_2x.jpg")
+    assert cover["square_cover_url"].endswith("/777/library_600x900.jpg")
     assert service._catalog_entry_cover("404") == {}
 
 

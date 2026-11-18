@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.26.11**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.26.14**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,7 +21,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.26.11**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.26.14**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -42,19 +42,20 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **环境诊断**：`make doctor` 一条命令输出运行时/Steam/state/日志/端口/网络（只读）
 - **Decky 原生游戏库**：QAM 内直接浏览/搜索/筛选/安装，已安装页可启动/打开目录/卸载；扫描已移至设置 → 安装（自动补 Steam 快捷方式），不再依赖浏览器网页
 - **平台与分类筛选**：库页可切换平台（PC / FC / NDS / PSP / GBA / 3DS / PS2 / PS1 / PS3 / MD / Switch）与分类，支持手柄导航
-- **浏览 / 分页 / 排序**：打开库页即浏览全部资源，按平台/分类筛选，支持排序与 L1/R1 翻页
+- **浏览 / 分页 / 排序**：封面网格 + 分类 shelf，支持平台/分类/排序 chips、加载更多；封面懒加载 1x，聚焦时底部显示游戏信息条
 - **已安装管理**：已安装页签可启动游戏、打开目录、卸载；「扫描已安装」在**设置 → 安装**里，按目录名匹配标题补回列表，Steam 里没有的会自动创建快捷方式（只扫安装目录一层）
 - **存储位置**：QAM 自动识别 SD 卡/外置挂载，下载目录、安装目录可一键切到 `<SD>/freedeckCY/{downloads,installed}`，并显示剩余空间；只显示已挂载且可写的外置子挂载，不自动挂载/格式化、不检测 Steam 库同盘
 - **模拟器闭环（10 平台）**：GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC/MD（Mesen2）/ 3DS（Azahar，支持 .cia 自动安装）/ PS2（PCSX2）/ PS3（RPCS3）/ Switch（Eden）；全部首次安装在线下载官方包（不集成进插件包），启动脚本走原生 Linux、不写 Proton
 - **自动云存档**：Ludusavi 清单（53k+ 游戏）+ gamewatch 进程检测；游戏退出后只上传该游戏，存档未变化自动跳过；PC + **10 个模拟器平台**的存档都能纳入；支持模拟器存档恢复（自动备份、同机原路径优先）；PSP/PS3/3DS 共享存档会按游戏拆分；QAM 可关闭/关闭模拟器部分
 - **PS1 多碟**：安装目录多张 `.cue`/`.chd` 时自动生成 `freedeckcy-multidisc.m3u`，DuckStation 直接启动；同目录多游戏按标题/目录消歧，仍歧义会明确失败
 - **百度网盘**：QAM **扫码登录**（BDUSS/Cookie，无需 App Key）；百度分享链接可解析、转存、下载并安装；也可选 OpenAPI（需开发者应用）作为回退
-- **游戏提交**：网页库「提交游戏」打开 GitHub Issue 表单；也支持 `submissions/*.json` PR，CI 校验后一键合并进目录
+- **服务器 CSV 目录**：设置页「检查并更新游戏列表」用 ETag/Last-Modified + SHA256 判断服务器是否更新；有变化才下载替换，本地 CSV 优先
+- **游戏提交/自动合并**：网页库「提交游戏」打开 GitHub Issue 表单；维护者加 `auto-merge` 标签后 Action 立即合并，另有每 6 小时定时合并任务；也支持 `submissions/*.json` PR
 - **原生游戏库兜底**：QAM「游戏库」优先打开原生弹层并显示 UI 版本；如仍看到网页，说明前端未重载
 - **诊断与更新**：QAM 设置「诊断」页可运行自检（目录/运行时/Steam/SD/网络/百度扫码/日志）并一键导出脱敏诊断 zip；检查 GitHub 最新 Release
 - **全量资源目录**：内置 7084 条资源（来自 v0.6），合并封面索引后 6823 条有封面（96.3%；原始自带 3473 条，索引命中 3311）；分类已清洗（不含平台名），可用 `scripts/merge_v06_catalog.py` 复现/更新
 - **无作者服务器依赖**：目录/封面/模拟器运行时均为本地或官方源；NewFreedeck 的 `panyiwei.xyz` 硬依赖已逆向并记录替代方案（[docs/UPSTREAM_SERVER.md](docs/UPSTREAM_SERVER.md)），兼容 JSON 快照在 [catalog-json/](catalog-json/)
-- **可选 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 支持本地路径或 `https://` URL（远程缓存 6 小时，失败回退 CSV）
+- **可选 JSON 目录**：`FREEDECKCY_CATALOG_JSON` 支持本地路径或 `https://` URL（默认关闭，失败回退 CSV）
 - **数据体检**：`make validate-catalog` 检查重复 ID / 非法链接 / 空标题 / 分类混平台名，并统计封面覆盖率、平台分布与资源总大小（约 39 TB）；CI 每次都会跑
 - **封面索引与缓存**：内置 `cover_index.csv` 3470 行（可用 `FREEDECKCY_COVER_INDEX_CSV` 覆盖）；解析过的封面落盘缓存（正缓存 7 天 / 负缓存 30 分钟），重启后不再重复请求
 - **DroidDeck（Android/ARM64）适配**：ARM64 运行时、ARM Proton 工具自动解析、双 Steam 根、`make package-droiddeck` 出 arm64 包，详见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
@@ -76,7 +77,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
-make package     # 产出 dist-artifacts/freedeckCY-v0.26.11.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.26.14.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -98,8 +99,8 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.26.11.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.26.11-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.26.14.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.26.14-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
@@ -203,7 +204,7 @@ backend/*.js                Node 辅助脚本（分享解析兜底、云盘上�
 scripts/                    运行时获取（aria2/7zz/node）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗 / 远程目录 / 清单转换
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
 catalog-json/               NewFreedeck 兼容目录 JSON + schema（可直接读/自托管）
-tests/                      pytest 用例（526 个）
+tests/                      pytest 用例（533 个）
 CHANGELOG.md                版本变更记录
 Makefile                    构建入口：runtime / catalog-json / ludusavi-manifest / package / package-droiddeck / test / doctor / validate-catalog / validate-submissions / normalize-catalog / clean
 ```
@@ -224,14 +225,14 @@ Makefile                    构建入口：runtime / catalog-json / ludusavi-man
 
 两种方式，字段与原版资源池投稿一致：
 
-1. **Issue 表单**：网页库右上角「提交游戏」，或直接打开 [Issue 表单](https://github.com/hulong1989/freedeckCY/issues/new?template=submit-game.yml)。
+1. **Issue 表单**：网页库右上角「提交游戏」，或直接打开 [Issue 表单](https://github.com/hulong1989/freedeckCY/issues/new?template=submit-game.yml)。维护者添加 `auto-merge` 标签后立即合并，另有每 6 小时定时合并。
 2. **PR**：复制 `submissions/examples/example-pc.json` 到 `submissions/<平台>-<游戏名>.json`，本地跑 `python scripts/validate_submissions.py`，然后提 PR。CI 通过后维护者执行 `python scripts/merge_submissions.py --apply` 合并。
 
 只提交分享链接，不要上传游戏文件；规则/字段/命令见 [submissions/README.md](https://github.com/hulong1989/freedeckCY/blob/main/submissions/README.md)。
 
 ## 已知问题
 
-- **Decky 更新后仍看到网页游戏库**：v0.23.0 起游戏库优先打开原生 modal，v0.24.0 增加返回/Steam 库按钮；页面顶部显示 `原生 UI · v0.26.11`，QAM 主页显示 `QAM 原生 UI v0.26.11`。如果看不到版本标识或仍打开网页，说明前端 `dist` 未更新，重装/重载插件（必要时重启 Decky Loader）后再试。
+- **Decky 更新后仍看到网页游戏库**：v0.23.0 起游戏库优先打开原生 modal，v0.24.0 增加返回/Steam 库按钮；页面顶部显示 `原生 UI · v0.26.14`，QAM 主页显示 `QAM 原生 UI v0.26.14`。如果看不到版本标识或仍打开网页，说明前端 `dist` 未更新，重装/重载插件（必要时重启 Decky Loader）后再试。
 
 完整清单（含已修复/未修复与 P0/P1/P2 分级）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「问题清单」，后续计划见 [docs/ROADMAP.md](docs/ROADMAP.md)。简要版：
 

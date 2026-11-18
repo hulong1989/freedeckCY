@@ -198,3 +198,33 @@ def test_remote_failure_without_cache_falls_back_to_csv(tmp_path, monkeypatch):
     catalog.load()
     assert catalog.source == "csv"
     assert [entry.game_id for entry in catalog.entries] == ["1"]
+
+
+def test_refresh_catalog_removes_remote_cache(tmp_path):
+    import asyncio
+    from types import SimpleNamespace
+
+    from tianyi_service import TianyiService
+
+    cache = tmp_path / "remote.json"
+    cache.write_text("{}", encoding="utf-8")
+    loaded = []
+
+    class _Catalog:
+        json_cache_path = str(cache)
+        source = "csv"
+        entries = [1, 2]
+        invalid_rows = 0
+
+        def load(self):
+            loaded.append(True)
+            self.source = "json-url"
+
+    service = TianyiService.__new__(TianyiService)
+    service.catalog = _Catalog()
+    service._invalidate_panel_cache = lambda **kwargs: None
+    result = asyncio.run(service.refresh_catalog())
+    assert not cache.exists()
+    assert loaded == [True]
+    assert result["source"] == "json-url"
+    assert result["total"] == 2

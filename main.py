@@ -407,6 +407,7 @@ class Plugin:
         proton_tool: str = "auto",
         cloud_save_auto_upload: bool = True,
         cloud_save_include_emulators: bool = True,
+        catalog_url: str = "",
     ) -> dict:
         """保存天翼下载设置。"""
         try:
@@ -420,6 +421,7 @@ class Plugin:
                 proton_tool = str(payload.get("proton_tool", proton_tool))
                 cloud_save_auto_upload = bool(payload.get("cloud_save_auto_upload", cloud_save_auto_upload))
                 cloud_save_include_emulators = bool(payload.get("cloud_save_include_emulators", cloud_save_include_emulators))
+                catalog_url = str(payload.get("catalog_url", catalog_url) or "")
             elif isinstance(payload, str) and not download_dir:
                 download_dir = payload
 
@@ -433,6 +435,7 @@ class Plugin:
                 proton_tool=proton_tool,
                 cloud_save_auto_upload=cloud_save_auto_upload,
                 cloud_save_include_emulators=cloud_save_include_emulators,
+                catalog_url=catalog_url,
             )
             return {"status": "success", "data": data}
         except Exception as exc:
@@ -458,6 +461,22 @@ class Plugin:
         """把诊断包写到下载目录。"""
         try:
             data = await self._get_tianyi_service().export_diagnostics_to_downloads()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def update_tianyi_catalog(self) -> dict:
+        """设置页：下载服务器最新目录 CSV 到本地并重新加载。"""
+        try:
+            data = await self._get_tianyi_service().update_catalog_csv()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def refresh_tianyi_catalog(self) -> dict:
+        """强制重新拉取远程游戏目录。"""
+        try:
+            data = await self._get_tianyi_service().refresh_catalog()
             return {"status": "success", "data": data}
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}

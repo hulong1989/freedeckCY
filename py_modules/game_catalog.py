@@ -165,6 +165,11 @@ def resolve_default_catalog_path() -> str:
         if env_path:
             candidates.append(Path(env_path))
 
+    # 设置页“更新游戏列表”下载到本地的 CSV 优先于包内 CSV。
+    local_catalog = Path(config.DECKY_SEND_DIR) / "tianyi" / "catalog.csv"
+    if local_catalog.is_file():
+        candidates.append(local_catalog)
+
     plugin_dir = getattr(decky, "DECKY_PLUGIN_DIR", None)
     if plugin_dir:
         root = Path(plugin_dir)
@@ -181,10 +186,7 @@ def resolve_default_catalog_path() -> str:
 
 
 def resolve_default_catalog_json_path() -> str:
-    """解析可选的 NewFreedeck 兼容 JSON 目录。
-
-    仅通过 `FREEDECKCY_CATALOG_JSON` 显式开启；默认仍读 CSV，避免发布包行为漂移。
-    """
+    """解析可选的 NewFreedeck 兼容 JSON 目录（显式 env 才开启）。"""
     for env_name in ("FREEDECKCY_CATALOG_JSON", "FRIENDECK_CATALOG_JSON"):
         env_path = (os.getenv(env_name) or "").strip()
         if not env_path:
@@ -198,6 +200,7 @@ def resolve_default_catalog_json_path() -> str:
         if resolved.is_file():
             return str(resolved)
         config.logger.warning("FREEDECKCY_CATALOG_JSON 指向的文件不存在: %s", env_path)
+        return ""
     return ""
 
 

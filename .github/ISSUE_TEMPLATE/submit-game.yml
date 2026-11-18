@@ -7,6 +7,9 @@ body:
       value: |
         感谢提交！请只填写**分享链接**，不要上传游戏文件、破解补丁或账号信息。
         提交前请确认链接可访问、提取码正确，并阅读 [submissions/README.md](https://github.com/hulong1989/freedeckCY/blob/main/submissions/README.md)。
+
+        维护者审核后给本 Issue 添加 **`auto-merge`** 标签，GitHub Action 会自动校验、
+        合并进目录并重新生成远程 `catalog/freedeckcy_catalog.json`。
   - type: input
     id: name
     attributes:
