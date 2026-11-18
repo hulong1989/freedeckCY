@@ -1,5 +1,432 @@
 // @ts-nocheck
+const EN = {
+    "下载": "Download",
+    "卸载": "Uninstall",
+    "失败": "Failed",
+    "安装": "Install",
+    "暂停": "Pause",
+    "未知": "Unknown",
+    "检查": "Check",
+    "游戏": "Game",
+    "登录": "Sign In",
+    "空闲": "Idle",
+    "继续": "Resume",
+    "诊断": "Diagnostics",
+    "账号": "Account",
+    "路径": "Path",
+    "返回": "Back",
+    "选择": "Select",
+    "重试": "Retry",
+    "上传中": "Uploading",
+    "下载中": "Downloading",
+    "安装中": "Installing",
+    "已安装": "Installed",
+    "已完成": "Completed",
+    "已暂停": "Paused",
+    "已登录": "Signed In",
+    "已移除": "Removed",
+    "已继续": "Resumed",
+    "已跳过": "Skipped",
+    "待处理": "Pending",
+    "待确认": "Pending Confirmation",
+    "恢复中": "Restoring",
+    "打包中": "Packaging",
+    "扫描中": "Scanning",
+    "未开始": "Not Started",
+    "未登录": "Not Signed In",
+    "未设置": "Not Set",
+    "未配置": "Not Configured",
+    "没登录": "Not Signed In",
+    "等待中": "Waiting",
+    "规划中": "Planning",
+    "该任务": "This Task",
+    "该游戏": "This Game",
+    "0 分钟": "0 min",
+    "下载失败": "Download failed",
+    "下载完成": "Download complete",
+    "全部暂停": "Pause All",
+    "全部游戏": "All Games",
+    "全部继续": "Resume All",
+    "加载更多": "Load More",
+    "卸载失败": "Uninstall failed",
+    "安装失败": "Install failed",
+    "应用限速": "Apply Speed Limit",
+    "扫描完成": "Scan complete",
+    "操作失败": "Action failed",
+    "未知账号": "Unknown Account",
+    "查看详情": "View Details",
+    "检查完成": "Check complete",
+    "检查更新": "Check for Updates",
+    "注销失败": "Sign-out failed",
+    "现在重启": "Restart Now",
+    "百度账号": "Baidu Account",
+    "确认卸载": "Confirm Uninstall",
+    "自检失败": "Self-check failed",
+    "自检超时": "Self-check timed out",
+    "运行自检": "Run Self-check",
+    "默认网盘": "Default Drive",
+    "上传云存档": "Upload Cloud Save",
+    "下载更新包": "Download Update Package",
+    "免重启刷新": "Refresh (No Restart)",
+    "导出诊断包": "Export Diagnostics",
+    "已重新开始": "Restarted",
+    "当前未登录": "Not Signed In",
+    "拉取版本中": "Fetching versions",
+    "新加入目录": "Newly Added",
+    "无可用版本": "No versions available",
+    "未命名任务": "Untitled Task",
+    "未命名游戏": "Untitled Game",
+    "设置已保存": "Settings saved",
+    "（进行中）": "(In Progress)",
+    "下载中...": "Downloading...",
+    "仅删游戏文件": "Delete Game Files Only",
+    "任务操作失败": "Task action failed",
+    "保存设置失败": "Failed to save settings",
+    "保存设置超时": "Saving settings timed out",
+    "刷新中...": "Refreshing...",
+    "加载中...": "Loading...",
+    "卸载中...": "Uninstalling...",
+    "启动中...": "Starting...",
+    "处理中...": "Processing...",
+    "应用中...": "Applying...",
+    "恢复中...": "Restoring...",
+    "打包中...": "Packaging...",
+    "执行恢复失败": "Restore failed",
+    "执行恢复超时": "Restore timed out",
+    "扫描中...": "Scanning...",
+    "暂停中...": "Pausing...",
+    "暂停全部失败": "Failed to pause all",
+    "暂停全部超时": "Pause all timed out",
+    "更新包已下载": "Update package downloaded",
+    "检查中...": "Checking...",
+    "检查更新失败": "Update check failed",
+    "检查更新超时": "Update check timed out",
+    "检查登录状态": "Check Sign-In Status",
+    "注销中...": "Signing out...",
+    "百度授权失败": "Baidu authorization failed",
+    "百度授权超时": "Baidu authorization timed out",
+    "继续中...": "Resuming...",
+    "继续全部失败": "Failed to resume all",
+    "继续全部超时": "Resume all timed out",
+    "自检中...": "Running self-check...",
+    "获取中...": "Fetching...",
+    "规划中...": "Planning...",
+    "设置限速失败": "Failed to set speed limit",
+    "设置限速超时": "Setting speed limit timed out",
+    "读取中...": "Reading...",
+    "读取状态失败": "Failed to read status",
+    "读取设置失败": "Failed to read settings",
+    "重试中...": "Retrying...",
+    "下载参数已更新": "Download settings updated",
+    "下载更新包失败": "Failed to download update package",
+    "下载更新包超时": "Downloading update package timed out",
+    "刷新云存档列表": "Refresh Cloud Save List",
+    "导出诊断包失败": "Failed to export diagnostics",
+    "导出诊断包超时": "Exporting diagnostics timed out",
+    "已取消下载限速": "Download speed limit cleared",
+    "已暂停全部下载": "All downloads paused",
+    "已继续全部下载": "All downloads resumed",
+    "已退出百度网盘": "Signed out of Baidu Netdisk",
+    "恢复流程已结束": "Restore finished",
+    "扫描已安装游戏": "Scan Installed Games",
+    "正在检查...": "Checking...",
+    "正在重启...": "Restarting...",
+    "注销天翼云账号": "Sign Out of Tianyi Cloud",
+    "百度二维码为空": "Baidu QR code is empty",
+    "请先读取存档项": "Load save entries first",
+    "读取可选存档项": "Load Save Entries",
+    "读取存档项失败": "Failed to load save entries",
+    "上传进行中...": "Upload in progress...",
+    "下载并恢复云存档": "Download and Restore Cloud Save",
+    "保存百度应用失败": "Failed to save Baidu app",
+    "保存百度应用超时": "Saving Baidu app timed out",
+    "已注销天翼云账号": "Signed out of Tianyi Cloud",
+    "当前已是最新版本": "Already up to date",
+    "扫码失败，请重试": "QR scan failed, please try again",
+    "扫码登录百度网盘": "Scan QR Code to Sign In to Baidu Netdisk",
+    "更新游戏列表失败": "Failed to update game list",
+    "更新游戏列表超时": "Updating game list timed out",
+    "清除百度授权失败": "Failed to clear Baidu authorization",
+    "清除百度授权超时": "Clearing Baidu authorization timed out",
+    "清除重启提示失败": "Failed to dismiss restart prompt",
+    "清除重启提示超时": "Dismissing restart prompt timed out",
+    "生成恢复计划失败": "Failed to create restore plan",
+    "生成恢复计划超时": "Creating restore plan timed out",
+    "百度授权链接为空": "Baidu authorization link is empty",
+    "百度登录检查失败": "Baidu sign-in check failed",
+    "百度登录检查超时": "Baidu sign-in check timed out",
+    "百度网盘授权成功": "Baidu Netdisk authorized",
+    "获取登录地址失败": "Failed to get sign-in URL",
+    "读取卸载信息超时": "Reading uninstall info timed out",
+    "读取存储信息超时": "Reading storage info timed out",
+    "读取恢复状态失败": "Failed to read restore status",
+    "读取恢复状态超时": "Reading restore status timed out",
+    "还没有已安装游戏": "No installed games yet",
+    "退出百度网盘失败": "Failed to sign out of Baidu Netdisk",
+    "退出百度网盘超时": "Signing out of Baidu Netdisk timed out",
+    "启动云存档上传失败": "Failed to start cloud save upload",
+    "启动云存档上传超时": "Starting cloud save upload timed out",
+    "尚未执行云存档上传": "Cloud save not uploaded yet",
+    "尚未执行云存档恢复": "Cloud save not restored yet",
+    "已清除百度网盘授权": "Baidu Netdisk authorization cleared",
+    "已配置应用，待授权": "App configured, awaiting authorization",
+    "扫描已安装游戏失败": "Failed to scan installed games",
+    "扫描已安装游戏超时": "Scanning installed games timed out",
+    "推荐 · 最近更新": "Featured · Recently Updated",
+    "检查并更新游戏列表": "Check and Update Game List",
+    "注销天翼云账号超时": "Signing out of Tianyi Cloud timed out",
+    "获取百度二维码失败": "Failed to get Baidu QR code",
+    "请先选择游戏和版本": "Select a game and version first",
+    "读取云存档列表失败": "Failed to load cloud save list",
+    "读取云存档列表超时": "Loading cloud save list timed out",
+    "读取云存档状态失败": "Failed to read cloud save status",
+    "读取云存档状态超时": "Reading cloud save status timed out",
+    "读取可选存档项超时": "Loading save entries timed out",
+    "云存档上传任务已启动": "Cloud save upload started",
+    "登录入口准备中...": "Preparing sign-in...",
+    "百度网盘扫码登录成功": "Baidu Netdisk sign-in successful",
+    "获取百度授权链接失败": "Failed to get Baidu authorization link",
+    "获取百度授权链接超时": "Getting Baidu authorization link timed out",
+    "请先完成恢复前置步骤": "Complete the restore prerequisites first",
+    "请至少选择一个存档项": "Select at least one save entry",
+    "轮询百度扫码状态失败": "Failed to poll Baidu QR status",
+    "轮询百度扫码状态超时": "Polling Baidu QR status timed out",
+    "安装路径为空，无法卸载": "Install path is empty; cannot uninstall",
+    "已请求重启 Steam": "Steam restart requested",
+    "百度开放平台应用已保存": "Baidu Open Platform app saved",
+    "请用百度 App 扫码": "Scan with the Baidu app",
+    "重启 Steam 失败": "Failed to restart Steam",
+    "重启 Steam 超时": "Restarting Steam timed out",
+    "任务操作超时，请稍后重试": "Task action timed out, please try again later",
+    "正在获取百度二维码...": "Getting Baidu QR code...",
+    "读取设置超时，请稍后重试": "Reading settings timed out, please try again later",
+    "freedeckCY 自检": "freedeckCY Self-check",
+    "游戏列表已是最新，无需下载": "Game list is up to date; no download needed",
+    "请先选择要恢复的游戏和版本": "Select the game and version to restore first",
+    "（含 Proton 前缀）": "(includes Proton prefix)",
+    "freedeckCY 诊断包": "freedeckCY Diagnostics",
+    "恢复计划缺少 plan_id": "Restore plan is missing plan_id",
+    "正在下载服务器最新目录...": "Downloading the latest catalog from the server...",
+    "获取登录地址超时，请稍后重试": "Getting sign-in URL timed out, please try again later",
+    "读取面板状态超时，请稍后重试": "Reading panel status timed out, please try again later",
+    "freedeckCY 目录已更新": "freedeckCY catalog updated",
+    "分片数必须在 1 到 64 之间": "Shard count must be between 1 and 64",
+    "已请求 Steam 刷新快捷方式": "Steam shortcut refresh requested",
+    "已通过 Steam 客户端请求重启": "Restart requested via Steam client",
+    "未配置（去百度网盘开放平台创建应用）": "Not configured (create an app on the Baidu Netdisk Open Platform)",
+    "没有匹配游戏，试试清空筛选或更换关键词": "No matching games. Try clearing filters or changing keywords.",
+    "卸载超时（大目录删除可能较慢，请稍后刷新确认）": "Uninstall timed out (large folders may take a while; refresh later to confirm)",
+    "当前 Steam 不支持免重启刷新，请手动重启": "The current Steam client doesn't support refresh without restart; please restart manually",
+    "获取百度二维码超时（网络/TLS 可能受阻，请稍后重试或运行诊断）": "Getting Baidu QR code timed out (network/TLS may be blocked; retry later or run diagnostics)",
+    "未登录（扫码后使用 BDUSS/Cookie，无需开放平台 App Key）": "Not signed in (uses BDUSS/Cookie after QR scan; no Open Platform App Key needed)",
+    "检查 GitHub Release，下载并校验更新包；不会自动覆盖运行中的插件。": "Checks GitHub Releases, downloads and verifies the update package; it won't overwrite a running plugin automatically.",
+    " ? `${catalog.total} 款游戏${hasActiveFilters ? ": " ? `${catalog.total} games${hasActiveFilters ? ",
+    "}\\n` +\n                    `安装：${plan.required_install_human || ": "}\\n` +\n                    `Install: ${plan.required_install_human || ",
+    " : providerOptions.length > 1 ? `安装（${activeProvider?.provider_label || ": " : providerOptions.length > 1 ? `Install (${activeProvider?.provider_label || ",
+    "}` : `${installed.total} 款已安装` })] }), SP_JSX.jsxs(DFL.Focusable, { className: ": "}` : `${installed.total} installed` })] }), SP_JSX.jsxs(DFL.Focusable, { className: ",
+    ",\n                body: `目录已刷新：${result.data?.total ?? 0} 条（${result.data?.source || ": ",\n                body: `Catalog refreshed: ${result.data?.total ?? 0} entries (${result.data?.source || ",
+    ";\n            const setupText = plan.emulator_info?.setup_hint ? `\\n提示：${plan.emulator_info.setup_hint}` : ": ";\n            const setupText = plan.emulator_info?.setup_hint ? `\\nTip: ${plan.emulator_info.setup_hint}` : ",
+    ");\n            }\n            const emulatorText = plan.emulator_info?.name ? `模拟器：${plan.emulator_info.name}` : ": ");\n            }\n            const emulatorText = plan.emulator_info?.name ? `Emulator: ${plan.emulator_info.name}` : ",
+    ";\n            DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `安装 ${plan.game_title || item.title}`, strDescription: `下载：${plan.required_download_human || ": ";\n            DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `Install ${plan.game_title || item.title}`, strDescription: `Download: ${plan.required_download_human || ",
+    ");\n            // 过滤条件/翻页可能并发触发多个请求：只让最后一次请求的结果落地，避免旧响应覆盖新列表。\n            if (catalogRequestRef.current !== requestSeq)\n                return;\n            if (result.status !== ": ");\n            // Filters/pagination may trigger concurrent requests: only the last request's result lands, so stale responses don't overwrite the new list.\n            if (catalogRequestRef.current !== requestSeq)\n                return;\n            if (result.status !== ",
+    ");\n        }\n        catch (error) {\n            toastError(error);\n        }\n        finally {\n            endBusy();\n        }\n    }, [beginBusy, endBusy]);\n    const onUninstall = SP_REACT.useCallback((item) => {\n        if (busyRef.current)\n            return;\n        DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `卸载 ${item.title}`, strDescription: ": ");\n        }\n        catch (error) {\n            toastError(error);\n        }\n        finally {\n            endBusy();\n        }\n    }, [beginBusy, endBusy]);\n    const onUninstall = SP_REACT.useCallback((item) => {\n        if (busyRef.current)\n            return;\n        DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `Uninstall ${item.title}`, strDescription: ",
+    ");\n    const libraryRootRef = SP_REACT.useRef(null);\n    const pageSize = 30;\n    const handleLibraryButton = SP_REACT.useCallback((evt) => {\n        const button = Number(evt?.detail?.button || 0);\n        const root = libraryRootRef.current;\n        // L1/R1 切换 游戏库/已安装；L2/R2 翻页。\n        if (button === 5 || button === 6) {\n            setTab((current) => current === ": ");\n    const libraryRootRef = SP_REACT.useRef(null);\n    const pageSize = 30;\n    const handleLibraryButton = SP_REACT.useCallback((evt) => {\n        const button = Number(evt?.detail?.button || 0);\n        const root = libraryRootRef.current;\n        // L1/R1 switch between Library/Installed; L2/R2 paging.\n        if (button === 5 || button === 6) {\n            setTab((current) => current === ",
+    ", body: `正在启动 ${item.title}` });\n        }\n        catch (error) {\n            toastError(error);\n        }\n        finally {\n            endBusy();\n        }\n    }, [beginBusy, endBusy]);\n    const onOpenFolder = SP_REACT.useCallback(async (item) => {\n        if (!beginBusy(item.game_id))\n            return;\n        try {\n            const result = await withTimeout(openTianyiInstalledFolder(item.game_id), 20000, ": ", body: `Starting ${item.title}` });\n        }\n        catch (error) {\n            toastError(error);\n        }\n        finally {\n            endBusy();\n        }\n    }, [beginBusy, endBusy]);\n    const onOpenFolder = SP_REACT.useCallback(async (item) => {\n        if (!beginBusy(item.game_id))\n            return;\n        try {\n            const result = await withTimeout(openTianyiInstalledFolder(item.game_id), 20000, ",
+    "));\n        }).catch(() => { });\n        return () => { cancelled = true; };\n    }, []);\n    // 用 ref 做同步锁：state 更新有延迟，快速连点会绕过 busyKey 判断导致重复请求/互相清 busy。\n    const beginBusy = SP_REACT.useCallback((key) => {\n        if (busyRef.current)\n            return false;\n        busyRef.current = key;\n        setBusyKey(key);\n        return true;\n    }, []);\n    const endBusy = SP_REACT.useCallback(() => {\n        busyRef.current = ": "));\n        }).catch(() => { });\n        return () => { cancelled = true; };\n    }, []);\n    // Use a ref as a sync lock: state updates lag, so rapid clicks can bypass the busyKey check and cause duplicate requests or clear each other's busy state.\n    const beginBusy = SP_REACT.useCallback((key) => {\n        if (busyRef.current)\n            return false;\n        busyRef.current = key;\n        setBusyKey(key);\n        return true;\n    }, []);\n    const endBusy = SP_REACT.useCallback(() => {\n        busyRef.current = ",
+    ");\n            }\n            const data = result.data;\n            setInstalled({\n                total: Number(data.total || 0),\n                items: Array.isArray(data.items) ? data.items : [],\n            });\n        }\n        catch (error) {\n            if (installedRequestRef.current === requestSeq)\n                toastError(error);\n        }\n        finally {\n            if (installedRequestRef.current === requestSeq)\n                setLoadingInstalled(false);\n        }\n    }, []);\n    // 搜索词/筛选没变时（例如同一个词再按一次回车）也要能刷新：用 nonce 触发 effect 重新拉取。\n    const submitSearch = SP_REACT.useCallback(() => {\n        setActiveQuery(query.trim());\n        setPage(1);\n        setReloadNonce((value) => value + 1);\n    }, [query]);\n    const resetSearch = SP_REACT.useCallback(() => {\n        setQuery(": ");\n            }\n            const data = result.data;\n            setInstalled({\n                total: Number(data.total || 0),\n                items: Array.isArray(data.items) ? data.items : [],\n            });\n        }\n        catch (error) {\n            if (installedRequestRef.current === requestSeq)\n                toastError(error);\n        }\n        finally {\n            if (installedRequestRef.current === requestSeq)\n                setLoadingInstalled(false);\n        }\n    }, []);\n    // Refresh even when the search term/filters are unchanged (e.g. pressing Enter again on the same term): use a nonce to re-trigger the fetch effect.\n    const submitSearch = SP_REACT.useCallback(() => {\n        setActiveQuery(query.trim());\n        setPage(1);\n        setReloadNonce((value) => value + 1);\n    }, [query]);\n    const resetSearch = SP_REACT.useCallback(() => {\n        setQuery(",
+    ", body: `已卸载：${item.title || item.game_id}` });\n                        await loadInstalled();\n                    }\n                    catch (error) {\n                        toastError(error);\n                    }\n                    finally {\n                        endBusy();\n                    }\n                })();\n            }, onCancel: () => { } }));\n    }, [beginBusy, endBusy, loadInstalled]);\n    const handleClose = SP_REACT.useCallback(() => {\n        if (onClose) {\n            try {\n                onClose();\n                return;\n            }\n            catch {\n                // onClose 失效时继续走路由返回兜底。\n            }\n        }\n        try {\n            DFL.Navigation.NavigateBack();\n        }\n        catch {\n            try {\n                DFL.Router.CloseSideMenus?.();\n            }\n            catch {\n                // 忽略关闭失败。\n            }\n        }\n    }, [onClose]);\n    const handleSteamLibrary = SP_REACT.useCallback(() => {\n        // modal 模式先关弹层；路由模式先留在插件页，导航失败再回退。\n        try {\n            onClose?.();\n        }\n        catch {\n            // 忽略关闭失败。\n        }\n        try {\n            DFL.Navigation.NavigateToLibraryTab();\n            return;\n        }\n        catch {\n            // 继续尝试旧接口。\n        }\n        try {\n            DFL.Router.NavigateToLibraryTab?.();\n            return;\n        }\n        catch {\n            // 继续尝试返回。\n        }\n        if (!onClose) {\n            try {\n                DFL.Navigation.NavigateBack();\n            }\n            catch {\n                // 忽略关闭失败。\n            }\n        }\n    }, [onClose]);\n    const onOpenDetail = SP_REACT.useCallback((item) => {\n        let modal = null;\n        try {\n            modal = DFL.showModal(SP_JSX.jsx(GameDetailModal, { item: item, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busy: Boolean(busyKey), onInstall: (selectedItem) => {\n                    try {\n                        modal?.Close();\n                    }\n                    catch {\n                        // 忽略关闭失败。\n                    }\n                    void onPrepareInstall(selectedItem || item);\n                }, onClose: () => {\n                    try {\n                        modal?.Close();\n                    }\n                    catch {\n                        // 忽略关闭失败。\n                    }\n                } }), undefined, {\n                strTitle: ": ", body: `Uninstalled: ${item.title || item.game_id}` });\n                        await loadInstalled();\n                    }\n                    catch (error) {\n                        toastError(error);\n                    }\n                    finally {\n                        endBusy();\n                    }\n                })();\n            }, onCancel: () => { } }));\n    }, [beginBusy, endBusy, loadInstalled]);\n    const handleClose = SP_REACT.useCallback(() => {\n        if (onClose) {\n            try {\n                onClose();\n                return;\n            }\n            catch {\n                // Fall back to route navigation when onClose fails.\n            }\n        }\n        try {\n            DFL.Navigation.NavigateBack();\n        }\n        catch {\n            try {\n                DFL.Router.CloseSideMenus?.();\n            }\n            catch {\n                // Ignore close failures.\n            }\n        }\n    }, [onClose]);\n    const handleSteamLibrary = SP_REACT.useCallback(() => {\n        // Modal mode closes the overlay first; route mode stays on the plugin page and only falls back if navigation fails.\n        try {\n            onClose?.();\n        }\n        catch {\n            // Ignore close failures.\n        }\n        try {\n            DFL.Navigation.NavigateToLibraryTab();\n            return;\n        }\n        catch {\n            // Try the legacy API next.\n        }\n        try {\n            DFL.Router.NavigateToLibraryTab?.();\n            return;\n        }\n        catch {\n            // Keep trying to navigate back.\n        }\n        if (!onClose) {\n            try {\n                DFL.Navigation.NavigateBack();\n            }\n            catch {\n                // Ignore close failures.\n            }\n        }\n    }, [onClose]);\n    const onOpenDetail = SP_REACT.useCallback((item) => {\n        let modal = null;\n        try {\n            modal = DFL.showModal(SP_JSX.jsx(GameDetailModal, { item: item, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busy: Boolean(busyKey), onInstall: (selectedItem) => {\n                    try {\n                        modal?.Close();\n                    }\n                    catch {\n                        // Ignore close failures.\n                    }\n                    void onPrepareInstall(selectedItem || item);\n                }, onClose: () => {\n                    try {\n                        modal?.Close();\n                    }\n                    catch {\n                        // Ignore close failures.\n                    }\n                } }), undefined, {\n                strTitle: ",
+};
 
+// @ts-nocheck
+
+const LANGUAGE_KEY = "freedeckcy.language";
+const ATTRIBUTES = ["placeholder", "title", "aria-label", "aria-description"];
+const CJK = /[\u3400-\u9fff]/;
+const listeners = new Set();
+const originalText = new WeakMap();
+const originalAttributes = new WeakMap();
+const trackedText = new Set();
+function getLanguage() {
+    try {
+        return localStorage.getItem(LANGUAGE_KEY) === "en" ? "en" : "zh";
+    }
+    catch {
+        return "zh";
+    }
+}
+function hasLanguage() {
+    try {
+        return localStorage.getItem(LANGUAGE_KEY) === "zh" || localStorage.getItem(LANGUAGE_KEY) === "en";
+    }
+    catch {
+        return false;
+    }
+}
+function setLanguage(language) {
+    try {
+        localStorage.setItem(LANGUAGE_KEY, language);
+    }
+    catch {
+        // localStorage 不可用时本次会话仍切换。
+    }
+    applyLanguage();
+    listeners.forEach((listener) => listener());
+}
+function useLanguage() {
+    const [language, setCurrent] = SP_REACT.useState(getLanguage);
+    SP_REACT.useEffect(() => {
+        const listener = () => setCurrent(getLanguage());
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+    }, []);
+    return language;
+}
+function translatePatterns(value) {
+    let output = value;
+    const rules = [
+        [/(\d[\d,]*)\s*款游戏/g, "$1 games"],
+        [/(\d[\d,]*)\s*款已安装/g, "$1 installed"],
+        [/(\d[\d,]*)\s*款/g, "$1 items"],
+        [/已显示\s*(\d+)\s*\/\s*(\d+)/g, "Showing $1 / $2"],
+        [/第\s*(\d+)\s*\/\s*(\d+)\s*页/g, "Page $1 / $2"],
+        [/剩余\s*([^）)]+)/g, "Free $1"],
+        [/已登录[:：]\s*/g, "Signed in: "],
+        [/未登录/g, "Not signed in"],
+        [/(\d+)\s*分钟/g, "$1 min"],
+        [/(\d+)\s*秒/g, "$1 s"],
+        [/(\d+)\s*个文件/g, "$1 files"],
+        [/(\d+)\s*个/g, "$1"],
+    ];
+    for (const [pattern, replacement] of rules) {
+        output = output.replace(pattern, replacement);
+    }
+    return output;
+}
+function translateString(value) {
+    if (!value || !CJK.test(value))
+        return value;
+    const exact = EN[value];
+    if (exact !== undefined)
+        return exact;
+    let output = translatePatterns(value);
+    if (output !== value && !CJK.test(output))
+        return output;
+    // 对拼接文案做短语级兜底：长词优先，避免“安装失败”被“安装”拆开。
+    const keys = Object.keys(EN).filter((key) => key.length > 1 && CJK.test(key)).sort((a, b) => b.length - a.length);
+    for (const key of keys) {
+        if (output.includes(key))
+            output = output.split(key).join(EN[key]);
+    }
+    return output;
+}
+function inScope(element) {
+    try {
+        return Boolean(element && element.closest("[data-fdc-i18n]"));
+    }
+    catch {
+        return false;
+    }
+}
+function translateTextNode(node) {
+    if (!inScope(node.parentElement))
+        return;
+    if (getLanguage() === "en") {
+        const current = node.nodeValue || "";
+        if (!CJK.test(current))
+            return;
+        const original = originalText.get(node);
+        if (original !== undefined && current === translateString(original))
+            return;
+        originalText.set(node, current);
+        trackedText.add(node);
+        const translated = translateString(current);
+        if (translated !== current)
+            node.nodeValue = translated;
+        return;
+    }
+    const original = originalText.get(node);
+    if (original !== undefined && node.nodeValue !== original) {
+        node.nodeValue = original;
+        trackedText.delete(node);
+    }
+}
+function translateElementAttributes(element) {
+    if (!inScope(element))
+        return;
+    let originals = originalAttributes.get(element);
+    if (!originals) {
+        originals = {};
+        originalAttributes.set(element, originals);
+    }
+    for (const name of ATTRIBUTES) {
+        const current = element.getAttribute(name);
+        if (getLanguage() === "en") {
+            if (!current || !CJK.test(current))
+                continue;
+            if (originals[name] === undefined || current !== translateString(originals[name]))
+                originals[name] = current;
+            const translated = translateString(originals[name]);
+            if (translated !== current)
+                element.setAttribute(name, translated);
+        }
+        else if (originals[name] !== undefined && current !== originals[name]) {
+            element.setAttribute(name, originals[name]);
+        }
+    }
+}
+function scan(root) {
+    if (!root)
+        return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+        translateTextNode(node);
+        node = walker.nextNode();
+    }
+    if (root instanceof Element)
+        translateElementAttributes(root);
+    const elements = root.querySelectorAll ? root.querySelectorAll("*") : [];
+    for (const element of Array.from(elements))
+        translateElementAttributes(element);
+}
+function applyLanguage() {
+    if (typeof document === "undefined")
+        return;
+    if (getLanguage() !== "en") {
+        for (const node of Array.from(trackedText)) {
+            const original = originalText.get(node);
+            if (original !== undefined && node.nodeValue !== original)
+                node.nodeValue = original;
+        }
+    }
+    scan(document.body);
+}
+let observerStarted = false;
+function startObserver() {
+    if (observerStarted || typeof document === "undefined")
+        return;
+    if (!document.body) {
+        window.setTimeout(startObserver, 250);
+        return;
+    }
+    observerStarted = true;
+    const observer = new MutationObserver(() => {
+        window.clearTimeout(window.__fdcI18nTimer);
+        window.__fdcI18nTimer = window.setTimeout(() => scan(document.body), 0);
+    });
+    observer.observe(document.body, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ATTRIBUTES,
+    });
+    applyLanguage();
+}
+if (typeof window !== "undefined")
+    window.setTimeout(startObserver, 0);
+
+// @ts-nocheck
 
 const _local_SP_JSX = { jsx: SP_JSX.jsx, jsxs: SP_JSX.jsxs, Fragment: SP_JSX.Fragment };
 const manifest = { "name": "freedeckCY" };
@@ -2449,7 +2876,7 @@ function SettingsPage() {
     if (loading) {
         return (_local_SP_JSX.jsx(DFL.PanelSection, { title: "freedeckCY \u8BBE\u7F6E", children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
     }
-    return (_local_SP_JSX.jsxs("div", { ref: settingsContainerRef, className: "freedeckcy-settings-root", style: {
+    return (_local_SP_JSX.jsxs("div", { ref: settingsContainerRef, "data-fdc-i18n": "1", className: "freedeckcy-settings-root", style: {
             paddingTop: 48,
             paddingBottom: 24,
             minHeight: "100%",
@@ -2496,6 +2923,12 @@ async function tryRefreshSteamLibrary() {
         catch { }
     }
     return false;
+}
+function LanguageChooser() {
+    return (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "13px", lineHeight: 1.5 }, children: "选择界面语言 / Choose your interface language" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), children: "中文" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), children: "English" })] }) })] }));
+}
+function LanguageSection({ language }) {
+    return (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: "界面语言 / Interface language" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), disabled: language === "zh", children: "中文" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), disabled: language === "en", children: "English" })] }) })] }));
 }
 function Content() {
     const [loading, setLoading] = SP_REACT.useState(true);
@@ -3002,10 +3435,13 @@ function Content() {
             setRestartingSteam(false);
         }
     }, [restartingSteam, state.steam_restart]);
+    const language = useLanguage();
+    if (!hasLanguage())
+        return _local_SP_JSX.jsx(LanguageChooser, {});
     if (loading) {
         return (_local_SP_JSX.jsx(DFL.PanelSection, { children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
     }
-    return (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: {
+    return (_local_SP_JSX.jsxs("div", { "data-fdc-i18n": "1", style: { display: "contents" }, children: [_local_SP_JSX.jsx(LanguageSection, { language: language }), _local_SP_JSX.jsxs(DFL.PanelSection, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: {
                                 width: "100%",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -3112,7 +3548,7 @@ function GameDetailModal(props) {
                 size_text: props.item.size_text || "",
             }];
     const activeProvider = providerOptions.find((option) => String(option.game_id || "") === String(selectedProviderId || "")) || providerOptions[0];
-    return (_local_SP_JSX.jsxs(DFL.Focusable, { noFocusRing: true, onCancel: props.onClose, onButtonDown: handleDetailButton, onGamepadDirection: handleDetailDirection, onCancelActionDescription: "返回", onOKActionDescription: "选择", className: "fdc-detail", "flow-children": "column", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-backdrop", style: coverUrl ? { backgroundImage: `url("${coverUrl.replace(/"/g, "%22")}")` } : {} }), _local_SP_JSX.jsxs("div", { ref: detailScrollRef, className: "fdc-detail-scroll", children: [_local_SP_JSX.jsxs("div", { className: "fdc-detail-top", children: [_local_SP_JSX.jsxs("div", { className: "fdc-detail-poster", children: [coverUrl ? (_local_SP_JSX.jsx("img", { src: coverUrl, alt: title, onError: () => setImageFailed(true), decoding: "async" })) : (_local_SP_JSX.jsx("div", { className: "fdc-poster-fallback", children: primaryTitle.slice(0, 2) })), props.installed ? (_local_SP_JSX.jsx("div", { className: "fdc-badge fdc-installed fdc-detail-installed", children: "已安装" })) : null] }), _local_SP_JSX.jsxs("div", { className: "fdc-detail-info", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-eyebrow", children: "freedeckCY 游戏库" }), _local_SP_JSX.jsx("div", { className: "fdc-detail-title", children: primaryTitle }), secondaryTitle ? (_local_SP_JSX.jsx("div", { className: "fdc-detail-subtitle", children: secondaryTitle })) : null, _local_SP_JSX.jsxs("div", { className: "fdc-detail-tags", children: [_local_SP_JSX.jsx("span", { children: String(props.item.platform || "pc").toUpperCase() }), _local_SP_JSX.jsx("span", { children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (_local_SP_JSX.jsx("span", { children: tag }, tag)))] }), _local_SP_JSX.jsx("div", { className: "fdc-detail-description", children: "下载完成后会自动解压并写入 Steam 快捷方式。双网盘资源可以选择更合适的下载源。" })] })] }), _local_SP_JSX.jsxs("div", { className: "fdc-detail-section", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-section-title", children: "下载源" }), _local_SP_JSX.jsxs(DFL.Focusable, { className: "fdc-source-row", "flow-children": "row", children: [providerOptions.map((option) => (_local_SP_JSX.jsxs(DFL.DialogButton, { className: "fdc-source" + (String(activeProvider?.game_id || "") === String(option.game_id || "") ? " fdc-source-active" : ""), onClick: () => setSelectedProviderId(option.game_id), style: { width: "auto", flex: "1 1 180px", minWidth: "160px", padding: "12px 14px", textAlign: "left" }, children: [_local_SP_JSX.jsx("div", { className: "fdc-source-name", children: option.provider_label || "网盘" }), _local_SP_JSX.jsx("div", { className: "fdc-source-meta", children: option.size_text || props.item.size_text || "大小未知" }), _local_SP_JSX.jsx("div", { className: "fdc-source-check", children: String(activeProvider?.game_id || "") === String(option.game_id || "") ? "已选择" : "选择此源" })] }, option.game_id)))] })] })] }), _local_SP_JSX.jsxs(DFL.Focusable, { className: "fdc-detail-actions", "flow-children": "row", children: [_local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-install-button", onClick: () => props.onInstall(activeProvider), disabled: props.busy || props.installed, children: props.installed ? "已安装" : props.busy ? "处理中..." : providerOptions.length > 1 ? `安装（${activeProvider?.provider_label || "网盘"}）` : "安装" }), _local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-secondary-button", onClick: props.onClose, children: "退出" })] })] }));
+    return (_local_SP_JSX.jsxs(DFL.Focusable, { "data-fdc-i18n": "1", noFocusRing: true, onCancel: props.onClose, onButtonDown: handleDetailButton, onGamepadDirection: handleDetailDirection, onCancelActionDescription: "返回", onOKActionDescription: "选择", className: "fdc-detail", "flow-children": "column", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-backdrop", style: coverUrl ? { backgroundImage: `url("${coverUrl.replace(/"/g, "%22")}")` } : {} }), _local_SP_JSX.jsxs("div", { ref: detailScrollRef, className: "fdc-detail-scroll", children: [_local_SP_JSX.jsxs("div", { className: "fdc-detail-top", children: [_local_SP_JSX.jsxs("div", { className: "fdc-detail-poster", children: [coverUrl ? (_local_SP_JSX.jsx("img", { src: coverUrl, alt: title, onError: () => setImageFailed(true), decoding: "async" })) : (_local_SP_JSX.jsx("div", { className: "fdc-poster-fallback", children: primaryTitle.slice(0, 2) })), props.installed ? (_local_SP_JSX.jsx("div", { className: "fdc-badge fdc-installed fdc-detail-installed", children: "已安装" })) : null] }), _local_SP_JSX.jsxs("div", { className: "fdc-detail-info", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-eyebrow", children: "freedeckCY 游戏库" }), _local_SP_JSX.jsx("div", { className: "fdc-detail-title", children: primaryTitle }), secondaryTitle ? (_local_SP_JSX.jsx("div", { className: "fdc-detail-subtitle", children: secondaryTitle })) : null, _local_SP_JSX.jsxs("div", { className: "fdc-detail-tags", children: [_local_SP_JSX.jsx("span", { children: String(props.item.platform || "pc").toUpperCase() }), _local_SP_JSX.jsx("span", { children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (_local_SP_JSX.jsx("span", { children: tag }, tag)))] }), _local_SP_JSX.jsx("div", { className: "fdc-detail-description", children: "下载完成后会自动解压并写入 Steam 快捷方式。双网盘资源可以选择更合适的下载源。" })] })] }), _local_SP_JSX.jsxs("div", { className: "fdc-detail-section", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-section-title", children: "下载源" }), _local_SP_JSX.jsxs(DFL.Focusable, { className: "fdc-source-row", "flow-children": "row", children: [providerOptions.map((option) => (_local_SP_JSX.jsxs(DFL.DialogButton, { className: "fdc-source" + (String(activeProvider?.game_id || "") === String(option.game_id || "") ? " fdc-source-active" : ""), onClick: () => setSelectedProviderId(option.game_id), style: { width: "auto", flex: "1 1 180px", minWidth: "160px", padding: "12px 14px", textAlign: "left" }, children: [_local_SP_JSX.jsx("div", { className: "fdc-source-name", children: option.provider_label || "网盘" }), _local_SP_JSX.jsx("div", { className: "fdc-source-meta", children: option.size_text || props.item.size_text || "大小未知" }), _local_SP_JSX.jsx("div", { className: "fdc-source-check", children: String(activeProvider?.game_id || "") === String(option.game_id || "") ? "已选择" : "选择此源" })] }, option.game_id)))] })] })] }), _local_SP_JSX.jsxs(DFL.Focusable, { className: "fdc-detail-actions", "flow-children": "row", children: [_local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-install-button", onClick: () => props.onInstall(activeProvider), disabled: props.busy || props.installed, children: props.installed ? "已安装" : props.busy ? "处理中..." : providerOptions.length > 1 ? `安装（${activeProvider?.provider_label || "网盘"}）` : "安装" }), _local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-secondary-button", onClick: props.onClose, children: "退出" })] })] }));
 }
 const LIBRARY_CSS = `
 .fdc-root { scroll-padding-top: 84px; scroll-padding-bottom: 150px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; --fdc-bg: #0b0f14; --fdc-panel: rgba(18,26,35,0.84); --fdc-line: rgba(255,255,255,0.10); --fdc-text: #f2f6fb; --fdc-muted: #9eacbb; --fdc-accent: #65d6c0; --fdc-blue: #72b8ff; background: radial-gradient(1100px 520px at 50% -20%, #162a33 0%, var(--fdc-bg) 55%); color: var(--fdc-text); }
@@ -3702,7 +4138,7 @@ function LibraryPage({ onClose }) {
         const value = String(item.value !== undefined ? item.value : (item.data || ""));
         return (_local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-chip" + (String(active || "") === value ? " fdc-chip-active" : ""), onClick: () => { onPick(value); setPage(1); }, children: item.label }, `chip:${value || "all"}`));
     });
-    return (_local_SP_JSX.jsxs(DFL.Focusable, { ref: libraryRootRef, noFocusRing: true, onCancel: handleClose, onButtonDown: handleLibraryButton, onGamepadDirection: handleLibraryDirection, onCancelActionDescription: "返回", onOKActionDescription: "选择", className: "fdc-root", "flow-children": "column", style: {
+    return (_local_SP_JSX.jsxs(DFL.Focusable, { ref: libraryRootRef, "data-fdc-i18n": "1", noFocusRing: true, onCancel: handleClose, onButtonDown: handleLibraryButton, onGamepadDirection: handleLibraryDirection, onCancelActionDescription: "返回", onOKActionDescription: "选择", className: "fdc-root", "flow-children": "column", style: {
             height: "100%",
             overflowY: "auto",
             boxSizing: "border-box",
