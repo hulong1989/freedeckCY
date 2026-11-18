@@ -2,7 +2,7 @@
 
 > [English](DROIDDECK.en.md) | 中文
 
-[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）、v0.15.0 起模拟器存档纳入云存档上传、v0.16.0 起模拟器存档恢复 + PSP/PS3/3DS 按游戏拆分 + PS1 多碟 m3u、v0.17.0 起百度网盘扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退）、v0.18.0 起扫描已安装游戏 + 百度扫码错误诊断、v0.19.0 起下载/安装目录支持 SD 卡/外置存储选择、v0.20.0 起 Decky 原生游戏库（不再依赖网页）、v0.21.0 起扫描已安装移到设置并自动补 Steam 快捷方式、v0.22.0 起诊断自检 + 一键诊断包、v0.23.0 起原生库 modal 兜底/版本标识 + 百度扫码超时、v0.24.0 起原生库返回/关闭修复、v0.25.0 起 Steam 原有游戏不再显示插件时长块、v0.26.x 做架构/稳定性修复、v0.27.0–v0.27.20 做原生游戏库视觉重构与 Steam Deck 手柄/触控板适配（DroidDeck 同样使用 Decky 焦点系统，触控/手柄逻辑可复用）。本文对应 **v0.28.10**，是安装与排障说明。
+[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）、v0.15.0 起模拟器存档纳入云存档上传、v0.16.0 起模拟器存档恢复 + PSP/PS3/3DS 按游戏拆分 + PS1 多碟 m3u、v0.17.0 起百度网盘扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退）、v0.18.0 起扫描已安装游戏 + 百度扫码错误诊断、v0.19.0 起下载/安装目录支持 SD 卡/外置存储选择、v0.20.0 起 Decky 原生游戏库（不再依赖网页）、v0.21.0 起扫描已安装移到设置并自动补 Steam 快捷方式、v0.22.0 起诊断自检 + 一键诊断包、v0.23.0 起原生库 modal 兜底/版本标识 + 百度扫码超时、v0.24.0 起原生库返回/关闭修复、v0.25.0 起 Steam 原有游戏不再显示插件时长块、v0.26.x 做架构/稳定性修复、v0.27.0–v0.27.20 做原生游戏库视觉重构与 Steam Deck 手柄/触控板适配（DroidDeck 同样使用 Decky 焦点系统，触控/手柄逻辑可复用）。本文对应 **v0.28.11**，是安装与排障说明。
 
 > 适配基于 DroidDeck 的源码与 ARM64 运行时结构，**尚未在真机上完整验证**。遇到问题请按文末“排障”收集日志。
 
@@ -29,7 +29,7 @@ freedeckCY 的处理方式：
 - 库页时长（v0.25.0）：仅 `managed=true` 显示；AppID 优先降低同名误判但非绝对；HLTB 失败只影响块内数值；依赖 Steam 库页结构。
 - 原生库返回（v0.24.0；v0.27.20）：库页顶部有「返回 / Steam 库 / 刷新」工具栏（v0.27.3 起因 QAM sticky 偏移改为普通流式）；modal 模式「返回」调 `onClose` 关闭弹层，全屏 route 模式用 `Navigation.NavigateBack()`；「Steam 库」关闭弹层后 `Router.NavigateToLibraryTab()` 回 Steam 库页（DroidDeck 上该 API 不可用时回退 `NavigateBack`）。B 键在详情/库根节点绑定 `onCancel`；仍可用显式按钮兜底。
 - 原生库入口（v0.20.0 起；v0.27.20 当前）：QAM 主页「游戏库」优先 `showModal(<LibraryPage />)` 原生弹层，失败才 `Navigation.Navigate("/freedeckcy/library")`；v0.27.20 起不再显示 UI 版本标识，版本以 Decky 插件列表/`package.json` 为准。
-- 双语界面（v0.28.10）：首次打开 QAM 插件选择中文 / English；选择存 localStorage，可在 QAM 主页切换；原生库/设置/详情同样生效。
+- 双语界面（v0.28.11）：首次打开 QAM 插件选择中文 / English；选择存 localStorage，可在 QAM 主页切换；原生库/设置/详情同样生效。
 - 手柄/触控板（v0.27）：D-pad/左摇杆在 `flow-children` 分组内移动；A 选择，B 关闭详情/游戏库，L1/R1 切换游戏库/已安装，L2/R2 约 0.8 屏滚动；触控板/触摸纵向列表与横向货架滚动。焦点卡自动滚入可视区，最左卡焦点环/顶部蓝框不被裁。
 - 百度扫码超时（v0.23.0）：点击立即 toast「正在获取百度二维码...」；前端 20s/15s、后端 12s/10s 超时，提示"获取百度二维码超时（网络/TLS 可能受阻...）"；DroidDeck/proot 网络/TLS 受限时按提示重试或运行诊断。
 - 诊断自检（v0.22.0）：QAM 设置 → 「诊断」→「运行自检」显示 summary（OK/警告/失败/跳过）和每项检查（插件/state/下载安装目录/runtime/目录数据/Steam/存储/天翼网络/百度 QR/任务/日志）与建议；「导出诊断包」把 `freedeckcy-diagnostics-<时间>.zip` 写到 proot 内下载目录（`settings.download_dir`，未设置则插件下载目录/`~/Downloads`），权限 0600，toast 显示路径。DroidDeck 上 runtime 检查会看 `defaults/runtime/aarch64/` 的 aria2c/7zz/node；Steam 检查看当前正在运行的客户端；网络/百度 QR 受 proot 网络限制。
@@ -328,5 +328,5 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 扫描补 Steam（v0.21.0）只写 `shortcuts.vdf`，需重启 Steam/切用户/重开库页才可见；模拟器未安装不自动下载；PC 找不到 exe/ROM 会跳过并记 `shortcut_error`。
 - 存储位置选择依赖 `/proc/mounts` 与 proot 内可写权限；Android 的 `/storage/emulated/0` 等路径可见性/可写性因设备而异，插件不自动挂载/格式化；不会检测 Steam 库同盘。
 - 扫描已安装依赖 proot 内 `settings.install_dir` 可见、目录名与目录标题匹配；只扫一层；v0.21.0 起会自动补建 Steam 快捷方式（模拟器未安装不下载，记 `shortcut_error`；Steam 需重启/切用户/重开库页才显示）；百度扫码要求手机 App 与网络可达 `passport.baidu.com`。
-- 本版测试基线：`make test` → 555 passed（2026-11 v0.28.10）。
+- 本版测试基线：`make test` → 555 passed（2026-11 v0.28.11）。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。
