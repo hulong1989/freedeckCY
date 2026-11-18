@@ -3101,7 +3101,7 @@ const LIBRARY_CSS = `
 .fdc-button { width: auto; flex: 0 0 auto; padding: 8px 14px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); }
 .fdc-filter-panel { margin: 0 6px 12px; padding: 10px 12px 12px; border: 1px solid var(--fdc-line); border-radius: 12px; background: var(--fdc-panel); }
 .fdc-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; align-items: center; }
-.fdc-chip { width: auto; flex: 0 0 auto; padding: 5px 10px; min-height: 28px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); font-size: 11px; color: #dbe6f2; }
+.fdc-chip { width: auto !important; min-width: 0 !important; flex: 0 0 auto; padding: 5px 9px !important; min-height: 28px; white-space: nowrap; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); font-size: 11px; color: #dbe6f2; }
 .fdc-chip-active { border-color: rgba(101,214,192,0.58); background: rgba(101,214,192,0.16); color: #effffa; }
 .fdc-label { font-size: 11px; color: var(--fdc-muted); margin-right: 4px; }
 .fdc-hero { position: relative; overflow: hidden; min-height: 238px; margin: 2px 6px 18px; border: 1px solid var(--fdc-line); border-radius: 16px; background: linear-gradient(125deg, #17303a, #0e151d 72%); display: flex; align-items: flex-end; }
