@@ -459,22 +459,32 @@ async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) ->
         message = ""
         if isinstance(data.get("errInfo"), dict):
             message = _safe_detail(data["errInfo"].get("msg", ""), 200)
-        raise BaiduQrError(message or "百度扫码登录未返回 BDUSS")
+        errno = data.get("errno", "")
+        raise BaiduQrError(message or f"百度扫码登录未返回 BDUSS（errno={errno}）")
     if not stoken:
         pan_cookies = await _fetch_pan_stoken(bduss, cookies)
         stoken = str(pan_cookies.get("STOKEN", "") or "").strip()
         if not ptoken:
             ptoken = str(pan_cookies.get("PTOKEN", "") or "").strip()
-    cookie_parts = [f"BDUSS={bduss}"]
+    cookie_map: Dict[str, str] = {"BDUSS": bduss}
     if stoken:
-        cookie_parts.append(f"STOKEN={stoken}")
+        cookie_map["STOKEN"] = stoken
     if ptoken:
-        cookie_parts.append(f"PTOKEN={ptoken}")
+        cookie_map["PTOKEN"] = ptoken
+    # 保留扫码会话里的 BAIDUID 等 Cookie，降低后续 share/verify 的风控概率。
+    for source in (cookies or {}, login_cookies):
+        if not isinstance(source, dict):
+            continue
+        for name, value in source.items():
+            key = str(name or "").strip()
+            text = str(value or "").strip()
+            if key and text and key not in cookie_map:
+                cookie_map[key] = text
     user = data.get("data", {}).get("user") if isinstance(data.get("data"), dict) else {}
     if not isinstance(user, dict):
         user = {}
     return {
-        "cookie": "; ".join(cookie_parts),
+        "cookie": "; ".join(f"{key}={value}" for key, value in cookie_map.items()),
         "BDUSS": bduss,
         "user_account": str(user.get("displayName") or user.get("username") or user.get("userId") or "").strip(),
     }
