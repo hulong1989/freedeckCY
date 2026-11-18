@@ -3087,15 +3087,17 @@ function GameDetailModal(props) {
 }
 const LIBRARY_CSS = `
 .fdc-root { --fdc-bg: #0b0f14; --fdc-panel: rgba(18,26,35,0.84); --fdc-line: rgba(255,255,255,0.10); --fdc-text: #f2f6fb; --fdc-muted: #9eacbb; --fdc-accent: #65d6c0; --fdc-blue: #72b8ff; background: radial-gradient(1100px 520px at 50% -20%, #162a33 0%, var(--fdc-bg) 55%); color: var(--fdc-text); }
-.fdc-topbar { position: sticky; top: 60px; z-index: 40; display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 0 -6px 10px; background: rgba(11,15,20,0.94); border-bottom: 1px solid var(--fdc-line); }
-.fdc-heading { flex: 1; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: 2px; }
+.fdc-topbar { position: sticky; top: 60px; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; margin: 0 -6px 10px; background: rgba(11,15,20,0.94); border-bottom: 1px solid var(--fdc-line); }
+.fdc-topbar button, .fdc-search-row button { flex: 0 0 auto !important; width: auto !important; white-space: nowrap; }
+.fdc-heading { flex: 1 1 220px; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: 2px; }
 .fdc-title { font-size: 20px; font-weight: 800; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fdc-subtitle { font-size: 11px; color: var(--fdc-muted); }
-.fdc-tabs { display: flex; gap: 6px; flex: 0 0 auto; }
-.fdc-tab { width: auto; min-width: 0; padding: 7px 13px; border-radius: 999px; border: 1px solid transparent; background: rgba(255,255,255,0.06); color: var(--fdc-muted); }
+.fdc-tabs { display: flex; flex-wrap: nowrap; gap: 6px; flex: 0 0 auto; }
+.fdc-tab { width: auto; min-width: 0; padding: 7px 13px; white-space: nowrap; border-radius: 999px; border: 1px solid transparent; background: rgba(255,255,255,0.06); color: var(--fdc-muted); }
 .fdc-tab-active { border-color: rgba(101,214,192,0.55); background: rgba(101,214,192,0.16); color: #eafff8; }
-.fdc-search-row { display: flex; align-items: flex-end; gap: 8px; width: 100%; padding: 2px 6px 8px; }
-.fdc-search { flex: 1; min-width: 0; }
+.fdc-search-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; width: 100%; padding: 2px 6px 8px; }
+.fdc-search { flex: 1 1 260px; min-width: 0; width: 0; }
+.fdc-search > * { width: 100%; }
 .fdc-button { width: auto; flex: 0 0 auto; padding: 8px 14px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); }
 .fdc-filter-panel { margin: 0 6px 12px; padding: 10px 12px 12px; border: 1px solid var(--fdc-line); border-radius: 12px; background: var(--fdc-panel); }
 .fdc-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; align-items: center; }
