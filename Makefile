@@ -83,6 +83,10 @@ validate-catalog:
 normalize-catalog:
 	@cd "$(ROOT)" && python3 scripts/normalize_catalog_categories.py defaults/tianyi_catalog/freedeckcy_catalog.csv
 
+check-ui:
+	@cd "$(ROOT)" || exit 1; \
+	node scripts/check-ui-scope.mjs
+
 test:
 	@cd "$(ROOT)" || exit 1; \
 	if [ -x "$(PYTEST)" ]; then \

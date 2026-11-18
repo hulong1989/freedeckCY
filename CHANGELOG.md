@@ -2,6 +2,17 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.43
+
+### P0 工程健康
+
+- 新增前端 hooks 依赖作用域检查 `scripts/check-ui-scope.mjs`：
+  - 检查 useMemo/useCallback/useEffect 依赖数组中的未定义标识符
+  - CI UI job 与 `make check-ui` 执行
+  - 防止再次出现 `batchBusy is not defined`
+- 拆分 `tianyi_service.py` 第一块：更新检查/下载流程迁移到 `py_modules/update_flow.py` 的 `UpdateFlowMixin`。
+- 新增更新流程契约测试；测试 548 passed。
+
 ## v0.26.42
 
 ### 从自有服务器检查插件更新

@@ -127,7 +127,7 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 541）
+.venv/bin/pytest -q          # 或 make check-ui && make test（用例数以输出为准，当前 548）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
@@ -214,7 +214,7 @@ backend/*.js                Node 辅助脚本（分享解析兜底、云盘上�
 scripts/                    运行时获取（aria2/7zz/node）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗 / 远程目录 / 清单转换
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
 catalog-json/               NewFreedeck 兼容目录 JSON + schema（可直接读/自托管）
-tests/                      pytest 用例（541 个）
+tests/                      pytest 用例（548 个）
 CHANGELOG.md                版本变更记录
 Makefile                    构建入口：runtime / catalog-json / ludusavi-manifest / package / package-droiddeck / test / doctor / validate-catalog / validate-submissions / normalize-catalog / clean
 ```

@@ -114,6 +114,10 @@ jobs:
       - name: Install UI dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check UI hook dependency scope
+        # src/index.tsx 带 @ts-nocheck，用 AST 检查 hooks 依赖数组里的未定义变量
+        run: pnpm check:ui
+
       - name: Build UI bundle
         run: pnpm build
 
