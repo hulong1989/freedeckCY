@@ -3152,9 +3152,9 @@ const LIBRARY_CSS = `
 @keyframes fdc-shimmer { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
 .fdc-empty { padding: 34px 12px; text-align: center; color: var(--fdc-muted); font-size: 13px; }
 .fdc-footer { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 0 20px; color: var(--fdc-muted); font-size: 11px; }
-.fdc-detail { position: relative; width: min(760px, 92vw); max-height: calc(100vh - 150px); overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,0.12); background: #0c1218; color: var(--fdc-text); display: flex; flex-direction: column; }
+.fdc-detail { position: relative; width: min(760px, 92vw); max-height: calc(100vh - 130px); overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,0.12); background: #0c1218; color: var(--fdc-text); display: flex; flex-direction: column; }
 .fdc-detail-backdrop { position: absolute; inset: 0; background-size: cover; background-position: center; filter: blur(22px) saturate(1.15); opacity: .34; transform: scale(1.12); }
-.fdc-detail-scroll { position: relative; z-index: 2; flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; padding: 18px 20px 14px; background: linear-gradient(180deg, rgba(10,15,20,0.48), rgba(10,15,20,0.94) 46%); }
+.fdc-detail-scroll { position: relative; z-index: 2; flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; padding: 44px 20px 12px; background-color: #0c1218; background-image: linear-gradient(180deg, rgba(10,15,20,0.48), rgba(10,15,20,0.94) 46%); }
 .fdc-detail-top { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 20px; align-items: start; }
 .fdc-detail-poster { position: relative; width: 168px; aspect-ratio: 2 / 3; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); background: linear-gradient(145deg, #1b3540, #0d141b); box-shadow: 0 18px 40px rgba(0,0,0,.38); }
 .fdc-detail-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -3176,10 +3176,10 @@ const LIBRARY_CSS = `
 .fdc-source-meta { font-size: 11px; color: #9eacbb; margin-top: 3px; }
 .fdc-source-check { font-size: 10px; color: #9eacbb; margin-top: 6px; }
 .fdc-source-active .fdc-source-check { color: var(--fdc-accent); }
-.fdc-detail-actions { position: static; flex: 0 0 auto; display: flex; gap: 10px; margin: 0; padding: 10px 20px 14px; border-top: 1px solid rgba(255,255,255,0.10); background: #0c1218; }
+.fdc-detail-actions { position: relative; z-index: 5; flex: 0 0 auto; display: flex; gap: 10px; margin: 0; padding: 10px 20px 14px; border-top: 1px solid rgba(255,255,255,0.10); background: #0c1218; }
 .fdc-install-button { flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid rgba(120,255,190,0.42); background: rgba(67,181,129,0.28); color: #eafff3; font-weight: 800; }
 .fdc-secondary-button { width: auto; min-width: 90px; min-height: 44px; border-radius: 10px; }
-@media (max-height: 600px) { .fdc-detail-scroll { padding: 14px 16px 10px; } .fdc-detail-top { grid-template-columns: 128px minmax(0, 1fr); gap: 14px; } .fdc-detail-poster { width: 128px; } .fdc-detail-title { font-size: 24px; } .fdc-detail-section { margin-top: 12px; } .fdc-detail-description { display: none; } }
+@media (max-height: 600px) { .fdc-detail-scroll { padding: 40px 16px 8px; } .fdc-detail-top { grid-template-columns: 112px minmax(0, 1fr); gap: 12px; } .fdc-detail-poster { width: 112px; } .fdc-detail-title { font-size: 22px; } .fdc-detail-section { margin-top: 8px; } .fdc-detail-section-title { margin-bottom: 5px; } .fdc-detail-description { display: none; } .fdc-source { padding: 8px 11px !important; min-height: 0 !important; } .fdc-source-check { margin-top: 3px; } }
 @media (max-width: 760px) { .fdc-topbar { flex-wrap: wrap; } .fdc-heading { order: 2; width: 100%; flex: 1 1 100%; } .fdc-tabs { order: 3; } .fdc-detail-top { grid-template-columns: 128px minmax(0, 1fr); } .fdc-detail-poster { width: 128px; } .fdc-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 13px; } }
 @media (prefers-reduced-motion: reduce) { .fdc-card, .fdc-skeleton { transition: none; animation: none; } }
 `;
