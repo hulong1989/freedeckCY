@@ -1,7 +1,7 @@
 // @ts-nocheck
 import * as SP_REACT from "react";
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { hasLanguage, setLanguage, useLanguage } from "./i18n";
+import { hasLanguage, setLanguage, useI18nRoot, useLanguage } from "./i18n";
 const SP_JSX = { jsx: _jsx, jsxs: _jsxs, Fragment: _Fragment };
 const manifest = {"name":"freedeckCY"};
 const API_VERSION = 2;
@@ -1344,6 +1344,7 @@ function SettingsPage() {
     const [selectedRestoreTargetDir, setSelectedRestoreTargetDir] = SP_REACT.useState("");
     const [splitDraft, setSplitDraft] = SP_REACT.useState(16);
     const settingsContainerRef = SP_REACT.useRef(null);
+    useI18nRoot(settingsContainerRef);
     const tabStabilityCss = SP_REACT.useMemo(() => `
       .freedeckcy-settings-root [class*="TabContentsScroll"],
       .freedeckcy-settings-root [class*="TabContents"],
@@ -2464,12 +2465,13 @@ async function tryRefreshSteamLibrary() {
     return false;
 }
 function LanguageChooser() {
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "13px", lineHeight: 1.5 }, children: "选择界面语言 / Choose your interface language" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), children: "中文" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), children: "English" })] }) })] }));
+    return (SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "13px", lineHeight: 1.5 }, children: "选择界面语言 / Choose your interface language" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), style: { flex: "1 1 0", width: "auto", minWidth: 0, padding: "8px 10px" }, children: "中文" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), style: { flex: "1 1 0", width: "auto", minWidth: 0, padding: "8px 10px" }, children: "English" })] }) })] }));
 }
 function LanguageSection({ language }) {
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: "界面语言 / Interface language" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), disabled: language === "zh", children: "中文" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), disabled: language === "en", children: "English" })] }) })] }));
+    return (SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: "界面语言 / Interface language" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), disabled: language === "zh", style: { flex: "1 1 0", width: "auto", minWidth: 0, padding: "8px 10px" }, children: "中文" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), disabled: language === "en", style: { flex: "1 1 0", width: "auto", minWidth: 0, padding: "8px 10px" }, children: "English" })] }) })] }));
 }
 function Content() {
+    const contentI18nRef = useI18nRoot();
     const [loading, setLoading] = SP_REACT.useState(true);
     const [state, setState] = SP_REACT.useState(EMPTY_STATE);
     const [openingLogin, setOpeningLogin] = SP_REACT.useState(false);
@@ -2980,7 +2982,7 @@ function Content() {
     if (loading) {
         return (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
     }
-    return (SP_JSX.jsxs("div", { "data-fdc-i18n": "1", style: { display: "contents" }, children: [SP_JSX.jsx(LanguageSection, { language: language }), SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
+    return (SP_JSX.jsxs("div", { ref: contentI18nRef, "data-fdc-i18n": "1", style: { display: "contents" }, children: [SP_JSX.jsx(LanguageSection, { language: language }), SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
                                 width: "100%",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -3039,6 +3041,8 @@ function GameDetailModal(props) {
     const [imageFailed, setImageFailed] = SP_REACT.useState(false);
     const [selectedProviderId, setSelectedProviderId] = SP_REACT.useState("");
     const detailScrollRef = SP_REACT.useRef(null);
+    const detailRootRef = SP_REACT.useRef(null);
+    useI18nRoot(detailRootRef);
     SP_REACT.useEffect(() => {
         const node = detailScrollRef.current;
         if (!node)
@@ -3087,7 +3091,7 @@ function GameDetailModal(props) {
                 size_text: props.item.size_text || "",
             }];
     const activeProvider = providerOptions.find((option) => String(option.game_id || "") === String(selectedProviderId || "")) || providerOptions[0];
-    return (SP_JSX.jsxs(DFL.Focusable, { "data-fdc-i18n": "1", noFocusRing: true, onCancel: props.onClose, onButtonDown: handleDetailButton, onGamepadDirection: handleDetailDirection, onCancelActionDescription: "返回", onOKActionDescription: "选择", className: "fdc-detail", "flow-children": "column", children: [SP_JSX.jsx("div", { className: "fdc-detail-backdrop", style: coverUrl ? { backgroundImage: `url("${coverUrl.replace(/"/g, "%22")}")` } : {} }), SP_JSX.jsxs("div", { ref: detailScrollRef, className: "fdc-detail-scroll", children: [SP_JSX.jsxs("div", { className: "fdc-detail-top", children: [SP_JSX.jsxs("div", { className: "fdc-detail-poster", children: [coverUrl ? (SP_JSX.jsx("img", { src: coverUrl, alt: title, onError: () => setImageFailed(true), decoding: "async" })) : (SP_JSX.jsx("div", { className: "fdc-poster-fallback", children: primaryTitle.slice(0, 2) })), props.installed ? (SP_JSX.jsx("div", { className: "fdc-badge fdc-installed fdc-detail-installed", children: "已安装" })) : null] }), SP_JSX.jsxs("div", { className: "fdc-detail-info", children: [SP_JSX.jsx("div", { className: "fdc-detail-eyebrow", children: "freedeckCY 游戏库" }), SP_JSX.jsx("div", { className: "fdc-detail-title", children: primaryTitle }), secondaryTitle ? (SP_JSX.jsx("div", { className: "fdc-detail-subtitle", children: secondaryTitle })) : null, SP_JSX.jsxs("div", { className: "fdc-detail-tags", children: [SP_JSX.jsx("span", { children: String(props.item.platform || "pc").toUpperCase() }), SP_JSX.jsx("span", { children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (SP_JSX.jsx("span", { children: tag }, tag)))] }), SP_JSX.jsx("div", { className: "fdc-detail-description", children: "下载完成后会自动解压并写入 Steam 快捷方式。双网盘资源可以选择更合适的下载源。" })] })] }), SP_JSX.jsxs("div", { className: "fdc-detail-section", children: [SP_JSX.jsx("div", { className: "fdc-detail-section-title", children: "下载源" }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-source-row", "flow-children": "row", children: [providerOptions.map((option) => (SP_JSX.jsxs(DFL.DialogButton, { className: "fdc-source" + (String(activeProvider?.game_id || "") === String(option.game_id || "") ? " fdc-source-active" : ""), onClick: () => setSelectedProviderId(option.game_id), style: { width: "auto", flex: "1 1 180px", minWidth: "160px", padding: "12px 14px", textAlign: "left" }, children: [SP_JSX.jsx("div", { className: "fdc-source-name", children: option.provider_label || "网盘" }), SP_JSX.jsx("div", { className: "fdc-source-meta", children: option.size_text || props.item.size_text || "大小未知" }), SP_JSX.jsx("div", { className: "fdc-source-check", children: String(activeProvider?.game_id || "") === String(option.game_id || "") ? "已选择" : "选择此源" })] }, option.game_id)))] })] })] }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-detail-actions", "flow-children": "row", children: [SP_JSX.jsx(DFL.DialogButton, { className: "fdc-install-button", onClick: () => props.onInstall(activeProvider), disabled: props.busy || props.installed, children: props.installed ? "已安装" : props.busy ? "处理中..." : providerOptions.length > 1 ? `安装（${activeProvider?.provider_label || "网盘"}）` : "安装" }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-secondary-button", onClick: props.onClose, children: "退出" })] })] }));
+    return (SP_JSX.jsxs(DFL.Focusable, { ref: detailRootRef, "data-fdc-i18n": "1", noFocusRing: true, onCancel: props.onClose, onButtonDown: handleDetailButton, onGamepadDirection: handleDetailDirection, onCancelActionDescription: "返回", onOKActionDescription: "选择", className: "fdc-detail", "flow-children": "column", children: [SP_JSX.jsx("div", { className: "fdc-detail-backdrop", style: coverUrl ? { backgroundImage: `url("${coverUrl.replace(/"/g, "%22")}")` } : {} }), SP_JSX.jsxs("div", { ref: detailScrollRef, className: "fdc-detail-scroll", children: [SP_JSX.jsxs("div", { className: "fdc-detail-top", children: [SP_JSX.jsxs("div", { className: "fdc-detail-poster", children: [coverUrl ? (SP_JSX.jsx("img", { src: coverUrl, alt: title, onError: () => setImageFailed(true), decoding: "async" })) : (SP_JSX.jsx("div", { className: "fdc-poster-fallback", children: primaryTitle.slice(0, 2) })), props.installed ? (SP_JSX.jsx("div", { className: "fdc-badge fdc-installed fdc-detail-installed", children: "已安装" })) : null] }), SP_JSX.jsxs("div", { className: "fdc-detail-info", children: [SP_JSX.jsx("div", { className: "fdc-detail-eyebrow", children: "freedeckCY 游戏库" }), SP_JSX.jsx("div", { className: "fdc-detail-title", children: primaryTitle }), secondaryTitle ? (SP_JSX.jsx("div", { className: "fdc-detail-subtitle", children: secondaryTitle })) : null, SP_JSX.jsxs("div", { className: "fdc-detail-tags", children: [SP_JSX.jsx("span", { children: String(props.item.platform || "pc").toUpperCase() }), SP_JSX.jsx("span", { children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (SP_JSX.jsx("span", { children: tag }, tag)))] }), SP_JSX.jsx("div", { className: "fdc-detail-description", children: "下载完成后会自动解压并写入 Steam 快捷方式。双网盘资源可以选择更合适的下载源。" })] })] }), SP_JSX.jsxs("div", { className: "fdc-detail-section", children: [SP_JSX.jsx("div", { className: "fdc-detail-section-title", children: "下载源" }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-source-row", "flow-children": "row", children: [providerOptions.map((option) => (SP_JSX.jsxs(DFL.DialogButton, { className: "fdc-source" + (String(activeProvider?.game_id || "") === String(option.game_id || "") ? " fdc-source-active" : ""), onClick: () => setSelectedProviderId(option.game_id), style: { width: "auto", flex: "1 1 180px", minWidth: "160px", padding: "12px 14px", textAlign: "left" }, children: [SP_JSX.jsx("div", { className: "fdc-source-name", children: option.provider_label || "网盘" }), SP_JSX.jsx("div", { className: "fdc-source-meta", children: option.size_text || props.item.size_text || "大小未知" }), SP_JSX.jsx("div", { className: "fdc-source-check", children: String(activeProvider?.game_id || "") === String(option.game_id || "") ? "已选择" : "选择此源" })] }, option.game_id)))] })] })] }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-detail-actions", "flow-children": "row", children: [SP_JSX.jsx(DFL.DialogButton, { className: "fdc-install-button", onClick: () => props.onInstall(activeProvider), disabled: props.busy || props.installed, children: props.installed ? "已安装" : props.busy ? "处理中..." : providerOptions.length > 1 ? `安装（${activeProvider?.provider_label || "网盘"}）` : "安装" }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-secondary-button", onClick: props.onClose, children: "退出" })] })] }));
 }
 const LIBRARY_CSS = `
 .fdc-root { scroll-padding-top: 84px; scroll-padding-bottom: 150px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; --fdc-bg: #0b0f14; --fdc-panel: rgba(18,26,35,0.84); --fdc-line: rgba(255,255,255,0.10); --fdc-text: #f2f6fb; --fdc-muted: #9eacbb; --fdc-accent: #65d6c0; --fdc-blue: #72b8ff; background: radial-gradient(1100px 520px at 50% -20%, #162a33 0%, var(--fdc-bg) 55%); color: var(--fdc-text); }
@@ -3248,6 +3252,7 @@ function LibraryPage({ onClose }) {
     const installedRequestRef = SP_REACT.useRef(0);
     const busyRef = SP_REACT.useRef("");
     const libraryRootRef = SP_REACT.useRef(null);
+    useI18nRoot(libraryRootRef);
     const pageSize = 30;
     const handleLibraryButton = SP_REACT.useCallback((evt) => {
         const button = Number(evt?.detail?.button || 0);

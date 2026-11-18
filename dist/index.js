@@ -1,5 +1,234 @@
 // @ts-nocheck
-const EN = {
+const EN_MISSING = {
+    "中文": "Chinese",
+    "全选": "Select All",
+    "全部": "All",
+    "其他": "Other",
+    "分类": "Category",
+    "刷新": "Refresh",
+    "取消": "Cancel",
+    "名称": "Name",
+    "平台": "Platform",
+    "排序": "Sort",
+    "搜索": "Search",
+    "清空": "Clear",
+    "百度": "Baidu",
+    "目录": "Folder",
+    "移除": "Remove",
+    "稍后": "Later",
+    "筛选": "Filter",
+    "网盘": "Drive",
+    "设置": "Settings",
+    "退出": "Close",
+    "下载源": "Download Source",
+    "已选择": "Selected",
+    "总时长": "Total",
+    "授权码": "Authorization Code",
+    "游戏库": "Game Library",
+    "诊断包": "Diagnostics",
+    "下载到 ": "Download to ",
+    "下载参数": "Download Settings",
+    "下载目录": "Download Folder",
+    "主线时长": "Main Story",
+    "保存应用": "Save App",
+    "分页数量": "Page Size",
+    "取消扫码": "Cancel QR Scan",
+    "启动失败": "Launch failed",
+    "大小未知": "Unknown size",
+    "安装到 ": "Install to ",
+    "安装目录": "Install Folder",
+    "安装行为": "Install Behavior",
+    "完成授权": "Complete Authorization",
+    "已玩时长": "Played",
+    "开始下载": "Start Download",
+    "插件更新": "Plugin Update",
+    "插件自检": "Plugin Self-check",
+    "搜索游戏": "Search Games",
+    "收起筛选": "Hide Filters",
+    "清空筛选": "Clear Filters",
+    "游戏目录": "Game Catalog",
+    "游戏详情": "Game Details",
+    "确认移除": "Confirm Removal",
+    "确认覆盖": "Confirm Overwrite",
+    "选择此源": "Select This Source",
+    "选择游戏": "Select Game",
+    "默认排序": "Default",
+    "（剩余 ": " (Free ",
+    "云存档上传": "Cloud Save Upload",
+    "天翼云账号": "Tianyi Cloud Account",
+    "扫描已安装": "Scan Installed Games",
+    "按时间倒序": "Newest First",
+    "保存下载参数": "Save Download Settings",
+    "保存目录地址": "Save Catalog URL",
+    "启动安装失败": "Failed to start install",
+    "启动安装超时": "Starting install timed out",
+    "启动游戏超时": "Launching game timed out",
+    "大小从大到小": "Largest First",
+    "大小从小到大": "Smallest First",
+    "恢复目标目录": "Restore Target Folder",
+    "打开目录失败": "Failed to open folder",
+    "打开目录超时": "Opening folder timed out",
+    "清除百度授权": "Clear Baidu Authorization",
+    "百度扫码登录": "Baidu QR Login",
+    "确认移除任务": "Confirm Remove Task",
+    "确认覆盖存档": "Confirm Overwrite Saves",
+    "获取授权链接": "Get Authorization Link",
+    "退出百度网盘": "Sign Out of Baidu Netdisk",
+    "选择下载目录": "Choose Download Folder",
+    "选择安装目录": "Choose Install Folder",
+    "选择版本时间": "Choose Version Time",
+    "Steam 库": "Steam Library",
+    "云存档下载恢复": "Cloud Save Download & Restore",
+    "包含模拟器存档": "Include Emulator Saves",
+    "刷新远程目录失败": "Failed to refresh remote catalog",
+    "刷新远程目录超时": "Refreshing remote catalog timed out",
+    "生成安装计划失败": "Failed to create install plan",
+    "生成安装计划超时": "Creating install plan timed out",
+    "读取游戏列表失败": "Failed to load game list",
+    "读取游戏列表超时": "Loading game list timed out",
+    "aria2 分片数": "aria2 Shard Count",
+    "游戏退出后自动上传": "Auto-upload After Game Exit",
+    "读取已安装列表失败": "Failed to load installed list",
+    "读取已安装列表超时": "Loading installed list timed out",
+    "安装后自动删除压缩包": "Delete Archive After Install",
+    "游戏列表每页显示条数": "Games per page",
+    "百度网盘（扫码登录）": "Baidu Netdisk (QR Login)",
+    "粘贴百度返回的授权码": "Paste the authorization code from Baidu",
+    "仅在自动安装成功后生效": "Only applies after a successful auto-install",
+    "按游戏分组显示云端版本": "Group cloud versions by game",
+    "磁盘空间不足，无法安装": "Not enough disk space to install",
+    "${value} / 页": "${value} / page",
+    "${minutes} 分钟": "${minutes} min",
+    "Language / 语言": "Language",
+    "Steam 快捷方式已写入": "Steam Shortcut Added",
+    "freedeckCY 设置": "freedeckCY Settings",
+    "freedeckCY 游戏库": "freedeckCY Game Library",
+    "二维码图片加载失败，请打开：": "Failed to load QR code image. Open:",
+    "下载完成后自动安装已固定开启。": "Auto-install after download is always on.",
+    "导出失败：${message}": "Export failed: ${message}",
+    "建议 8~32，范围 1~64": "Recommended 8-32, range 1-64",
+    "建议：${check.fix}": "Suggestion: ${check.fix}",
+    "更新失败：${message}": "Update failed: ${message}",
+    "检测到多个候选目录，请明确选择": "Multiple candidate folders detected; choose one explicitly",
+    "卸载 ${item.title}": "Uninstall ${item.title}",
+    "确定卸载「${title}」吗？": "Uninstall “${title}”?",
+    "${items.length} 款": "${items.length} games",
+    "错误：${errorReason}": "Error: ${errorReason}",
+    "将删除安装目录并移除记录，是否继续？": "This will delete the install folder and remove the record. Continue?",
+    "已登录：${account}（账号）": "Signed in: ${account} (Account)",
+    "正在启动 ${item.title}": "Starting ${item.title}",
+    "下载目录已更新：${selected}": "Download folder updated: ${selected}",
+    "安装目录已更新：${selected}": "Install folder updated: ${selected}",
+    "已加入下载队列，可在插件主页查看任务进度": "Added to the download queue. Check task progress on the plugin home page.",
+    "最近一次：${last.message}": "Last run: ${last.message}",
+    "下载限速已设为 ${value} KB/s": "Download speed limit set to ${value} KB/s",
+    "已卸载：${title}${suffix}": "Uninstalled: ${title}${suffix}",
+    "${installed.total} 款已安装": "${installed.total} installed",
+    "后台检测游戏进程，退出后自动打包上传；默认开启": "Watches the game process in the background and uploads automatically after exit; enabled by default",
+    "已读取存档项 ${rows.length} 个": "Loaded ${rows.length} save entries",
+    "百度网盘 OpenAPI（可选，需开发者资质）": "Baidu Netdisk OpenAPI (optional; requires developer access)",
+    "${rounded.toFixed(1)} 小时": "${rounded.toFixed(1)} h",
+    "分页数量已更新：${nextValue} / 页": "Page size updated: ${nextValue} / page",
+    "已是最新：${total} 条（服务器没有更新）": "Already up to date: ${total} entries (no updates on server)",
+    "自检失败：${diagnosticsError}": "Self-check failed: ${diagnosticsError}",
+    "${Math.round(rounded)} 小时": "${Math.round(rounded)} h",
+    "${hours} 小时 ${minutes} 分钟": "${hours} h ${minutes} min",
+    "界面语言 / Interface language": "Interface language",
+    "\n\n示例：\n${samples.join(\"\n\")}": "\n\nExamples:\n${samples.join(\"\n\")}",
+    "打开设置失败：${errorText(error)}": "Failed to open settings: ${errorText(error)}",
+    "目录服务器 CSV 地址（留空用默认 GitHub）": "Catalog server CSV URL (leave blank to use the default GitHub source)",
+    "稍后处理失败：${errorText(error)}": "Failed to dismiss: ${errorText(error)}",
+    "进度 ${progress.toFixed(1)}%": "Progress ${progress.toFixed(1)}%",
+    "发现新版本 ${result.data.latest}": "New version available: ${result.data.latest}",
+    "打开游戏库失败：${errorText(error)}": "Failed to open game library: ${errorText(error)}",
+    "下载列表（${visibleTasks.length}）": "Downloads (${visibleTasks.length})",
+    "扫码状态连续失败：${errorText(error)}": "QR status check failed repeatedly: ${errorText(error)}",
+    "选择下载目录失败：${errorText(error)}": "Failed to choose download folder: ${errorText(error)}",
+    "选择安装目录失败：${errorText(error)}": "Failed to choose install folder: ${errorText(error)}",
+    "${updateText}（TLS 证书校验失败，已降级）": "${updateText} (TLS certificate validation failed; fallback used)",
+    "已导出：${result.data.path || \"\"}": "Exported: ${result.data.path || \"\"}",
+    "速度 ${formatSpeed(task.speed)}": "Speed ${formatSpeed(task.speed)}",
+    "已刷新云存档版本（游戏 ${games.length} 个）": "Cloud save versions refreshed (${games.length} games)",
+    "模拟器：${plan.emulator_info.name}": "Emulator: ${plan.emulator_info.name}",
+    "${downloadText}（TLS 证书校验失败，已降级）": "${downloadText} (TLS certificate validation failed; fallback used)",
+    "已卸载：${item.title || item.game_id}": "Uninstalled: ${item.title || item.game_id}",
+    "已更新：${total} 条${addedCount > 0 ? ": "Updated: ${total} entries${addedCount > 0 ? ",
+    "新增 ${count} 个游戏${titles.length ? ": "Added ${count} games${titles.length ? ",
+    "从服务器下载最新的游戏目录 CSV 到本地；下载成功后会立即重新加载。": "Downloads the latest game catalog CSV from the server; reloads immediately after a successful download.",
+    "安装 ${plan.game_title || item.title}": "Install ${plan.game_title || item.title}",
+    "未检测到可写 SD 卡/外置存储（请先在 SteamOS/系统中挂载）": "No writable SD card / external storage detected (mount it in SteamOS/system first)",
+    "确定移除「${title}」吗？\n\n只移除任务记录，不删除已下载文件。": "Remove “${title}”?\n\nThis only removes the task record; downloaded files are kept.",
+    "\n提示：${plan.emulator_info.setup_hint}": "\nTip: ${plan.emulator_info.setup_hint}",
+    "当前已登录：${login.user_account || \"未知账号\"}": "Currently signed in: ${login.user_account || \"Unknown Account\"}",
+    "游戏列表已更新：${total} 条${addedCount > 0 ? ": "Game list updated: ${total} entries${addedCount > 0 ? ",
+    "自动重启失败：${errorText(error)}；请手动重启 Steam": "Auto-restart failed: ${errorText(error)}; please restart Steam manually",
+    "安装目录占用：${formatBytesText(installBytes)}": "Install folder usage: ${formatBytesText(installBytes)}",
+    "选择界面语言 / Choose your interface language": "Choose your interface language",
+    "已授权：${baiduLogin.user_account || \"百度账号\"}": "Authorized: ${baiduLogin.user_account || \"Baidu Account\"}",
+    "${stage}：已恢复 ${current.restored_files} 个文件": "${stage}: ${current.restored_files} files restored",
+    "下载完成后会自动解压并写入 Steam 快捷方式。双网盘资源可以选择更合适的下载源。": "After downloading, files are extracted automatically and added as a Steam shortcut. For resources available on both drives, you can pick the more suitable download source.",
+    "已登录：${baiduWebLogin.user_account || \"百度账号\"}": "Signed in: ${baiduWebLogin.user_account || \"Baidu Account\"}",
+    "安装（${activeProvider?.provider_label || \"网盘\"}）": "Install (${activeProvider?.provider_label || \"Drive\"})",
+    "已显示 ${catalog.items.length} / ${catalog.total}": "Showing ${catalog.items.length} / ${catalog.total}",
+    "（已回收 Proton 前缀 ${formatBytesText(freedBytes)}）": " (Reclaimed Proton prefix ${formatBytesText(freedBytes)})",
+    "${item.game_title}（${item.versions.length} 个版本）": "${item.game_title} (${item.versions.length} versions)",
+    "连 Proton 前缀一起删（${formatBytesText(compatBytes)}）": "Also delete Proton prefix (${formatBytesText(compatBytes)})",
+    "GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch 的存档与记忆卡": "GBA/PSP/NDS/PS1/FC/MD/3DS/PS2/PS3/Switch saves and memory cards",
+    "扫描设置里的安装目录一层，把目录名匹配标题的游戏补回列表；Steam 里没有的会自动创建快捷方式。": "Scans one level under the install folder from Settings and re-adds games whose folder name matches a title; missing Steam shortcuts are created automatically.",
+    "${item.game_title}（不可恢复：${item.reason || \"无可用版本\"}）": "${item.game_title} (cannot restore: ${item.reason || \"No versions available\"})",
+    "${catalog.total} 款游戏${hasActiveFilters ? \" · 已筛选\" : \"\"}": "${catalog.total} games${hasActiveFilters ? \" · Filtered\" : \"\"}",
+    "${check.label || check.id || \"检查\"}：${check.detail || \"\"}": "${check.label || check.id || \"Check\"}: ${check.detail || \"\"}",
+    "${field === \"download_dir\" ? \"下载\" : \"安装\"}目录已切换到：${value}": "${field === \"download_dir\" ? \"Download\" : \"Install\"} folder switched to: ${value}",
+    "安装：${installStatusText(installStatus)}${installMessage ? ": "Install: ${installStatusText(installStatus)}${installMessage ? ",
+    "检测到 ${Number(plan.conflict_count || 0)} 个冲突文件，确认后会覆盖原有存档。": "Detected ${Number(plan.conflict_count || 0)} conflicting files; confirming will overwrite the existing saves.",
+    "检查插件版本、状态/下载/安装目录、aria2/7zz/node、Steam 快捷方式、SD 卡、网络与百度扫码接口。": "Checks the plugin version, status/download/install folders, aria2/7zz/node, Steam shortcuts, SD card, network, and Baidu QR login API.",
+    "Proton 前缀（compatdata）另占 ${formatBytesText(compatBytes)}，可选择一并删除。": "Proton prefix (compatdata) uses another ${formatBytesText(compatBytes)}; you can choose to delete it too.",
+    "当前 ${updateInfo.current || \"?\"} · 最新 ${updateInfo.latest || \"?\"}": "Current ${updateInfo.current || \"?\"} · Latest ${updateInfo.latest || \"?\"}",
+    "最近更新（${catalogUpdate.added_count || catalogUpdate.items.length}）": "Recently Updated (${catalogUpdate.added_count || catalogUpdate.items.length})",
+    "游戏预览（已安装 ${state.installed.total || sortedInstalledGames.length}）": "Game Preview (${state.installed.total || sortedInstalledGames.length} installed)",
+    "最近一次：${stage}，成功 ${last.uploaded}，跳过 ${last.skipped}，失败 ${last.failed}": "Last run: ${stage}, succeeded ${last.uploaded}, skipped ${last.skipped}, failed ${last.failed}",
+    "安装：${plan.required_install_human || \"未知\"} → ${plan.install_dir || \"-\"}\n": "Install: ${plan.required_install_human || \"Unknown\"} → ${plan.install_dir || \"-\"}\n",
+    "导出 diagnostics.json、self-check.json、最新 300 行日志；cookie/token 已脱敏，写到下载目录。": "Exports diagnostics.json, self-check.json, and the latest 300 log lines; cookies/tokens are redacted and written to the download folder.",
+    "目录已刷新：${result.data?.total ?? 0} 条（${result.data?.source || \"unknown\"}）": "Catalog refreshed: ${result.data?.total ?? 0} entries (${result.data?.source || \"unknown\"})",
+    "OK ${summary.ok || 0} / 警告 ${summary.warn || 0} / 失败 ${summary.fail || 0}": "OK ${summary.ok || 0} / Warnings ${summary.warn || 0} / Failures ${summary.fail || 0}",
+    "下载：${plan.required_download_human || \"未知\"} → ${plan.download_dir || \"-\"}\n": "Download: ${plan.required_download_human || \"Unknown\"} → ${plan.download_dir || \"-\"}\n",
+    "「${state.steam_restart.title || \"游戏\"}」已安装并写入 Steam 快捷方式。重启 Steam 后才会显示在库中。": "“${state.steam_restart.title || \"Game\"}” is installed and added as a Steam shortcut. It will show up in your library after Steam restarts.",
+    "限速 KB/s（当前 ${Math.round(Number(state.settings.download_speed_limit || 0) / 1024)}，0 不限）": "Speed limit KB/s (current ${Math.round(Number(state.settings.download_speed_limit || 0) / 1024)}, 0 = unlimited)",
+    "${cloudSaveUploadState.message || \"未开始\"} | ${clampProgress(cloudSaveUploadState.progress).toFixed(1)}%": "${cloudSaveUploadState.message || \"Not Started\"} | ${clampProgress(cloudSaveUploadState.progress).toFixed(1)}%",
+    "${cloudSaveRestoreState.message || \"未开始\"} | ${clampProgress(cloudSaveRestoreState.progress).toFixed(1)}%": "${cloudSaveRestoreState.message || \"Not Started\"} | ${clampProgress(cloudSaveRestoreState.progress).toFixed(1)}%",
+    "游玩时长：${formatPlaytimeText(item.playtime_seconds || 0, item.playtime_text)}${item.playtime_active ? \"（进行中）\" : \"\"}": "Playtime: ${formatPlaytimeText(item.playtime_seconds || 0, item.playtime_text)}${item.playtime_active ? \" (In Progress)\" : \"\"}",
+    "${stage}：${current.processed_games}/${current.total_games}，成功 ${current.uploaded}，跳过 ${current.skipped}，失败 ${current.failed}": "${stage}: ${current.processed_games}/${current.total_games}, succeeded ${current.uploaded}, skipped ${current.skipped}, failed ${current.failed}",
+    "v${diagnosticsReport.version || \"?\"} · ${diagnosticsReport.arch || \"-\"} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}": "v${diagnosticsReport.version || \"?\"} · ${diagnosticsReport.arch || \"-\"} · OK ${diagnosticsReport.summary?.ok || 0} / Warnings ${diagnosticsReport.summary?.warn || 0} / Failures ${diagnosticsReport.summary?.fail || 0} / Skipped ${diagnosticsReport.summary?.skip || 0}",
+    "动作冒险": "Action Adventure",
+    "角色扮演": "RPG",
+    "模拟器": "Emulator",
+    "策略战棋": "Strategy",
+    "模拟经营": "Simulation",
+    "休闲益智": "Casual Puzzle",
+    "枪战射击": "Shooter",
+    "体育竞速": "Sports Racing",
+    "恐怖惊悚": "Horror",
+    "卡牌桌游": "Card & Board",
+    "格斗清版": "Fighting",
+    "即时战略": "RTS",
+    "天翼云盘": "Tianyi Cloud",
+    "百度网盘": "Baidu Netdisk",
+    "网盘": "Cloud Drive",
+    "天翼": "Tianyi",
+    "百度": "Baidu",
+    "全部游戏": "All Games",
+    "已安装": "Installed",
+    "已选择": "Selected",
+    "选择此源": "Choose Source",
+    "下载源": "Download Source",
+    "安装": "Install",
+    "退出": "Exit",
+    "大小未知": "Unknown Size",
+    "已选择此源": "Selected Source",
+};
+
+// @ts-nocheck
+const EN_BASE = {
     "下载": "Download",
     "卸载": "Uninstall",
     "失败": "Failed",
@@ -236,12 +465,13 @@ const EN = {
     ");\n            }\n            const data = result.data;\n            setInstalled({\n                total: Number(data.total || 0),\n                items: Array.isArray(data.items) ? data.items : [],\n            });\n        }\n        catch (error) {\n            if (installedRequestRef.current === requestSeq)\n                toastError(error);\n        }\n        finally {\n            if (installedRequestRef.current === requestSeq)\n                setLoadingInstalled(false);\n        }\n    }, []);\n    // 搜索词/筛选没变时（例如同一个词再按一次回车）也要能刷新：用 nonce 触发 effect 重新拉取。\n    const submitSearch = SP_REACT.useCallback(() => {\n        setActiveQuery(query.trim());\n        setPage(1);\n        setReloadNonce((value) => value + 1);\n    }, [query]);\n    const resetSearch = SP_REACT.useCallback(() => {\n        setQuery(": ");\n            }\n            const data = result.data;\n            setInstalled({\n                total: Number(data.total || 0),\n                items: Array.isArray(data.items) ? data.items : [],\n            });\n        }\n        catch (error) {\n            if (installedRequestRef.current === requestSeq)\n                toastError(error);\n        }\n        finally {\n            if (installedRequestRef.current === requestSeq)\n                setLoadingInstalled(false);\n        }\n    }, []);\n    // Refresh even when the search term/filters are unchanged (e.g. pressing Enter again on the same term): use a nonce to re-trigger the fetch effect.\n    const submitSearch = SP_REACT.useCallback(() => {\n        setActiveQuery(query.trim());\n        setPage(1);\n        setReloadNonce((value) => value + 1);\n    }, [query]);\n    const resetSearch = SP_REACT.useCallback(() => {\n        setQuery(",
     ", body: `已卸载：${item.title || item.game_id}` });\n                        await loadInstalled();\n                    }\n                    catch (error) {\n                        toastError(error);\n                    }\n                    finally {\n                        endBusy();\n                    }\n                })();\n            }, onCancel: () => { } }));\n    }, [beginBusy, endBusy, loadInstalled]);\n    const handleClose = SP_REACT.useCallback(() => {\n        if (onClose) {\n            try {\n                onClose();\n                return;\n            }\n            catch {\n                // onClose 失效时继续走路由返回兜底。\n            }\n        }\n        try {\n            DFL.Navigation.NavigateBack();\n        }\n        catch {\n            try {\n                DFL.Router.CloseSideMenus?.();\n            }\n            catch {\n                // 忽略关闭失败。\n            }\n        }\n    }, [onClose]);\n    const handleSteamLibrary = SP_REACT.useCallback(() => {\n        // modal 模式先关弹层；路由模式先留在插件页，导航失败再回退。\n        try {\n            onClose?.();\n        }\n        catch {\n            // 忽略关闭失败。\n        }\n        try {\n            DFL.Navigation.NavigateToLibraryTab();\n            return;\n        }\n        catch {\n            // 继续尝试旧接口。\n        }\n        try {\n            DFL.Router.NavigateToLibraryTab?.();\n            return;\n        }\n        catch {\n            // 继续尝试返回。\n        }\n        if (!onClose) {\n            try {\n                DFL.Navigation.NavigateBack();\n            }\n            catch {\n                // 忽略关闭失败。\n            }\n        }\n    }, [onClose]);\n    const onOpenDetail = SP_REACT.useCallback((item) => {\n        let modal = null;\n        try {\n            modal = DFL.showModal(SP_JSX.jsx(GameDetailModal, { item: item, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busy: Boolean(busyKey), onInstall: (selectedItem) => {\n                    try {\n                        modal?.Close();\n                    }\n                    catch {\n                        // 忽略关闭失败。\n                    }\n                    void onPrepareInstall(selectedItem || item);\n                }, onClose: () => {\n                    try {\n                        modal?.Close();\n                    }\n                    catch {\n                        // 忽略关闭失败。\n                    }\n                } }), undefined, {\n                strTitle: ": ", body: `Uninstalled: ${item.title || item.game_id}` });\n                        await loadInstalled();\n                    }\n                    catch (error) {\n                        toastError(error);\n                    }\n                    finally {\n                        endBusy();\n                    }\n                })();\n            }, onCancel: () => { } }));\n    }, [beginBusy, endBusy, loadInstalled]);\n    const handleClose = SP_REACT.useCallback(() => {\n        if (onClose) {\n            try {\n                onClose();\n                return;\n            }\n            catch {\n                // Fall back to route navigation when onClose fails.\n            }\n        }\n        try {\n            DFL.Navigation.NavigateBack();\n        }\n        catch {\n            try {\n                DFL.Router.CloseSideMenus?.();\n            }\n            catch {\n                // Ignore close failures.\n            }\n        }\n    }, [onClose]);\n    const handleSteamLibrary = SP_REACT.useCallback(() => {\n        // Modal mode closes the overlay first; route mode stays on the plugin page and only falls back if navigation fails.\n        try {\n            onClose?.();\n        }\n        catch {\n            // Ignore close failures.\n        }\n        try {\n            DFL.Navigation.NavigateToLibraryTab();\n            return;\n        }\n        catch {\n            // Try the legacy API next.\n        }\n        try {\n            DFL.Router.NavigateToLibraryTab?.();\n            return;\n        }\n        catch {\n            // Keep trying to navigate back.\n        }\n        if (!onClose) {\n            try {\n                DFL.Navigation.NavigateBack();\n            }\n            catch {\n                // Ignore close failures.\n            }\n        }\n    }, [onClose]);\n    const onOpenDetail = SP_REACT.useCallback((item) => {\n        let modal = null;\n        try {\n            modal = DFL.showModal(SP_JSX.jsx(GameDetailModal, { item: item, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busy: Boolean(busyKey), onInstall: (selectedItem) => {\n                    try {\n                        modal?.Close();\n                    }\n                    catch {\n                        // Ignore close failures.\n                    }\n                    void onPrepareInstall(selectedItem || item);\n                }, onClose: () => {\n                    try {\n                        modal?.Close();\n                    }\n                    catch {\n                        // Ignore close failures.\n                    }\n                } }), undefined, {\n                strTitle: ",
 };
+const EN = { ...EN_BASE, ...EN_MISSING };
 
 // @ts-nocheck
 
 const LANGUAGE_KEY = "freedeckcy.language";
 const ATTRIBUTES = ["placeholder", "title", "aria-label", "aria-description"];
-const CJK = /[\u3400-\u9fff]/;
+const CJK = /[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]/;
 const listeners = new Set();
 const originalText = new WeakMap();
 const originalAttributes = new WeakMap();
@@ -290,12 +520,15 @@ function translatePatterns(value) {
         [/已显示\s*(\d+)\s*\/\s*(\d+)/g, "Showing $1 / $2"],
         [/第\s*(\d+)\s*\/\s*(\d+)\s*页/g, "Page $1 / $2"],
         [/剩余\s*([^）)]+)/g, "Free $1"],
-        [/已登录[:：]\s*/g, "Signed in: "],
-        [/未登录/g, "Not signed in"],
+        [/已登录[:：]\s*/g, "Signed In: "],
+        [/未登录/g, "Not Signed In"],
+        [/（账号）/g, " (Account)"],
+        [/（进行中）/g, " (In Progress)"],
         [/(\d+)\s*分钟/g, "$1 min"],
         [/(\d+)\s*秒/g, "$1 s"],
         [/(\d+)\s*个文件/g, "$1 files"],
         [/(\d+)\s*个/g, "$1"],
+        [/／/g, "/"],
     ];
     for (const [pattern, replacement] of rules) {
         output = output.replace(pattern, replacement);
@@ -308,6 +541,9 @@ function translateString(value) {
     const exact = EN[value];
     if (exact !== undefined)
         return exact;
+    const punctuation = { "（": "(", "）": ")", "：": ":", "，": ", ", "。": ". ", "／": "/", "【": "[", "】": "]" };
+    if (value.length === 1 && punctuation[value] !== undefined)
+        return punctuation[value];
     let output = translatePatterns(value);
     if (output !== value && !CJK.test(output))
         return output;
@@ -377,20 +613,24 @@ function translateElementAttributes(element) {
 function scan(root) {
     if (!root)
         return;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const doc = root.nodeType === 9 ? root : root.ownerDocument;
+    const view = doc?.defaultView;
+    if (!doc)
+        return;
+    const walker = doc.createTreeWalker(root, (view?.NodeFilter || NodeFilter).SHOW_TEXT);
     let node = walker.nextNode();
     while (node) {
         translateTextNode(node);
         node = walker.nextNode();
     }
-    if (root instanceof Element)
+    if (root.nodeType === 1)
         translateElementAttributes(root);
     const elements = root.querySelectorAll ? root.querySelectorAll("*") : [];
     for (const element of Array.from(elements))
         translateElementAttributes(element);
 }
 function applyLanguage() {
-    if (typeof document === "undefined")
+    if (typeof document === "undefined" && activeDocuments.size === 0)
         return;
     if (getLanguage() !== "en") {
         for (const node of Array.from(trackedText)) {
@@ -399,22 +639,29 @@ function applyLanguage() {
                 node.nodeValue = original;
         }
     }
-    scan(document.body);
+    const documents = activeDocuments.size > 0 ? Array.from(activeDocuments) : [document];
+    for (const doc of documents)
+        scan(doc.body);
 }
-let observerStarted = false;
-function startObserver() {
-    if (observerStarted || typeof document === "undefined")
+const observedDocuments = new WeakSet();
+const activeDocuments = new Set();
+function startI18nObserver(targetDocument) {
+    const doc = targetDocument || (typeof document !== "undefined" ? document : null);
+    if (!doc || !doc.body)
         return;
-    if (!document.body) {
-        window.setTimeout(startObserver, 250);
+    activeDocuments.add(doc);
+    if (observedDocuments.has(doc)) {
+        applyLanguage();
         return;
     }
-    observerStarted = true;
-    const observer = new MutationObserver(() => {
-        window.clearTimeout(window.__fdcI18nTimer);
-        window.__fdcI18nTimer = window.setTimeout(() => scan(document.body), 0);
+    observedDocuments.add(doc);
+    const view = doc.defaultView || window;
+    const Observer = view.MutationObserver;
+    const observer = new Observer(() => {
+        view.clearTimeout(view.__fdcI18nTimer);
+        view.__fdcI18nTimer = view.setTimeout(() => scan(doc.body), 0);
     });
-    observer.observe(document.body, {
+    observer.observe(doc.body, {
         subtree: true,
         childList: true,
         characterData: true,
@@ -423,8 +670,29 @@ function startObserver() {
     });
     applyLanguage();
 }
-if (typeof window !== "undefined")
-    window.setTimeout(startObserver, 0);
+function useI18nRoot(elementRef) {
+    const fallbackRef = SP_REACT.useRef(null);
+    SP_REACT.useEffect(() => {
+        let attempts = 0;
+        const run = () => {
+            const node = elementRef?.current || fallbackRef.current;
+            const doc = node?.ownerDocument || (typeof document !== "undefined" ? document : null);
+            if (!doc || !doc.body) {
+                if (attempts++ < 40)
+                    window.setTimeout(run, 50);
+                return;
+            }
+            try {
+                startI18nObserver(doc);
+            }
+            catch (error) {
+                console.error("freedeckCY i18n observer failed", error);
+            }
+        };
+        run();
+    }, []);
+    return fallbackRef;
+}
 
 // @ts-nocheck
 
@@ -1805,6 +2073,7 @@ function SettingsPage() {
     const [selectedRestoreTargetDir, setSelectedRestoreTargetDir] = SP_REACT.useState("");
     const [splitDraft, setSplitDraft] = SP_REACT.useState(16);
     const settingsContainerRef = SP_REACT.useRef(null);
+    useI18nRoot(settingsContainerRef);
     const tabStabilityCss = SP_REACT.useMemo(() => `
       .freedeckcy-settings-root [class*="TabContentsScroll"],
       .freedeckcy-settings-root [class*="TabContents"],
@@ -2925,12 +3194,13 @@ async function tryRefreshSteamLibrary() {
     return false;
 }
 function LanguageChooser() {
-    return (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "13px", lineHeight: 1.5 }, children: "选择界面语言 / Choose your interface language" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), children: "中文" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), children: "English" })] }) })] }));
+    return (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "13px", lineHeight: 1.5 }, children: "选择界面语言 / Choose your interface language" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), style: { flex: "1 1 0", width: "auto", minWidth: 0, padding: "8px 10px" }, children: "中文" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), style: { flex: "1 1 0", width: "auto", minWidth: 0, padding: "8px 10px" }, children: "English" })] }) })] }));
 }
 function LanguageSection({ language }) {
-    return (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: "界面语言 / Interface language" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), disabled: language === "zh", children: "中文" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), disabled: language === "en", children: "English" })] }) })] }));
+    return (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "Language / 语言", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", opacity: 0.8 }, children: "界面语言 / Interface language" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("zh"), disabled: language === "zh", style: { flex: "1 1 0", width: "auto", minWidth: 0, padding: "8px 10px" }, children: "中文" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => setLanguage("en"), disabled: language === "en", style: { flex: "1 1 0", width: "auto", minWidth: 0, padding: "8px 10px" }, children: "English" })] }) })] }));
 }
 function Content() {
+    const contentI18nRef = useI18nRoot();
     const [loading, setLoading] = SP_REACT.useState(true);
     const [state, setState] = SP_REACT.useState(EMPTY_STATE);
     const [openingLogin, setOpeningLogin] = SP_REACT.useState(false);
@@ -3441,7 +3711,7 @@ function Content() {
     if (loading) {
         return (_local_SP_JSX.jsx(DFL.PanelSection, { children: _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
     }
-    return (_local_SP_JSX.jsxs("div", { "data-fdc-i18n": "1", style: { display: "contents" }, children: [_local_SP_JSX.jsx(LanguageSection, { language: language }), _local_SP_JSX.jsxs(DFL.PanelSection, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: {
+    return (_local_SP_JSX.jsxs("div", { ref: contentI18nRef, "data-fdc-i18n": "1", style: { display: "contents" }, children: [_local_SP_JSX.jsx(LanguageSection, { language: language }), _local_SP_JSX.jsxs(DFL.PanelSection, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: {
                                 width: "100%",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -3500,6 +3770,8 @@ function GameDetailModal(props) {
     const [imageFailed, setImageFailed] = SP_REACT.useState(false);
     const [selectedProviderId, setSelectedProviderId] = SP_REACT.useState("");
     const detailScrollRef = SP_REACT.useRef(null);
+    const detailRootRef = SP_REACT.useRef(null);
+    useI18nRoot(detailRootRef);
     SP_REACT.useEffect(() => {
         const node = detailScrollRef.current;
         if (!node)
@@ -3548,7 +3820,7 @@ function GameDetailModal(props) {
                 size_text: props.item.size_text || "",
             }];
     const activeProvider = providerOptions.find((option) => String(option.game_id || "") === String(selectedProviderId || "")) || providerOptions[0];
-    return (_local_SP_JSX.jsxs(DFL.Focusable, { "data-fdc-i18n": "1", noFocusRing: true, onCancel: props.onClose, onButtonDown: handleDetailButton, onGamepadDirection: handleDetailDirection, onCancelActionDescription: "返回", onOKActionDescription: "选择", className: "fdc-detail", "flow-children": "column", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-backdrop", style: coverUrl ? { backgroundImage: `url("${coverUrl.replace(/"/g, "%22")}")` } : {} }), _local_SP_JSX.jsxs("div", { ref: detailScrollRef, className: "fdc-detail-scroll", children: [_local_SP_JSX.jsxs("div", { className: "fdc-detail-top", children: [_local_SP_JSX.jsxs("div", { className: "fdc-detail-poster", children: [coverUrl ? (_local_SP_JSX.jsx("img", { src: coverUrl, alt: title, onError: () => setImageFailed(true), decoding: "async" })) : (_local_SP_JSX.jsx("div", { className: "fdc-poster-fallback", children: primaryTitle.slice(0, 2) })), props.installed ? (_local_SP_JSX.jsx("div", { className: "fdc-badge fdc-installed fdc-detail-installed", children: "已安装" })) : null] }), _local_SP_JSX.jsxs("div", { className: "fdc-detail-info", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-eyebrow", children: "freedeckCY 游戏库" }), _local_SP_JSX.jsx("div", { className: "fdc-detail-title", children: primaryTitle }), secondaryTitle ? (_local_SP_JSX.jsx("div", { className: "fdc-detail-subtitle", children: secondaryTitle })) : null, _local_SP_JSX.jsxs("div", { className: "fdc-detail-tags", children: [_local_SP_JSX.jsx("span", { children: String(props.item.platform || "pc").toUpperCase() }), _local_SP_JSX.jsx("span", { children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (_local_SP_JSX.jsx("span", { children: tag }, tag)))] }), _local_SP_JSX.jsx("div", { className: "fdc-detail-description", children: "下载完成后会自动解压并写入 Steam 快捷方式。双网盘资源可以选择更合适的下载源。" })] })] }), _local_SP_JSX.jsxs("div", { className: "fdc-detail-section", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-section-title", children: "下载源" }), _local_SP_JSX.jsxs(DFL.Focusable, { className: "fdc-source-row", "flow-children": "row", children: [providerOptions.map((option) => (_local_SP_JSX.jsxs(DFL.DialogButton, { className: "fdc-source" + (String(activeProvider?.game_id || "") === String(option.game_id || "") ? " fdc-source-active" : ""), onClick: () => setSelectedProviderId(option.game_id), style: { width: "auto", flex: "1 1 180px", minWidth: "160px", padding: "12px 14px", textAlign: "left" }, children: [_local_SP_JSX.jsx("div", { className: "fdc-source-name", children: option.provider_label || "网盘" }), _local_SP_JSX.jsx("div", { className: "fdc-source-meta", children: option.size_text || props.item.size_text || "大小未知" }), _local_SP_JSX.jsx("div", { className: "fdc-source-check", children: String(activeProvider?.game_id || "") === String(option.game_id || "") ? "已选择" : "选择此源" })] }, option.game_id)))] })] })] }), _local_SP_JSX.jsxs(DFL.Focusable, { className: "fdc-detail-actions", "flow-children": "row", children: [_local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-install-button", onClick: () => props.onInstall(activeProvider), disabled: props.busy || props.installed, children: props.installed ? "已安装" : props.busy ? "处理中..." : providerOptions.length > 1 ? `安装（${activeProvider?.provider_label || "网盘"}）` : "安装" }), _local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-secondary-button", onClick: props.onClose, children: "退出" })] })] }));
+    return (_local_SP_JSX.jsxs(DFL.Focusable, { ref: detailRootRef, "data-fdc-i18n": "1", noFocusRing: true, onCancel: props.onClose, onButtonDown: handleDetailButton, onGamepadDirection: handleDetailDirection, onCancelActionDescription: "返回", onOKActionDescription: "选择", className: "fdc-detail", "flow-children": "column", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-backdrop", style: coverUrl ? { backgroundImage: `url("${coverUrl.replace(/"/g, "%22")}")` } : {} }), _local_SP_JSX.jsxs("div", { ref: detailScrollRef, className: "fdc-detail-scroll", children: [_local_SP_JSX.jsxs("div", { className: "fdc-detail-top", children: [_local_SP_JSX.jsxs("div", { className: "fdc-detail-poster", children: [coverUrl ? (_local_SP_JSX.jsx("img", { src: coverUrl, alt: title, onError: () => setImageFailed(true), decoding: "async" })) : (_local_SP_JSX.jsx("div", { className: "fdc-poster-fallback", children: primaryTitle.slice(0, 2) })), props.installed ? (_local_SP_JSX.jsx("div", { className: "fdc-badge fdc-installed fdc-detail-installed", children: "已安装" })) : null] }), _local_SP_JSX.jsxs("div", { className: "fdc-detail-info", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-eyebrow", children: "freedeckCY 游戏库" }), _local_SP_JSX.jsx("div", { className: "fdc-detail-title", children: primaryTitle }), secondaryTitle ? (_local_SP_JSX.jsx("div", { className: "fdc-detail-subtitle", children: secondaryTitle })) : null, _local_SP_JSX.jsxs("div", { className: "fdc-detail-tags", children: [_local_SP_JSX.jsx("span", { children: String(props.item.platform || "pc").toUpperCase() }), _local_SP_JSX.jsx("span", { children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (_local_SP_JSX.jsx("span", { children: tag }, tag)))] }), _local_SP_JSX.jsx("div", { className: "fdc-detail-description", children: "下载完成后会自动解压并写入 Steam 快捷方式。双网盘资源可以选择更合适的下载源。" })] })] }), _local_SP_JSX.jsxs("div", { className: "fdc-detail-section", children: [_local_SP_JSX.jsx("div", { className: "fdc-detail-section-title", children: "下载源" }), _local_SP_JSX.jsxs(DFL.Focusable, { className: "fdc-source-row", "flow-children": "row", children: [providerOptions.map((option) => (_local_SP_JSX.jsxs(DFL.DialogButton, { className: "fdc-source" + (String(activeProvider?.game_id || "") === String(option.game_id || "") ? " fdc-source-active" : ""), onClick: () => setSelectedProviderId(option.game_id), style: { width: "auto", flex: "1 1 180px", minWidth: "160px", padding: "12px 14px", textAlign: "left" }, children: [_local_SP_JSX.jsx("div", { className: "fdc-source-name", children: option.provider_label || "网盘" }), _local_SP_JSX.jsx("div", { className: "fdc-source-meta", children: option.size_text || props.item.size_text || "大小未知" }), _local_SP_JSX.jsx("div", { className: "fdc-source-check", children: String(activeProvider?.game_id || "") === String(option.game_id || "") ? "已选择" : "选择此源" })] }, option.game_id)))] })] })] }), _local_SP_JSX.jsxs(DFL.Focusable, { className: "fdc-detail-actions", "flow-children": "row", children: [_local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-install-button", onClick: () => props.onInstall(activeProvider), disabled: props.busy || props.installed, children: props.installed ? "已安装" : props.busy ? "处理中..." : providerOptions.length > 1 ? `安装（${activeProvider?.provider_label || "网盘"}）` : "安装" }), _local_SP_JSX.jsx(DFL.DialogButton, { className: "fdc-secondary-button", onClick: props.onClose, children: "退出" })] })] }));
 }
 const LIBRARY_CSS = `
 .fdc-root { scroll-padding-top: 84px; scroll-padding-bottom: 150px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; --fdc-bg: #0b0f14; --fdc-panel: rgba(18,26,35,0.84); --fdc-line: rgba(255,255,255,0.10); --fdc-text: #f2f6fb; --fdc-muted: #9eacbb; --fdc-accent: #65d6c0; --fdc-blue: #72b8ff; background: radial-gradient(1100px 520px at 50% -20%, #162a33 0%, var(--fdc-bg) 55%); color: var(--fdc-text); }
@@ -3712,6 +3984,7 @@ function LibraryPage({ onClose }) {
     const installedRequestRef = SP_REACT.useRef(0);
     const busyRef = SP_REACT.useRef("");
     const libraryRootRef = SP_REACT.useRef(null);
+    useI18nRoot(libraryRootRef);
     const pageSize = 30;
     const handleLibraryButton = SP_REACT.useCallback((evt) => {
         const button = Number(evt?.detail?.button || 0);

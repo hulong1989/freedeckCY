@@ -1,5 +1,7 @@
 # 上游服务器依赖逆向：panyiwei.xyz
 
+> [English](UPSTREAM_SERVER.en.md) | 中文
+
 > 结论先行：**NewFreedeck 强依赖 `http://panyiwei.xyz/freedeck-catalog/`，且没有任何本地目录兜底**；本文记录其协议、缓存、失败模式与替代方案。**freedeckCY 不依赖该服务器**（目录/封面/模拟器均本地或官方源）。
 
 ## 1. 依赖点清单

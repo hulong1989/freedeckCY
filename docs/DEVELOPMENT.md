@@ -1,6 +1,8 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.28.0**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+> [English](DEVELOPMENT.en.md) | 中文
+
+本文面向二次开发者，对应 freedeckCY **v0.28.7**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -288,7 +290,7 @@ make package PACKAGE_ARGS="--out-dir /tmp/freedeckcy-build"
 bash scripts/package.sh --help          # 查看全部参数
 ```
 
-- 版本号取自 `package.json` 的 `version` 字段（当前为 `0.28.0`）；
+- 版本号取自 `package.json` 的 `version` 字段（当前为 `0.28.7`）；
 - zip **顶层目录必须是插件目录 `freedeckCY/`**（Decky 本地安装会查找 `顶层目录/plugin.json`，根目录直接放文件会被静默忽略）；其下是 `main.py`、`plugin.json`、`package.json`、`LICENSE`、`README.md`，以及 `dist/`、`py_modules/`、`backend/`、`defaults/`；
 - 打包脚本会排除 `__pycache__`、`*.pyc`、`.DS_Store`、`node_modules`、`.git`、`tests`、`scripts`、`.github`、`docs`、`gl`、`dist-artifacts`（白名单之外的一律不打包）；
 - 默认复用已提交的 `dist/index.js`，不会强制跑 `pnpm build`；需要重新构建前端时用 `bash scripts/package.sh --build-ui`（要求 PATH 里有 pnpm）；
@@ -930,13 +932,15 @@ curl -s http://<deck-ip>:8081/json/list
 | 更新按钮错位/不能左右 | 两个按钮必须同一个 `Focusable flow-children="row"` + DialogButton，不能用两个 ButtonItem |
 | 搜索/筛选低一截 | 搜索框用 placeholder，不要 label；按钮 `align-items:center` |
 
-### 6.14.1 双语界面调试（v0.28.0）
+### 6.14.1 双语界面调试（v0.28.7）
 
 - 语言 key：`localStorage["freedeckcy.language"]`，值为 `zh` 或 `en`；首次打开无值会先显示语言选择。
 - 清空语言重新测试：在 CEF 中执行 `localStorage.removeItem("freedeckcy.language")`，重载插件。
 - 翻译范围：带 `data-fdc-i18n` 的根节点（QAM 内容、设置、原生库、详情）；新增根节点时记得加属性，否则不会被翻译。
 - 修改文案后更新 `src/i18n.en.ts` 对应 key；运行 `pnpm build` 重载插件。
 - 调试：CEF 中 `localStorage.setItem("freedeckcy.language","en")` + 重载，检查 QAM/设置/游戏库/详情四处。
+- 诊断属性：`document.documentElement[data-fdc-i18n-observer]` 应为 `ready`；没有时检查 `useI18nRoot` 是否挂到真实根节点、root 的 `ownerDocument` 是否是 QAM/BigPicture 文档。
+- 词表 434 条（`src/i18n.en.ts` + `src/i18n.missing.ts`）；新增中文 UI 后要同时补词表，否则只走短语兜底。
 
 ### 6.15 诊断自检（v0.22.0）
 

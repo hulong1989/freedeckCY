@@ -6,7 +6,7 @@ export type Language = "zh" | "en";
 
 const LANGUAGE_KEY = "freedeckcy.language";
 const ATTRIBUTES = ["placeholder", "title", "aria-label", "aria-description"];
-const CJK = /[\u3400-\u9fff]/;
+const CJK = /[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]/;
 const listeners = new Set<() => void>();
 const originalText = new WeakMap<Text, string>();
 const originalAttributes = new WeakMap<Element, Record<string, string>>();
@@ -60,12 +60,15 @@ function translatePatterns(value: string): string {
         [/已显示\s*(\d+)\s*\/\s*(\d+)/g, "Showing $1 / $2"],
         [/第\s*(\d+)\s*\/\s*(\d+)\s*页/g, "Page $1 / $2"],
         [/剩余\s*([^）)]+)/g, "Free $1"],
-        [/已登录[:：]\s*/g, "Signed in: "],
-        [/未登录/g, "Not signed in"],
+        [/已登录[:：]\s*/g, "Signed In: "],
+        [/未登录/g, "Not Signed In"],
+        [/（账号）/g, " (Account)"],
+        [/（进行中）/g, " (In Progress)"],
         [/(\d+)\s*分钟/g, "$1 min"],
         [/(\d+)\s*秒/g, "$1 s"],
         [/(\d+)\s*个文件/g, "$1 files"],
         [/(\d+)\s*个/g, "$1"],
+        [/／/g, "/"],
     ];
     for (const [pattern, replacement] of rules) {
         output = output.replace(pattern, replacement);
@@ -79,6 +82,9 @@ export function translateString(value: string): string {
     const exact = EN[value];
     if (exact !== undefined)
         return exact;
+    const punctuation: Record<string, string> = { "（": "(", "）": ")", "：": ":", "，": ", ", "。": ". ", "／": "/", "【": "[", "】": "]" };
+    if (value.length === 1 && punctuation[value] !== undefined)
+        return punctuation[value];
     let output = translatePatterns(value);
     if (output !== value && !CJK.test(output))
         return output;
@@ -152,21 +158,25 @@ function translateElementAttributes(element: Element): void {
 function scan(root: ParentNode): void {
     if (!root)
         return;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const doc = root.nodeType === 9 ? (root as Document) : (root as Element).ownerDocument;
+    const view = doc?.defaultView;
+    if (!doc)
+        return;
+    const walker = doc.createTreeWalker(root, (view?.NodeFilter || NodeFilter).SHOW_TEXT);
     let node = walker.nextNode();
     while (node) {
         translateTextNode(node as Text);
         node = walker.nextNode();
     }
-    if (root instanceof Element)
-        translateElementAttributes(root);
+    if (root.nodeType === 1)
+        translateElementAttributes(root as Element);
     const elements = root.querySelectorAll ? root.querySelectorAll("*") : [];
     for (const element of Array.from(elements))
         translateElementAttributes(element);
 }
 
 export function applyLanguage(): void {
-    if (typeof document === "undefined")
+    if (typeof document === "undefined" && activeDocuments.size === 0)
         return;
     if (getLanguage() !== "en") {
         for (const node of Array.from(trackedText)) {
@@ -175,23 +185,31 @@ export function applyLanguage(): void {
                 node.nodeValue = original;
         }
     }
-    scan(document.body);
+    const documents = activeDocuments.size > 0 ? Array.from(activeDocuments) : [document];
+    for (const doc of documents)
+        scan(doc.body);
 }
 
-let observerStarted = false;
-function startObserver(): void {
-    if (observerStarted || typeof document === "undefined")
+const observedDocuments = new WeakSet<Document>();
+const activeDocuments = new Set<Document>();
+
+export function startI18nObserver(targetDocument?: Document): void {
+    const doc = targetDocument || (typeof document !== "undefined" ? document : null);
+    if (!doc || !doc.body)
         return;
-    if (!document.body) {
-        window.setTimeout(startObserver, 250);
+    activeDocuments.add(doc);
+    if (observedDocuments.has(doc)) {
+        applyLanguage();
         return;
     }
-    observerStarted = true;
-    const observer = new MutationObserver(() => {
-        window.clearTimeout((window as any).__fdcI18nTimer);
-        (window as any).__fdcI18nTimer = window.setTimeout(() => scan(document.body), 0);
+    observedDocuments.add(doc);
+    const view = doc.defaultView || window;
+    const Observer = view.MutationObserver;
+    const observer = new Observer(() => {
+        view.clearTimeout((view as any).__fdcI18nTimer);
+        (view as any).__fdcI18nTimer = view.setTimeout(() => scan(doc.body), 0);
     });
-    observer.observe(document.body, {
+    observer.observe(doc.body, {
         subtree: true,
         childList: true,
         characterData: true,
@@ -201,5 +219,26 @@ function startObserver(): void {
     applyLanguage();
 }
 
-if (typeof window !== "undefined")
-    window.setTimeout(startObserver, 0);
+export function useI18nRoot(elementRef?: React.RefObject<Element>): React.RefObject<HTMLDivElement> {
+    const fallbackRef = React.useRef(null);
+    React.useEffect(() => {
+        let attempts = 0;
+        const run = () => {
+            const node = elementRef?.current || fallbackRef.current;
+            const doc = node?.ownerDocument || (typeof document !== "undefined" ? document : null);
+            if (!doc || !doc.body) {
+                if (attempts++ < 40)
+                    window.setTimeout(run, 50);
+                return;
+            }
+            try {
+                startI18nObserver(doc);
+            }
+            catch (error) {
+                console.error("freedeckCY i18n observer failed", error);
+            }
+        };
+        run();
+    }, []);
+    return fallbackRef;
+}

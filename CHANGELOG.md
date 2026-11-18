@@ -2,6 +2,68 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.28.7
+
+### 语言按钮与游戏库对齐
+
+- 中文/English 两个 Decky 默认 160px 按钮总宽 328px，超出 300px 内容区。
+- 改为 flex 等分、`minWidth:0`，与下方「游戏库」按钮同宽对齐。
+- 去掉 i18n 临时诊断属性。
+- 555 passed。
+
+## v0.28.6
+
+### i18n observer 诊断标记
+
+- 增加 `data-fdc-i18n-observer` / `data-fdc-i18n-error` 诊断属性。
+- root ref 未就绪时重试 40 次，避免挂载时序导致 observer 未启动。
+- 555 passed。
+
+## v0.28.5
+
+### 跨 realm 扫描修复
+
+- 共享 context 与 QAM document 属于不同 realm，`root instanceof Element` 为 false，`scan()` 误把 body 当 Document 返回。
+- 改用 `root.nodeType` 判断，继续用 ownerDocument/defaultView。
+- 555 passed。
+
+## v0.28.4
+
+### 跨文档 i18n（共享 context）
+
+- Decky 组件在共享 JS context 执行，QAM DOM 属于另一个 document；全局 `document.createTreeWalker`/`MutationObserver` 会跨文档失效。
+- 改用根节点 `ownerDocument` + `defaultView` 创建 TreeWalker/MutationObserver/timer。
+- 保留组件挂载时通过 root ref 启动。
+- 555 passed。
+
+## v0.28.3
+
+### 英文 observer 绑定到实际 UI 文档
+
+- Decky 模块与 QAM 文档可能不是同一个 document；模块级启动 observer 监听错文档。
+- `useI18nRoot(ref)` 改为在 Content/Settings/Library/Detail 组件挂载后，从真实根节点 `ownerDocument` 启动 observer。
+- 语言切换扫描所有已挂载插件文档；补上 Content 根 ref。
+- 555 passed。
+
+## v0.28.2
+
+### 英文翻译生命周期修复
+
+- 真机选中 English 后界面仍为中文：语言 key 正确、DOM 有 `data-fdc-i18n`，但翻译 observer 没在 QAM 文档运行。
+- 翻译 observer 从模块加载时启动改为组件挂载时启动（`useI18nRoot`）。
+- Content / SettingsPage / LibraryPage / GameDetailModal 各自在目标文档启动 observer。
+- 保留 434 条词表与动态短语翻译；555 passed。
+
+## v0.28.1
+
+### 英文翻译完整覆盖
+
+- 修复英文不起作用：源码大部分中文是 `\uXXXX` 转义，第一版词表只提取了直接中文字符。
+- 重新解码源码字符串，新增 199 条真实 UI 词；总词表 434 条。
+- 动态登录状态/括号/数量/剩余容量等增加正则和短语兜底。
+- 热注入验证：QAM 登录状态、Game Library、Settings 全部英文。
+- 555 passed。
+
 ## v0.28.0
 
 ### 双语界面 / 首次语言选择
