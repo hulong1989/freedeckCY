@@ -141,7 +141,7 @@ freedeckCY 自身也可以用 `FREEDECKCY_CATALOG_JSON=/path/to/all.json` 或 `F
 
 | 平台 | 推荐来源 |
 |---|---|
-| GBA | mGBA 官方 GitHub Releases（**freedeckCY 已内置 0.10.5 AppImage**） |
+| GBA | mGBA 官方 GitHub Releases（**v0.10.0 起不随包内置，首次安装下载 0.10.5 AppImage**） |
 | PS1 | DuckStation 官方 GitHub Releases |
 | PS2 | PCSX2 官方 GitHub Releases |
 | PS3 | RPCS3 官方站点/GitHub |

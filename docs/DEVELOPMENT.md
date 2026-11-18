@@ -288,7 +288,7 @@ make package PACKAGE_ARGS="--out-dir /tmp/freedeckcy-build"
 bash scripts/package.sh --help          # 查看全部参数
 ```
 
-- 版本号取自 `package.json` 的 `version` 字段（当前为 `0.6.0`）；
+- 版本号取自 `package.json` 的 `version` 字段（当前为 `0.27.20`）；
 - zip **顶层目录必须是插件目录 `freedeckCY/`**（Decky 本地安装会查找 `顶层目录/plugin.json`，根目录直接放文件会被静默忽略）；其下是 `main.py`、`plugin.json`、`package.json`、`LICENSE`、`README.md`，以及 `dist/`、`py_modules/`、`backend/`、`defaults/`；
 - 打包脚本会排除 `__pycache__`、`*.pyc`、`.DS_Store`、`node_modules`、`.git`、`tests`、`scripts`、`.github`、`docs`、`gl`、`dist-artifacts`（白名单之外的一律不打包）；
 - 默认复用已提交的 `dist/index.js`，不会强制跑 `pnpm build`；需要重新构建前端时用 `bash scripts/package.sh --build-ui`（要求 PATH 里有 pnpm）；
@@ -870,9 +870,9 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 
 **页面结构（v0.27.20）**：
 
-- 顶部栏：返回 / Steam 库 / 标题 / 游戏库 / 已安装 / 刷新。
+- 顶部栏：返回 / Steam 库 / 标题 / 游戏库 / 已安装 / 刷新（普通流式，非 sticky）。
 - 搜索：placeholder「搜索游戏」+ 搜索 / 筛选按钮；筛选面板含平台/分类/排序 chip。
-- Hero + 最近更新 + 分类横向货架 + 封面网格；卡片含来源/已安装角标。
+- 默认 Hero + 最近更新 + 分类横向货架；搜索/筛选后显示封面网格；卡片含来源/已安装角标。
 - 详情：`GameDetailModal` + `showModal`；下载源选择、固定「安装/退出」操作栏。
 - 每页 30 条 + 「加载更多」；已安装页签卡片支持启动/目录/卸载。
 - QAM 不再显示 `QAM 原生 UI v...` 标识；版本以 Decky 插件列表和 `package.json` 为准。
@@ -885,7 +885,7 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 | A | 激活当前按钮/卡片/筛选 chip |
 | B | 关闭详情；游戏库内退出（`onCancel`） |
 | L1/R1 | 切换「游戏库 / 已安装」 |
-| L2/R2 | 游戏库/详情内容整页滚动 |
+| L2/R2 | 游戏库/详情内容约 0.8 屏滚动 |
 | 触控板 / 触摸 | 纵向列表、横向货架滚动；按钮/卡片可点击 |
 | 搜索框 | A 聚焦后输入，Enter 提交 |
 
@@ -1045,8 +1045,8 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 | **Switch keys/固件没识别** | `prod.keys`/`title.keys` 放 `bios/switch/`，安装时复制到 `~/.local/share/eden/keys/`；固件放压缩包，解出的 `.nca` 目录会部署到 `~/.local/share/eden/nand/system/Contents/registered/`；确认目录非空，必要时重启 Eden |
 | **3DS / PS3 / Switch 装完不能直接玩** | 这些平台需要用户自备系统文件：3DS 需要 Azahar 的 system files、PS3 需要固件（`PS3UPDAT.PUP`）、Switch 需要 `prod.keys`+固件。安装消息/库页弹窗会带 `setup_hint`；按提示在模拟器首次启动时配置，插件不内置也不下载这些文件 |
 | **Mesen2（FC/MD）不启动 / 参数不对** | Mesen2 是 zip 内单文件 `Mesen`，启动参数是 `/fullscreen <rom>`（不是 `-f`）；FC 与 MD 共用 `emulators/mesen/<arch>/` 缓存，删缓存会同时影响两者。检查 `cat launch-freedeckcy.sh` 是否 `exec <Mesen> /fullscreen <rom>`，并可手工试跑 |
-| **PS2/PS3/3DS/Switch 为什么不能装** | 未接入：PS2（PCSX2 官方包仅 x64，需 BIOS）、PS3（RPCS3 仅 x64，需固件）、3DS（Azahar 仅 x64，需 system files）、Switch（需 keys/固件，且无官方 arm64 包）。目录里只可浏览，后端拒绝安装（ROADMAP 9.8 剩余项，需先解决 arm64 官方包与固件合规） |
-| **PSP/NDS/PS1/FC/MD 找不到存档 / 没法管理存档** | 当前闭环只管"下载 ROM → 启动模拟器"，**不含 BIOS/存档管理**；存档由模拟器自身写入（如 `~/.local/share/PPSSPP`、`~/.local/share/melonDS`、DuckStation/Mesen2 配置目录），插件不接管 |
+| **PS2/PS3/3DS/Switch 为什么不能装** | 这些平台已接入。x86_64 可安装（PS2 需 BIOS、3DS 需 system files、PS3 需固件、Switch 需 keys）；aarch64 上 3DS/PS2/PS3 无官方 arm64 包，被目录白名单隐藏；Switch 有 arm64 包可用 |
+| **PSP/NDS/PS1/FC/MD 找不到存档 / 没法管理存档** | v0.12.0 起自动部署 `bios/<platform>/`；v0.15.0 起模拟器存档纳入云存档上传，v0.16.0 起支持恢复；没有独立存档管理 UI |
 | **DroidDeck 里装完游戏，Steam 里看不到快捷方式** | DroidDeck 可能同时运行两个 Steam 客户端：`~/.droiddeck-x64/.local/share/Steam`（x64）与 `~/.local/share/Steam`（标准/ARM）。插件会优先写正在运行的那个（其 `steam.pid` 存在），但若判断错，可用 `FREEDECKCY_STEAM_ROOT` 锁定目标根，重装一次游戏并重启 Steam；`GET /api/tianyi/settings` 可确认 `droiddeck_detected` |
 | **游戏启动不了 / 提示兼容工具缺失（DroidDeck）** | 需要 ARM Proton：确认 Steam 里已装 `droiddeck-proton-arm64`（或 11 版）。插件默认写 `droiddeck-proton-arm64`；版本不匹配时用 `FREEDECKCY_PROTON_TOOL=droiddeck-proton-11-arm64`，或设成 `none` 后在 Steam 里手动选兼容工具；`settings` 接口的 `proton_tool_resolved` 是实际写入值 |
 | **下载/解压报“找不到二进制”（ARM 设备）** | `ls -l defaults/runtime/{aria2,7z,node}/aarch64/…` 检查 arm64 运行时是否打进包；缺则 `make runtime ARCH=aarch64` 后重新 `make package-droiddeck`；也可用 `FREEDECKCY_ARIA2_BIN` / `FREEDECKCY_7Z_BIN` / `FREEDECKCY_NODE_BIN` 指向系统 arm64 版本 |
@@ -1088,7 +1088,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 - **compatdata 清理默认关闭**：卸载默认只删游戏文件；"连 Proton 前缀一起删"需要显式选择，避免误删存档。
 - **隔离文件与备份不会自动清理**：`*.freedeckcy-archive-invalid-*`、`*.freedeckcy-size-mismatch-*`、`*.freedeckcy-bak-*` 会留在原目录，需要手工清理（或后续 ROADMAP 项）。
 - **更新检查/诊断的能力边界**：`update-check` 未走 GitHub 认证（限流 60 次/小时/IP），失败只返回 message 不缓存失败；诊断包只脱敏常见键值（cookie/token/HOME），提交 issue 前仍建议自己过目一遍。
-- **自动云存档的边界（v0.8.0）**：只做"游戏退出后自动上传"，没有自动恢复/冲突策略（恢复仍需手动）；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档在模拟器自身配置目录（如 `~/.local/share/PPSSPP`），暂未纳入清单/Proton 扫描；指纹只看相对路径+大小+mtime（最多 5000 文件），不读内容；`cloud_save_auto_upload` 默认开启；gamewatch 依赖进程命令行含 install_path（自定义 wrapper 可能漏检），无 `/proc` 时用 `pgrep -f`。
+- **自动云存档的边界**：v0.8.0 只做 PC；v0.15.0 起纳入模拟器存档（GBA/PSP/NDS/PS1/FC/MD/Switch），v0.16.0 起支持恢复（冲突确认、覆盖前备份）；PS1/PS2/Switch 仍整卡/整目录覆盖；指纹只看相对路径+大小+mtime（最多 5000 文件）；`cloud_save_auto_upload` 默认开启；gamewatch 依赖进程命令行含 install_path，无 `/proc` 时用 `pgrep -f`。
 - **无 i18n**：界面全硬编码中文，文案散落在 `src/index.tsx`、`defaults/tianyi_library_ui/` 与 Python 返回值里。
 - **无 Python 类型检查**：只有 pytest 单测 + CI，没有 mypy/ruff 之类的门禁。
 - **天翼接口未公开**：签名、接口、风控随时可能变，失败时优先看 `/tmp/freedeckcy.log` 里的协议诊断。
@@ -1155,7 +1155,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 - [ ] 改模拟器存档发现/恢复后跑 `pytest tests/test_emulator_saves.py -q`：单游戏不退化成整目录、共享目录去重、PARAM.SFO/3DS 拆分、恢复目标白名单、开关关闭；PS1 多碟跑 `tests/test_emulator.py` 的 m3u 用例；
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
 - [ ] 改库页时长逻辑后验证：原版 Steam 游戏详情页无块、插件游戏有块；`get_library_game_time_stats` 对未托管返回 `managed=false` 且不查 HLTB；`pytest tests/test_diagnostics.py -q`；
-- [ ] 改原生库返回逻辑后验证三种路径：modal「返回」、modal「Steam 库」、route「返回」；滚动后 sticky 栏仍可点；必要时用 `Navigation.NavigateBack` 回退验证；
+- [ ] 改原生库返回逻辑后验证三种路径：modal「返回」、modal「Steam 库」、route「返回」；v0.27.3 起顶部工具栏非 sticky，验证返回按钮/滚动后按钮行为即可；必要时用 `Navigation.NavigateBack` 回退验证；
 - [ ] 改原生库入口/百度 QR 后跑 `pnpm build`、重载插件：确认插件版本 0.27.20、点游戏库走 modal；QR 超时日志包含 `Baidu QR ...`；
 - [ ] 改原生库布局/输入后，用真机 CEF 验最左卡左右焦点环、顶部蓝框、A/B/方向键、触控板滚动、详情操作栏完整可见；
 - [ ] 改诊断后跑 `pytest tests/test_diagnostics.py -q`，确认 checks 结构/summary；导出包含 `self-check.json` 且权限 0600；

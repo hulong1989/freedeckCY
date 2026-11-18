@@ -27,11 +27,11 @@ freedeckCY 的处理方式：
 - 库页时长（v0.25.0）：仅 `managed=true` 显示；AppID 优先降低同名误判但非绝对；HLTB 失败只影响块内数值；依赖 Steam 库页结构。
 - 原生库返回（v0.24.0；v0.27.20）：库页顶部有「返回 / Steam 库 / 刷新」工具栏（v0.27.3 起因 QAM sticky 偏移改为普通流式）；modal 模式「返回」调 `onClose` 关闭弹层，全屏 route 模式用 `Navigation.NavigateBack()`；「Steam 库」关闭弹层后 `Router.NavigateToLibraryTab()` 回 Steam 库页（DroidDeck 上该 API 不可用时回退 `NavigateBack`）。B 键在详情/库根节点绑定 `onCancel`；仍可用显式按钮兜底。
 - 原生库入口（v0.20.0 起；v0.27.20 当前）：QAM 主页「游戏库」优先 `showModal(<LibraryPage />)` 原生弹层，失败才 `Navigation.Navigate("/freedeckcy/library")`；v0.27.20 起不再显示 UI 版本标识，版本以 Decky 插件列表/`package.json` 为准。
-- 手柄/触控板（v0.27）：D-pad/左摇杆在 `flow-children` 分组内移动；A 选择，B 关闭详情/游戏库，L1/R1 切换游戏库/已安装，L2/R2 翻页；触控板/触摸纵向列表与横向货架滚动。焦点卡自动滚入可视区，最左卡焦点环/顶部蓝框不被裁。
+- 手柄/触控板（v0.27）：D-pad/左摇杆在 `flow-children` 分组内移动；A 选择，B 关闭详情/游戏库，L1/R1 切换游戏库/已安装，L2/R2 约 0.8 屏滚动；触控板/触摸纵向列表与横向货架滚动。焦点卡自动滚入可视区，最左卡焦点环/顶部蓝框不被裁。
 - 百度扫码超时（v0.23.0）：点击立即 toast「正在获取百度二维码...」；前端 20s/15s、后端 12s/10s 超时，提示"获取百度二维码超时（网络/TLS 可能受阻...）"；DroidDeck/proot 网络/TLS 受限时按提示重试或运行诊断。
 - 诊断自检（v0.22.0）：QAM 设置 → 「诊断」→「运行自检」显示 summary（OK/警告/失败/跳过）和每项检查（插件/state/下载安装目录/runtime/目录数据/Steam/存储/天翼网络/百度 QR/任务/日志）与建议；「导出诊断包」把 `freedeckcy-diagnostics-<时间>.zip` 写到 proot 内下载目录（`settings.download_dir`，未设置则插件下载目录/`~/Downloads`），权限 0600，toast 显示路径。DroidDeck 上 runtime 检查会看 `defaults/runtime/aarch64/` 的 aria2c/7zz/node；Steam 检查看当前正在运行的客户端；网络/百度 QR 受 proot 网络限制。
 - 扫描已安装（v0.21.0 位置变更）：入口在 **QAM 设置 → 安装 → 「扫描已安装游戏」**（原生库已安装页不再有扫描按钮；网页库按钮保留备用）。扫描仍以 proot 内 `settings.install_dir` 为根、只扫一层、目录名匹配标题；对没有快捷方式的游戏会自动补建：PC 找 `.exe`，模拟器需已安装（不自动下载）并生成 wrapper；成功后 toast 显示"自动加入 Steam：N"。**Steam 需要重启/切用户/重开库页**才能在 DroidDeck 里看到新快捷方式。
-- Decky 原生游戏库（v0.20.0；v0.27.20 视觉/输入重构）：QAM 主页「游戏库」进入原生封面网格/Hero/分类货架/详情页，不再打开本地网页；搜索 + 平台/分类/排序筛选、30 条/页 + 加载更多、双网盘下载源选择；已安装页签支持启动/目录/卸载。扫描入口在设置；安装进度在 QAM 主页任务区。旧本地网页库仅桌面调试/回退。
+- Decky 原生游戏库（v0.20.0；v0.27.20 视觉/输入重构）：QAM 主页「游戏库」进入原生库（默认 Hero+分类货架，搜索/筛选后网格）；不再打开本地网页；搜索 + 平台/分类/排序筛选、30 条/页 + 加载更多、双网盘下载源选择；已安装页签支持启动/目录/卸载。扫描入口在设置；安装进度在 QAM 主页任务区。旧本地网页库仅桌面调试/回退。
 - 存储位置选择（v0.19.0）：QAM「设置 → 路径」会在下载/安装目录下显示检测到的外置挂载按钮（如 `/storage/emulated/0`、`/sdcard`、`/mnt/...`；标签「SD 卡 / 外置：<目录名>（剩余 X）」），点一下就把目录切到 `<mount>/freedeckCY/downloads|installed`。**只显示已挂载且 proot/Android 下可写的子挂载**；/storage、/sdcard、/mnt 挂载根本身会被跳过；权限不足/只读/未挂载不显示；插件不会自动创建/挂载/格式化，也不检测 Steam 库是否同盘。原「选择下载目录/安装目录」仍保留。
 - 扫描已安装（v0.18.0 起，v0.21.0 迁移）：网页库「已安装」工具栏按钮仍作为备用（`POST /api/tianyi/installed/scan`）；主入口在 QAM 设置 → 安装。DroidDeck 上安装目录通常是 proot 内路径（如 `/root/Games`），插件只扫 `settings.install_dir` **一层子目录**；目录名需与目录标题匹配，v0.21.0 起会自动补建 Steam 快捷方式（见上一条）。
 - 百度网盘（v0.17.0，扫码/Cookie 主链路）：aarch64 与 x86_64 行为一致（纯 HTTPS API，无本地二进制）。QAM「百度网盘（扫码登录）」→「扫码登录百度网盘」→ 用手机百度 App/百度网盘 App 扫码确认；Cookie 写入 proot 内 `~/.local/share/freedeckCY/tianyi/state.json` 的 `baidu_login`，之后百度分享可直接安装，不需要开放平台 App Key。Cookie 会过期/被风控，失效后重新扫码；扫码 session 仅内存 180s。**OpenAPI（v0.14.0）保留为可选回退**（自建应用 + OAuth，无 Cookie 时才用）。**不接 CDP/网页逆向**。详见 [ARCHITECTURE.md](ARCHITECTURE.md) §5.13 / [DEVELOPMENT.md](DEVELOPMENT.md) §6.11。
@@ -76,7 +76,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 
 - 登录天翼云盘（QAM 面板）；
 - 在下载设置里把下载目录/安装目录改到空间充足的路径（例如 `/root/Games`）；
-- 打开游戏库页面（QAM 里“游戏列表”或本地 Web UI），搜索/筛选后安装；
+- 打开 QAM 主页「游戏库」（原生弹层），搜索/筛选后安装；本地 Web UI 仅桌面调试/回退；
 - 模拟器：aarch64 上可看到 GBA/PSP/NDS/PS1/FC/MD/Switch（3DS/PS2/PS3 被隐藏），筛选后直接安装，插件会自动生成启动脚本并注册 Steam 快捷方式。**所有平台（含 GBA）首次安装都要联网下载 arm64 官方包**，耗时取决于网络。**装前/装后都可把 BIOS/固件/keys（或压缩包）放到 `~/.local/share/freedeckCY/bios/<platform>/`**，重装/重新注册时会自动部署；PS1 需要 BIOS，Switch 需要 `prod.keys`+固件。
 
 ## 4. 功能支持情况
@@ -105,7 +105,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | Decky 原生游戏库（v0.20.0；v0.27.20） | ✅ aarch64 可用：QAM 原生封面网格/Hero/筛选/详情页/已安装动作；不依赖网页与本地 HTTP |
 | 手柄/触控板（v0.27） | ✅ DroidDeck 触控/手柄走 Decky 焦点系统：A/B、方向键、L1/R1、L2/R2、触控滚动；与 Steam Deck 共用同一实现 |
 | 库页时长隔离（v0.25.0） | ✅ aarch64 可用：仅插件安装/补录游戏显示时长块；Steam 原有游戏 `managed=false` 不插入、不查 HLTB |
-| 原生库返回/关闭（v0.24.0） | ✅ aarch64 可用：sticky「返回/Steam 库/刷新」+ 标题栏返回；modal 用 `onClose`，route 用 `NavigateBack`；「Steam 库」走 `NavigateToLibraryTab`（不可用则回退） |
+| 原生库返回/关闭（v0.24.0） | ✅ aarch64 可用：「返回 / Steam 库 / 刷新」工具栏（v0.27.3 起普通流式）+ 标题栏；modal 用 `onClose`，route 用 `NavigateBack`；「Steam 库」走 `NavigateToLibraryTab`（不可用则回退） |
 | 原生库 modal 兜底/QR 超时（v0.23.0） | ✅ aarch64 可用：游戏库优先 modal、全屏路由兜底；v0.27.20 起不再显示 UI 版本标识；百度扫码前后端超时与明确提示 |
 | 诊断自检/诊断包（v0.22.0） | ✅ aarch64 可用：QAM 设置「诊断」运行自检、导出 0600 zip 到 proot 下载目录；runtime 检查 aarch64 组件，网络/百度 QR 受 proot 限制 |
 | 扫描已安装 + 自动补 Steam（v0.21.0） | ✅ 入口在设置 → 安装；扫描 proot 内 `install_dir` 一层，自动补建 PC/模拟器快捷方式（模拟器未安装不下载，记 `shortcut_error`）；Steam 需重启/切用户/重开库页才显示 |
@@ -155,7 +155,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 ls -l defaults/runtime/aria2/aarch64/aria2c \
       defaults/runtime/7z/aarch64/7zz \
       defaults/runtime/node/aarch64/bin/node \
-      defaults/runtime/mgba/aarch64/mGBA.AppImage
+      ~/.local/share/freedeckCY/emulators/gba/aarch64/  # 模拟器不在插件包内
 ```
 
 缺哪个就重新 `make runtime ARCH=aarch64` 并重新打包；也可用环境变量指向系统里的 arm64 版本。（模拟器已不在包内，无需准备。）
@@ -265,7 +265,7 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 
 **游戏库无法返回 / 困在库页**
 
-- v0.24.0 起库页顶部 sticky 栏和标题栏都有「返回」；modal 用 `onClose` 关闭、全屏 route 用 `Navigation.NavigateBack()`。
+- 库页顶部有「返回 / Steam 库 / 刷新」工具栏（v0.27.3 起普通流式）和标题栏返回；modal 用 `onClose` 关闭、全屏 route 用 `Navigation.NavigateBack()`。
 - 「Steam 库」按钮会先关库页再 `Router.NavigateToLibraryTab()`；DroidDeck 上该 API 不可用时会回退 `NavigateBack`。
 - Steam 覆盖层 B/Esc 不一定能关 modal，优先点显式按钮；route 返回依赖导航栈，栈空时只能关侧栏或重载插件。
 
@@ -311,7 +311,7 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 
 - 未在真机验证：DroidDeck 的 FEX/ARM Proton、不同 Android 机型的存储映射都可能影响结果。
 - aarch64 上可安装 **GBA/PSP/NDS/PS1/FC/MD/Switch** 共 7 个平台（mGBA/PPSSPP/melonDS/DuckStation/Mesen2/Eden；v0.6.0~v0.12.0，全部在线下载）；v0.12.0 安装后自动部署 `bios/<platform>/`（含压缩包）并写 portable 配置（PS1/NDS/Switch/GBA/PSP；PS2/PS3/3DS 仅 x86_64）；**3DS/PS2/PS3 官方包仅 x86_64，DroidDeck 上被目录白名单自动隐藏**（条目/筛选条都不出现，见 [ROADMAP.md](ROADMAP.md) 9.8）。**插件包不集成任何模拟器，7 个平台（含 GBA）首次安装都需要联网**从官方 release 下载 arm64 包（包体积约 45MB），离线可手动预置缓存或用 `FREEDECKCY_*_BIN`；**PS1 需自备 BIOS、Switch 需 keys+固件**（setup_hint 提示，缺失不阻断但装完不能直接玩）；各平台只识别各自 ROM 扩展名，不含存档管理；ARM64 上这些平台尚未真机验证。
-- **自动云存档边界（v0.8.0）**：只对 gamewatch 检测到"退出"的游戏自动上传，没有自动恢复/冲突策略；模拟器（GBA/PSP/NDS/PS1/FC/MD）存档在模拟器配置目录，暂未纳入清单/Proton 扫描；指纹只看相对路径+大小+mtime（≤5000 文件）；`/proc` 不可用时依赖 `pgrep`；ARM64 上该链路尚未真机验证。
+- **自动云存档边界**：v0.8.0 只做 PC；v0.15.0 起纳入模拟器存档（GBA/PSP/NDS/PS1/FC/MD/Switch），v0.16.0 起支持恢复；PS1/PS2/Switch 仍整卡/整目录覆盖；指纹只看相对路径+大小+mtime（≤5000 文件）；`/proc` 不可用时依赖 `pgrep`；ARM64 上该链路真机验证有限。
 - 模拟器存档恢复（v0.16.0）在 Android/proot 下按 HOME 白名单恢复，Flatpak 路径不适用；PS1/PS2 单片记忆卡、Switch 目录不能按游戏拆；3DS 恢复随平台不可见；共享卡覆盖需确认且有备份。
 - 模拟器存档（v0.15.0）在 Android/proot 下只认 HOME 内标准/portable 路径，Flatpak 的 `~/.var/app/...` 不适用；GBA/FC/MD/NDS 需 ROM 同名，PSP/PS1/PS2/3DS/PS3/Switch 上传共享记忆卡/标题目录（同卡其它游戏也会包含）；v0.16.0 起支持恢复（白名单目标/备份/冲突确认）；PS1/PS2/Switch 仍整卡覆盖，3DS/Switch 大目录受 5000 文件限制。
 - 3DS（v0.14.1）在 DroidDeck/aarch64 上仍不可用（无 arm64 官方包，目录隐藏）；SteamOS/x86_64 优先 Flatpak（需系统有 flatpak 且能访问 Flathub），无 Flatpak 时回退 AppImage（可能仍有上游 #127/#953 问题）；3DS wrapper 走 XWayland；已有快捷方式自动重写但未在 DroidDeck 真机验证。

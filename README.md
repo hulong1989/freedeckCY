@@ -279,7 +279,7 @@ submissions/                仓库游戏提交 JSON / schema
 backend/*.js                Node 辅助脚本（分享解析兜底、云存档上传）
 scripts/                    运行时获取/打包/诊断/目录校验/提交合并
 docs/                       架构/开发/路线图/DroidDeck
-tests/                      pytest 用例（554 个）
+tests/                      pytest 用例（555 个）
 CHANGELOG.md                版本变更
 Makefile                    runtime / package / package-droiddeck / test / check-ui / doctor / ...
 ```
