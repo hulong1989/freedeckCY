@@ -505,6 +505,7 @@ class TianyiService:
         self._steam_restart_pending: Dict[str, Any] = {}
         self._launcher_repair_task: Optional[asyncio.Task] = None
         self._launcher_repair_done = False
+        self._catalog_auto_update_task: Optional[asyncio.Task] = None
         self._baidu_device_lock = asyncio.Lock()
         self._baidu_device_login: Dict[str, Any] = {}
         self._baidu_qr_lock = asyncio.Lock()
@@ -608,6 +609,21 @@ class TianyiService:
         self._playtime_lock = asyncio.Lock()
         self._playtime_sessions: Dict[str, Dict[str, Any]] = {}
 
+    async def _auto_update_catalog(self, url: str) -> None:
+        """后台检查并更新服务器目录；失败只记日志，不阻塞插件启动。"""
+        try:
+            result = await asyncio.wait_for(self.update_catalog_csv(url), timeout=90)
+            config.logger.info(
+                "启动自动检查目录: updated=%s reason=%s total=%s",
+                result.get("updated"),
+                result.get("reason", ""),
+                result.get("total", 0),
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            config.logger.warning("启动自动检查目录失败: %s", exc)
+
     async def initialize(self) -> None:
         """初始化状态与目录。"""
         os.makedirs(os.path.dirname(self.store.state_file), exist_ok=True)
@@ -629,6 +645,11 @@ class TianyiService:
         await self._recover_playtime_sessions_from_store()
         if self._recover_unfinished_install_tasks():
             await asyncio.to_thread(self.store.save)
+        catalog_url = str(getattr(self.store.settings, "catalog_url", "") or "").strip()
+        if not catalog_url:
+            catalog_url = str(getattr(config, "DEFAULT_CATALOG_CSV_URL", "") or "").strip()
+        if catalog_url.startswith(("http://", "https://")):
+            self._catalog_auto_update_task = asyncio.create_task(self._auto_update_catalog(catalog_url))
 
     async def shutdown(self) -> None:
         """关闭后台资源。"""
@@ -650,6 +671,13 @@ class TianyiService:
             except BaseException:
                 pass
         self._launcher_repair_task = None
+        if self._catalog_auto_update_task and not self._catalog_auto_update_task.done():
+            self._catalog_auto_update_task.cancel()
+            try:
+                await self._catalog_auto_update_task
+            except BaseException:
+                pass
+        self._catalog_auto_update_task = None
         if self._auto_cloud_upload_task and not self._auto_cloud_upload_task.done():
             self._auto_cloud_upload_task.cancel()
             try:
@@ -915,7 +943,11 @@ class TianyiService:
             },
             "installed": installed,
             "tasks": tasks,
-            "settings": asdict(self.store.settings),
+            "settings": {
+                **asdict(self.store.settings),
+                "catalog_url": str(getattr(self.store.settings, "catalog_url", "") or "").strip()
+                or str(getattr(config, "DEFAULT_CATALOG_CSV_URL", "") or "").strip(),
+            },
             "library_url": library_url,
             "cover_proxy_base": self.get_cover_proxy_base(),
             "login_capture": await self.get_login_capture_status(),
@@ -6412,6 +6444,7 @@ class TianyiService:
     ) -> Dict[str, Any]:
         """构建安装计划与空间探针信息。"""
         open_path = ""
+        executable_name = ""
         platform = "pc"
         if not share_url:
             item = self.catalog.get_by_game_id(game_id)
@@ -6421,6 +6454,7 @@ class TianyiService:
             game_title = item.title
             game_id = item.game_id
             open_path = str(item.openpath or "")
+            executable_name = str(getattr(item, "executable_name", "") or "")
             platform = str(item.platform or "pc")
         else:
             normalized_share_url = str(share_url or "").strip()
@@ -6443,6 +6477,7 @@ class TianyiService:
                 game_title = str(matched_item.title or game_id or "自定义分享")
                 game_id = str(matched_item.game_id or game_id or normalized_share_url)
                 open_path = str(matched_item.openpath or "")
+                executable_name = str(getattr(matched_item, "executable_name", "") or "")
                 platform = str(matched_item.platform or "pc")
                 if "pwd=" not in normalized_share_url and str(matched_item.pwd or "").strip():
                     joiner = "&" if "?" in normalized_share_url else "?"
@@ -6590,6 +6625,7 @@ class TianyiService:
             "emulator_info": emulator_info,
             "rom_target": rom_target,
             "openpath": open_path,
+            "executable_name": executable_name,
             "share_url": share_url,
             "share_code": resolved.share_code,
             "share_id": resolved.share_id,
@@ -6680,6 +6716,7 @@ class TianyiService:
         game_id = str(plan.get("game_id", "")).strip()
         game_title = str(plan.get("game_title", "")).strip() or game_id or "未命名游戏"
         open_path = str(plan.get("openpath", "") or "")
+        executable_name = str(plan.get("executable_name", "") or "")
         target_dir = str(plan.get("download_dir", "")).strip()
 
         plan_files = [
@@ -6751,6 +6788,7 @@ class TianyiService:
                         progress=0.0,
                         speed=0,
                         openpath=open_path,
+                        executable_name=executable_name,
                         file_size=file_size,
                         group_id=group_id,
                         group_total=group_total,
@@ -7673,6 +7711,11 @@ class TianyiService:
         root = os.path.realpath(os.path.expanduser(str(install_path or "").strip()))
         if not root or not os.path.isdir(root):
             return ""
+        declared = str(getattr(entry, "executable_name", "") or "").strip()
+        if declared:
+            declared_path = self._find_declared_executable(root, declared)
+            if declared_path:
+                return declared_path
         openpath = str(getattr(entry, "openpath", "") or "").replace("\\", "/").strip("/")
         if openpath and openpath.lower().endswith(".exe"):
             parts = [part for part in openpath.split("/") if part not in {"", "."}]
@@ -9239,11 +9282,35 @@ class TianyiService:
                 return part
         return parts[0]
 
+    def _find_declared_executable(self, root_dir: str, declared: str) -> str:
+        """按目录里的 executable_name 定位启动文件；找不到返回空。"""
+        root = os.path.realpath(os.path.expanduser(str(root_dir or "").strip()))
+        raw = str(declared or "").strip().replace("\\", "/").strip("/")
+        if not root or not raw or not os.path.isdir(root):
+            return ""
+        parts = [part for part in raw.split("/") if part and part not in {".", ".."}]
+        if not parts or ".." in parts:
+            return ""
+        candidate = os.path.realpath(os.path.join(root, *parts))
+        if os.path.isfile(candidate) and _is_within_dir(candidate, root):
+            return candidate
+        leaf = parts[-1]
+        matched = self._find_path_by_leaf_name(root, leaf, max_depth=8)
+        if matched and _is_within_dir(matched, root):
+            return matched
+        return ""
+
     def _resolve_installed_executable_path(self, *, task: TianyiTaskRecord, target_dir: str) -> str:
         """基于 openpath 优先定位安装后的可执行文件。"""
         root = os.path.realpath(os.path.expanduser(str(target_dir or "").strip()))
         if not root or not os.path.isdir(root):
             return ""
+
+        declared = str(getattr(task, "executable_name", "") or "").strip()
+        if declared:
+            declared_path = self._find_declared_executable(root, declared)
+            if declared_path:
+                return declared_path
 
         raw_openpath = str(task.openpath or "").strip().replace("\\", "/")
         if raw_openpath:

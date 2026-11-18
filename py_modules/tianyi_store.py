@@ -130,6 +130,7 @@ class TianyiTaskRecord:
     progress: float
     speed: int
     openpath: str = ""
+    executable_name: str = ""
     install_status: str = "pending"
     install_message: str = ""
     installed_path: str = ""
@@ -167,6 +168,7 @@ class TianyiTaskRecord:
             progress=float(data.get("progress", 0.0) or 0.0),
             speed=_to_int(data.get("speed", 0), 0),
             openpath=str(data.get("openpath", "") or ""),
+            executable_name=str(data.get("executable_name", "") or ""),
             install_status=str(data.get("install_status", "pending") or "pending"),
             install_message=str(data.get("install_message", "") or ""),
             installed_path=str(data.get("installed_path", "") or ""),

@@ -64,10 +64,8 @@ HOME_DIR = str(Path.home())
 DOWNLOADS_DIR = str(Path.home() / "Downloads")
 SHARE_DIR = str(Path.home() / ".local" / "share")
 DECKY_SEND_DIR = os.path.join(SHARE_DIR, "freedeckCY")
-# 服务器游戏目录 CSV（设置在插件里手动下载到本地，不在启动时自动联网）。
-DEFAULT_CATALOG_CSV_URL = (
-    "https://raw.githubusercontent.com/hulong1989/freedeckCY/main/defaults/tianyi_catalog/freedeckcy_catalog.csv"
-)
+# 内置目录服务器：插件启动自动检查，有更新才下载到本地。
+DEFAULT_CATALOG_CSV_URL = "http://171.215.30.40:8088/catalog.csv"
 
 # 服务配置
 # 仅监听回环地址，禁止局域网访问。

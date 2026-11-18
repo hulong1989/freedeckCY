@@ -160,6 +160,7 @@ def test_to_dict_contains_frontend_fields(catalog: GameCatalog) -> None:
         "down_url",
         "pwd",
         "openpath",
+        "executable_name",
         "size_bytes",
         "size_text",
         "platform",

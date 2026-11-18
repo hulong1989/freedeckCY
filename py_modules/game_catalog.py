@@ -31,6 +31,7 @@ _CATEGORY_SPLIT_RE = re.compile(r"[,，/、;；|]+")
 _COVER_URL_FIELDS = ("cover_url", "landscape_cover_url", "cover")
 _PORTRAIT_FIELDS = ("cover_portrait_url", "square_cover_url", "portrait_url", "portrait")
 _APPID_FIELDS = ("steam_appid", "app_id", "appid")
+_EXECUTABLE_FIELDS = ("executable_name", "executable", "launch_exe", "main_exe")
 
 
 @dataclass
@@ -46,6 +47,8 @@ class GameCatalogEntry:
     openpath: str
     size_bytes: int
     size_text: str
+    # 可选：相对安装根目录的启动文件（PC 主 exe / 模拟器 ROM），留空自动识别
+    executable_name: str = ""
     # 平台：pc / switch / ps1 / ps2 / ps3 / psp / 3ds / gba / md / nds / fc / arcade ...
     platform: str = DEFAULT_PLATFORM
     cover_url: str = ""
@@ -249,6 +252,9 @@ def _entry_from_json_item(item: object) -> Optional[GameCatalogEntry]:
         down_url=down_url,
         pwd=str(item.get("pwd") or "").strip(),
         openpath=str(item.get("openpath") or item.get("file_name") or "").strip(),
+        executable_name=str(
+            item.get("executable_name") or item.get("executable") or item.get("launch_exe") or item.get("main_exe") or ""
+        ).strip(),
         size_bytes=size_bytes,
         size_text=size_text,
         platform=platform,
@@ -482,6 +488,7 @@ class GameCatalog:
                     down_url=down_url,
                     pwd=str(row.get("pwd", "")).strip(),
                     openpath=str(row.get("openpath", "")).strip(),
+                    executable_name=_first_value(row, _EXECUTABLE_FIELDS),
                     size_bytes=size_bytes,
                     size_text=size_text,
                     platform=platform,

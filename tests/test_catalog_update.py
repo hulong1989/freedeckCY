@@ -37,7 +37,7 @@ def test_catalog_update_downloads_and_reloads(tmp_path, monkeypatch):
     service, state_dir = _service(tmp_path)
 
     async def _fetch(url, **kwargs):
-        assert "freedeckcy_catalog.csv" in url
+        assert "/catalog.csv" in url
         return _valid_csv(), {"ETag": '"v1"', "Last-Modified": "Wed, 01 Jan 2026 00:00:00 GMT"}, 200
 
     monkeypatch.setattr(service, "_fetch_catalog_csv", _fetch)
