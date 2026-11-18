@@ -3111,14 +3111,14 @@ const LIBRARY_CSS = `
 .fdc-section-title { font-size: 15px; font-weight: 800; }
 .fdc-section-count { font-size: 11px; color: var(--fdc-muted); }
 .fdc-shelf-block { margin-bottom: 18px; }
-.fdc-shelf { display: flex; gap: 14px; overflow-x: auto; padding: 10px 8px 12px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; touch-action: pan-x; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
+.fdc-shelf { display: flex; gap: 14px; overflow-x: auto; padding: 10px 12px 12px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; touch-action: pan-x; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
 .fdc-shelf::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .fdc-root { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
 .fdc-root::-webkit-scrollbar { width: 6px; height: 6px; }
 .fdc-root::-webkit-scrollbar-track { background: transparent; }
 .fdc-root::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 999px; }
 .fdc-shelf .fdc-card-wrap { flex: 0 0 auto; scroll-snap-align: start; }
-.fdc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-items: start; gap: 18px; padding: 10px 8px 24px; width: 100%; box-sizing: border-box; }
+.fdc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-items: start; gap: 18px; padding: 10px 12px 24px; width: 100%; box-sizing: border-box; }
 .fdc-grid .fdc-card-wrap { width: 100% !important; }
 .fdc-card-wrap, .fdc-shelf-block { scroll-margin-top: 84px; }
 .fdc-card-wrap { display: flex; flex-direction: column; gap: 5px; min-width: 0; width: 100%; }
@@ -3186,7 +3186,19 @@ function LibraryCoverCard(props) {
         const node = cardRef.current;
         if (!node)
             return;
-        node.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        const shelf = node.closest(".fdc-shelf");
+        if (shelf) {
+            const margin = 14;
+            const cardRect = node.getBoundingClientRect();
+            const shelfRect = shelf.getBoundingClientRect();
+            if (cardRect.left < shelfRect.left + margin) {
+                shelf.scrollBy({ left: cardRect.left - (shelfRect.left + margin), behavior: "smooth" });
+            }
+            else if (cardRect.right > shelfRect.right - margin) {
+                shelf.scrollBy({ left: cardRect.right - (shelfRect.right - margin), behavior: "smooth" });
+            }
+        }
+        node.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
     }, []);
     const rawCoverUrl = imageFailed ? "" : String(props.coverUrl || "").trim();
     const coverUrl = rawCoverUrl && props.coverProxyBase && !proxyFailed ? `${props.coverProxyBase}?url=${encodeURIComponent(rawCoverUrl)}` : rawCoverUrl;
