@@ -473,10 +473,10 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
-    async def check_tianyi_update(self) -> dict:
-        """检查 GitHub Release 更新。"""
+    async def check_tianyi_update(self, force: bool = False) -> dict:
+        """检查自有服务器/GitHub 更新；force=True 时绕过缓存。"""
         try:
-            data = await self._get_tianyi_service().check_update()
+            data = await self._get_tianyi_service().check_update(force=bool(force))
             return {"status": "success", "data": data}
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}

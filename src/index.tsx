@@ -93,7 +93,7 @@ function FaCloudDownloadAlt (props) {
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.43";
+const PLUGIN_UI_BUILD = "0.26.44";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const restartSteamBackend = callable("restart_steam");
 const clearSteamRestartPending = callable("clear_steam_restart_pending");
@@ -1786,7 +1786,7 @@ function SettingsPage() {
         setCheckingUpdate(true);
         setUpdateMessage("");
         try {
-            const result = await withTimeout(checkTianyiUpdate(), 30000, "检查更新超时");
+            const result = await withTimeout(checkTianyiUpdate(true), 30000, "检查更新超时");
             if (result.status !== "success" || !result.data) {
                 throw new Error(result.message || "检查更新失败");
             }

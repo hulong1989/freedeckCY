@@ -132,10 +132,10 @@ class UpdateFlowMixin:
             "assets": assets,
         }
 
-    async def check_update(self) -> Dict[str, Any]:
-        """检查 GitHub 最新 release（1 小时缓存）。"""
+    async def check_update(self, force: bool = False) -> Dict[str, Any]:
+        """检查自有服务器/GitHub 最新版本（默认 2 分钟缓存）。"""
         now = time.time()
-        if self._update_cache and now - self._update_cache_at < 3600:
+        if not force and self._update_cache and now - self._update_cache_at < 120:
             return dict(self._update_cache)
 
         current = self._plugin_version() or "0.0.0"
