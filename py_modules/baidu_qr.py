@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
 import aiohttp
+from yarl import URL
 
 QRCODE_URL = "https://passport.baidu.com/v2/api/getqrcode"
 UNICAST_URL = "https://passport.baidu.com/channel/unicast"
@@ -137,7 +138,13 @@ def _is_cert_failure(exc: BaseException) -> bool:
 
 
 async def request_qr() -> Dict[str, Any]:
-    params = {"lp": "pc", "qrloginfrom": "pc"}
+    params = {
+        "lp": "pc",
+        "qrloginfrom": "pc",
+        "apiver": "v3",
+        "tpl": "netdisk",
+        "tt": str(int(time.time() * 1000)),
+    }
     text = ""
     last_error = ""
     cookies: Dict[str, str] = {}
@@ -263,7 +270,13 @@ async def poll_qr(
     - TCP 连接超时 → error（网络不可达，不能一直显示"等待扫码"）；
     - aiohttp 整体不可用时回退 urllib，并复用 getqrcode 的 cookie。
     """
-    params = {"channel_id": str(sign or "").strip(), "tpl": "pp", "tt": str(int(time.time() * 1000))}
+    params = {
+        "channel_id": str(sign or "").strip(),
+        "tpl": "netdisk",
+        "apiver": "v3",
+        "tt": str(int(time.time() * 1000)),
+        "_": str(int(time.time() * 1000)),
+    }
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
     text = ""
     last_error = ""
@@ -333,6 +346,37 @@ def _parse_login_payload(text: str) -> Dict[str, Any]:
     return {}
 
 
+async def _fetch_pan_stoken(bduss: str, cookies: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    """登录后走 passport auth hop，拿 pan.baidu.com 自己的 STOKEN。"""
+    params = {
+        "return_type": "5",
+        "tpl": "netdisk",
+        "u": "https://pan.baidu.com/disk/home",
+    }
+    jar = aiohttp.CookieJar(unsafe=True)
+    if cookies:
+        jar.update_cookies(cookies)
+    try:
+        connector = aiohttp.TCPConnector(ssl=_ssl_context())
+        async with aiohttp.ClientSession(
+            timeout=_timeout(15), cookie_jar=jar, connector=connector
+        ) as session:
+            async with session.get(
+                "https://passport.baidu.com/v3/login/api/auth/",
+                params=params,
+                headers={"User-Agent": UA, "Referer": "https://pan.baidu.com/"},
+            ) as response:
+                await response.text()
+            pan_cookies = jar.filter_cookies(URL("https://pan.baidu.com/"))
+            return {
+                str(key): str(getattr(morsel, "value", "") or "")
+                for key, morsel in pan_cookies.items()
+                if str(key or "").strip() and str(getattr(morsel, "value", "") or "").strip()
+            }
+    except Exception:
+        return {}
+
+
 async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """用 unicast 返回的 v 换取 BDUSS/STOKEN/PTOKEN。
 
@@ -344,15 +388,14 @@ async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) ->
         raise BaiduQrError("百度登录凭证 v 为空")
     ts = str(int(time.time() * 1000))
     params = {
+        "v": ts,
         "bduss": value,
+        "u": "https://pan.baidu.com/disk/home",
+        "loginVersion": "v4",
         "qrcode": "1",
-        "tpl": "pp",
+        "tpl": "netdisk",
         "apiver": "v3",
         "tt": ts,
-        "traceid": "",
-        "time": ts,
-        "alg": "v3",
-        "elapsed": "1",
     }
     headers = {"User-Agent": UA, "Referer": "https://passport.baidu.com/"}
     text = ""
@@ -404,6 +447,11 @@ async def complete_login(v: str, *, cookies: Optional[Dict[str, str]] = None) ->
         if isinstance(data.get("errInfo"), dict):
             message = _safe_detail(data["errInfo"].get("msg", ""), 200)
         raise BaiduQrError(message or "百度扫码登录未返回 BDUSS")
+    if not stoken:
+        pan_cookies = await _fetch_pan_stoken(bduss, cookies)
+        stoken = str(pan_cookies.get("STOKEN", "") or "").strip()
+        if not ptoken:
+            ptoken = str(pan_cookies.get("PTOKEN", "") or "").strip()
     cookie_parts = [f"BDUSS={bduss}"]
     if stoken:
         cookie_parts.append(f"STOKEN={stoken}")

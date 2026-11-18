@@ -35,7 +35,7 @@ import config
 import catalog_signature
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
-from baidu_client import BaiduApiError, fetch_baidu_download_url, resolve_baidu_share
+from baidu_client import BaiduApiError, delete_baidu_home_file, fetch_baidu_download_url, resolve_baidu_share
 from baidu_qr import BaiduQrError, complete_login, fetch_qr_image, poll_qr, request_qr
 from baidu_openapi_client import (
     BaiduOpenApiError,
@@ -6702,11 +6702,11 @@ class TianyiService:
         result["files"] = files
         return result
 
-    async def _fetch_baidu_web_direct_url(self, share_ctx: Dict[str, Any], file_id: str) -> str:
+    async def _fetch_baidu_web_direct_url(self, share_ctx: Dict[str, Any], file_id: str, file_name: str = "") -> str:
         cookie = str(self.store.baidu_login.cookie or "").strip()
         if "BDUSS=" not in cookie.upper():
             raise BaiduApiError("未登录百度网盘，请先扫码登录", diagnostics={"stage": "login"})
-        return await fetch_baidu_download_url(cookie, share_ctx, file_id)
+        return await fetch_baidu_download_url(cookie, share_ctx, file_id, file_name=file_name)
 
     async def _fetch_baidu_direct_url(self, share_ctx: Dict[str, Any], file_id: str) -> str:
         access_token = await self._ensure_baidu_openapi_access_token()
@@ -6762,7 +6762,7 @@ class TianyiService:
                 file_size = max(0, _safe_int(file_item.get("size"), 0))
 
                 if provider == "baidu":
-                    direct_url = await self._fetch_baidu_web_direct_url(share_ctx, file_id)
+                    direct_url = await self._fetch_baidu_web_direct_url(share_ctx, file_id, name)
                     gid = await self.aria2.add_uri(
                         direct_url=direct_url,
                         cookie=str(self.store.baidu_login.cookie or "").strip(),
@@ -8686,18 +8686,28 @@ class TianyiService:
     async def _cleanup_baidu_transfer_files(self, members: Sequence[TianyiTaskRecord]) -> None:
         """安装结束后清理百度网盘转存目录，避免占满用户网盘。"""
         for member in members:
-            if str(member.provider or "") != "baidu_openapi":
+            provider = str(member.provider or "")
+            if provider not in {"baidu", "baidu_openapi"}:
                 continue
             share_ctx = member.share_ctx if isinstance(member.share_ctx, dict) else {}
             if not share_ctx:
                 continue
             try:
-                access_token = await self._ensure_baidu_openapi_access_token()
-                await delete_baidu_openapi_transfer_file(
-                    access_token=access_token,
-                    share_ctx=share_ctx,
-                    file_id=str(member.file_id or ""),
-                )
+                if provider == "baidu":
+                    transfer_path = str(share_ctx.get("baidu_transfer_path") or "").strip()
+                    if not transfer_path:
+                        continue
+                    await delete_baidu_home_file(
+                        cookie=str(self.store.baidu_login.cookie or "").strip(),
+                        path=transfer_path,
+                    )
+                else:
+                    access_token = await self._ensure_baidu_openapi_access_token()
+                    await delete_baidu_openapi_transfer_file(
+                        access_token=access_token,
+                        share_ctx=share_ctx,
+                        file_id=str(member.file_id or ""),
+                    )
             except Exception as exc:
                 config.logger.warning("清理百度转存文件失败 task=%s: %s", member.task_id, exc)
 

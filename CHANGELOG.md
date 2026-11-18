@@ -2,6 +2,18 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.25
+
+### 百度网盘对齐 freedeck-go
+
+- 打开分享前先 `share/verify`，用 `BDCLND` cookie 打开分享页；提取码分享更稳定。
+- 根目录与子目录都分页（100/页），修复模拟器合集只取第一页导致文件缺失。
+- 转存前创建 `/FreedeckTmp`，使用 `ondup=overwrite`，并补充 `channel/web/clienttype` 参数。
+- 转存目标路径优先由文件名推导，异步 task 不返回 `to` 时不再失败。
+- 安装成功后删除 `/FreedeckTmp` 临时文件（网页百度和 OpenAPI 都清理）。
+- 扫码登录参数对齐 netdisk；登录后补调 passport auth 获取 pan 侧 STOKEN。
+- 测试 540 passed。
+
 ## v0.26.24
 
 ### 目录签名 / 更新提醒 / 免重启尝试

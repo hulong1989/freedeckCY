@@ -292,12 +292,17 @@ async def _share_verify(
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
     }
-    async with session.post("https://pan.baidu.com/share/verify", params=params, data={"pwd": pwd}, headers=headers) as resp:
+    async with session.post(
+        "https://pan.baidu.com/share/verify",
+        params=params,
+        data={"pwd": pwd, "vcode": "", "vcode_str": ""},
+        headers=headers,
+    ) as resp:
         status = int(resp.status)
         if status == 405:
             def _run() -> Dict[str, Any]:
                 request_url = "https://pan.baidu.com/share/verify?" + urlencode(params, doseq=True)
-                payload_data = urlencode({"pwd": pwd}, doseq=True).encode("utf-8")
+                payload_data = urlencode({"pwd": pwd, "vcode": "", "vcode_str": ""}, doseq=True).encode("utf-8")
                 request = urllib_request.Request(request_url, data=payload_data, method="POST")
                 request.add_header("User-Agent", _UA)
                 request.add_header("Referer", str(share_url or "").strip())
@@ -529,6 +534,33 @@ async def resolve_baidu_share(share_url: str, cookie: str) -> Tuple[ResolvedShar
             except Exception:
                 pass
 
+        # 参考 freedeck-go：访问分享页前先用提取码调用 share/verify，
+        # 拿到 randsk 后以 BDCLND cookie 再打开 /s/1... 页面。
+        pre_randsk = ""
+        pre_verify_error = ""
+        try:
+            pre_verify = await _share_verify(
+                session,
+                share_url=canonical_url,
+                surl=surl,
+                pwd=pwd,
+                ssl_context=ssl_context,
+            )
+            if int(pre_verify.get("errno", 0) or 0) == 0:
+                pre_randsk = str(pre_verify.get("randsk") or "").strip()
+            else:
+                pre_verify_error = str(pre_verify.get("show_msg") or pre_verify.get("err_msg") or "")
+        except Exception as exc:
+            # 页面兜底流程仍可继续；真正的错误在后续 list/verify 中返回。
+            pre_verify_error = str(exc)
+        if pre_randsk:
+            try:
+                session.cookie_jar.update_cookies(
+                    {"BDCLND": pre_randsk}, response_url=URL("https://pan.baidu.com/")
+                )
+            except Exception:
+                pass
+
         async def fetch_html(target_url: str, *, referer: str) -> Tuple[str, str, int, Dict[str, str]]:
             async def _fetch_html_via_urllib() -> Tuple[str, str, int, Dict[str, str]]:
                 def _run() -> Tuple[str, str, int, Dict[str, str]]:
@@ -699,6 +731,11 @@ async def resolve_baidu_share(share_url: str, cookie: str) -> Tuple[ResolvedShar
             "pwd": pwd,
             "tls": tls_diag,
         }
+        if pre_randsk:
+            ctx["randsk"] = pre_randsk
+            ctx["sekey"] = unquote(pre_randsk)
+        elif pre_verify_error:
+            ctx["pre_verify_error"] = pre_verify_error
 
         if share_id <= 0 or uk <= 0:
             title = ""
@@ -726,7 +763,7 @@ async def resolve_baidu_share(share_url: str, cookie: str) -> Tuple[ResolvedShar
             share_id=share_id,
             uk=uk,
             page=1,
-            num=200,
+            num=100,
             dir_path="",
             sekey=sekey,
             ssl_context=ssl_context,
@@ -772,7 +809,7 @@ async def resolve_baidu_share(share_url: str, cookie: str) -> Tuple[ResolvedShar
                 share_id=share_id,
                 uk=uk,
                 page=1,
-                num=200,
+                num=100,
                 dir_path="",
                 sekey=sekey,
                 ssl_context=ssl_context,
@@ -785,16 +822,40 @@ async def resolve_baidu_share(share_url: str, cookie: str) -> Tuple[ResolvedShar
                 raise BaiduApiError(f"百度网盘解析失败：{show_msg}（errno={errno}）", diagnostics={**ctx, "payload": payload})
             raise BaiduApiError(f"百度网盘解析失败 errno={errno}", diagnostics={**ctx, "payload": payload})
 
-        root_items = payload.get("list") or []
-        if not isinstance(root_items, list):
-            root_items = []
-
         from collections import deque
 
         max_files = 5000
         max_dirs = 800
-        per_page = 200
+        per_page = 100
         max_pages = 60
+
+        # 根目录也要翻页：模拟器合集经常 500+ 文件，只取第一页会漏游戏。
+        root_items: List[Any] = []
+        first_batch = payload.get("list") or []
+        if isinstance(first_batch, list):
+            root_items.extend(first_batch)
+        root_page = 1
+        while len(first_batch) >= per_page and root_page < max_pages:
+            root_page += 1
+            page_payload = await _share_list(
+                session,
+                share_url=share_url_for_api,
+                share_id=share_id,
+                uk=uk,
+                page=root_page,
+                num=per_page,
+                dir_path="",
+                sekey=sekey,
+                ssl_context=ssl_context,
+            )
+            page_errno = int(page_payload.get("errno", 0) or 0)
+            if page_errno != 0:
+                break
+            batch = page_payload.get("list") or []
+            if not isinstance(batch, list) or not batch:
+                break
+            root_items.extend(batch)
+            first_batch = batch
 
         visited_dirs: set[str] = set()
         seen_file_ids: set[str] = set()
@@ -896,6 +957,12 @@ async def resolve_baidu_share(share_url: str, cookie: str) -> Tuple[ResolvedShar
                         ctx["randsk"] = randsk
                         ctx["sekey"] = unquote(randsk)
                         sekey = str(ctx.get("sekey") or "").strip()
+                        try:
+                            session.cookie_jar.update_cookies(
+                                {"BDCLND": randsk}, response_url=URL("https://pan.baidu.com/")
+                            )
+                        except Exception:
+                            pass
 
                     payload = await _share_list(
                         session,
@@ -943,7 +1010,7 @@ async def resolve_baidu_share(share_url: str, cookie: str) -> Tuple[ResolvedShar
         return resolved, ctx
 
 
-async def fetch_baidu_download_url(cookie: str, ctx: Dict[str, Any], file_id: str) -> str:
+async def fetch_baidu_download_url(cookie: str, ctx: Dict[str, Any], file_id: str, *, file_name: str = "") -> str:
     """根据解析上下文获取单文件直链（返回 dlink）。
 
     说明：
@@ -967,6 +1034,10 @@ async def fetch_baidu_download_url(cookie: str, ctx: Dict[str, Any], file_id: st
         share_file_id = int(str(file_id or "").strip())
     except Exception as exc:
         raise BaiduApiError("file_id 无效", diagnostics={"file_id": file_id, "ctx": ctx}) from exc
+
+    # 参考 freedeck-go：转存目标可以直接由文件名确定，避免异步 task 不返回 to 时找不到路径。
+    safe_file_name = os.path.basename(str(file_name or "").replace("\\", "/")).strip()
+    target_path = f"/FreedeckTmp/{safe_file_name}" if safe_file_name else ""
 
     timeout = aiohttp.ClientTimeout(total=30)
     headers = {
@@ -1105,6 +1176,22 @@ async def fetch_baidu_download_url(cookie: str, ctx: Dict[str, Any], file_id: st
                 diagnostics={"stage": "gettemplatevariable", "file_id": file_id, "ctx": ctx, "payload": tpl},
             )
 
+        # 2) 确保 /FreedeckTmp 目录存在（参考 freedeck-go 的 createFolder）
+        try:
+            await request_json(
+                "POST",
+                "https://pan.baidu.com/api/create",
+                params={"a": "commit", "bdstoken": bdstoken},
+                data={"path": "/FreedeckTmp", "isdir": "1", "block_list": "[]"},
+                headers_override={
+                    "Referer": "https://pan.baidu.com/disk/home",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            )
+        except Exception:
+            # -8（目录已存在）或接口不支持时继续 transfer。
+            pass
+
         # 2) 保存到网盘（share/transfer）
         transfer_cache = ctx.get("_transfer_cache")
         if not isinstance(transfer_cache, dict):
@@ -1134,8 +1221,11 @@ async def fetch_baidu_download_url(cookie: str, ctx: Dict[str, Any], file_id: st
             transfer_params: Dict[str, Any] = {
                 "shareid": str(int(share_id)),
                 "from": str(int(uk)),
-                "ondup": "newcopy",
+                "ondup": "overwrite",
                 "async": "1",
+                "channel": "chunlei",
+                "web": "1",
+                "clienttype": "0",
             }
             if bdstoken:
                 transfer_params["bdstoken"] = bdstoken
@@ -1174,8 +1264,11 @@ async def fetch_baidu_download_url(cookie: str, ctx: Dict[str, Any], file_id: st
                     to_fs_id = int(extra_list[0].get("to_fs_id") or 0) or None
                 except Exception:
                     to_fs_id = None
+            if not to_path and target_path:
+                to_path = target_path
             if to_path:
                 ctx["_last_transfer_to_path"] = to_path
+                ctx["baidu_transfer_path"] = to_path
 
             task_id = 0
             try:
@@ -1247,9 +1340,8 @@ async def fetch_baidu_download_url(cookie: str, ctx: Dict[str, Any], file_id: st
 
         if not to_path:
             # transfer 返回 extra.list[0].to 为保存后的完整路径
-            # 若没有（极少数异步任务），暂时退回到默认目录下的同名文件。
-            # 这里优先尝试从 ctx 中的 last_transfer_to 取值。
-            to_path = str(ctx.get("_last_transfer_to_path") or "").strip()
+            # 若没有（极少数异步任务），用文件名推导 /FreedeckTmp/name。
+            to_path = str(ctx.get("_last_transfer_to_path") or "").strip() or target_path
 
         if not to_path:
             raise BaiduApiError(
@@ -1658,3 +1750,53 @@ async def fetch_baidu_home_video_dlink_alist(
             "User-Agent": "netdisk",
         },
     }
+
+
+async def delete_baidu_home_file(*, cookie: str, path: str) -> bool:
+    """删除保存在用户网盘的 /FreedeckTmp 临时文件。"""
+    normalized_path = str(path or "").strip()
+    cookie_dict = _parse_cookie_header(cookie)
+    if not normalized_path or not _has_bduss(cookie_dict):
+        return False
+    timeout = aiohttp.ClientTimeout(total=25)
+    headers = {
+        "User-Agent": _UA,
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://pan.baidu.com/disk/home",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    ssl_context, _ = _build_ssl_context()
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
+        session.cookie_jar.update_cookies(cookie_dict, response_url=URL("https://pan.baidu.com/"))
+        async with session.get(
+            "https://pan.baidu.com/api/gettemplatevariable",
+            params={"fields": json.dumps(["bdstoken"], ensure_ascii=False)},
+        ) as resp:
+            tpl = await resp.json(content_type=None)
+        if int((tpl or {}).get("errno", 0) or 0) != 0:
+            raise BaiduApiError("删除百度临时文件失败：无法获取 bdstoken", diagnostics={"stage": "delete_token", "payload": tpl})
+        bdstoken = str(((tpl or {}).get("result") or {}).get("bdstoken") or "").strip()
+        if not bdstoken:
+            raise BaiduApiError("删除百度临时文件失败：bdstoken 为空", diagnostics={"stage": "delete_token"})
+        async with session.post(
+            "https://pan.baidu.com/api/filemanager",
+            params={
+                "opera": "delete",
+                "async": "0",
+                "onnest": "fail",
+                "bdstoken": bdstoken,
+                "channel": "chunlei",
+                "web": "1",
+                "clienttype": "0",
+            },
+            data={"filelist": json.dumps([normalized_path], ensure_ascii=False)},
+            headers={"Origin": "https://pan.baidu.com"},
+        ) as resp:
+            payload = await resp.json(content_type=None)
+        errno = int((payload or {}).get("errno", 0) or 0)
+        if errno == 132:
+            raise BaiduApiError("百度删除临时文件需要安全验证", diagnostics={"stage": "delete", "payload": payload})
+        if errno != 0:
+            raise BaiduApiError(f"删除百度临时文件失败 errno={errno}", diagnostics={"stage": "delete", "payload": payload})
+        return True

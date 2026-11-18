@@ -118,7 +118,7 @@ def test_create_baidu_tasks_uses_pan_headers(tmp_path, monkeypatch):
 
     service.aria2 = _FakeAria2()
 
-    async def _fake_direct(share_ctx, file_id):
+    async def _fake_direct(share_ctx, file_id, file_name=""):
         return "https://d.pcs.baidu.com/file/demo"
 
     monkeypatch.setattr(service, "_fetch_baidu_direct_url", _fake_direct)
@@ -212,7 +212,7 @@ def test_create_baidu_web_tasks_uses_cookie(tmp_path, monkeypatch):
 
     service.aria2 = _FakeAria2()
 
-    async def _fake_direct(share_ctx, file_id):
+    async def _fake_direct(share_ctx, file_id, file_name=""):
         return "https://d.pcs.baidu.com/file/demo"
 
     monkeypatch.setattr(service, "_fetch_baidu_web_direct_url", _fake_direct)
