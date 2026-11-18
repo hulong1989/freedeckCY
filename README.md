@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.26.14**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.26.25**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,7 +21,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.26.14**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.26.25**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -48,7 +48,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **模拟器闭环（10 平台）**：GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC/MD（Mesen2）/ 3DS（Azahar，支持 .cia 自动安装）/ PS2（PCSX2）/ PS3（RPCS3）/ Switch（Eden）；全部首次安装在线下载官方包（不集成进插件包），启动脚本走原生 Linux、不写 Proton
 - **自动云存档**：Ludusavi 清单（53k+ 游戏）+ gamewatch 进程检测；游戏退出后只上传该游戏，存档未变化自动跳过；PC + **10 个模拟器平台**的存档都能纳入；支持模拟器存档恢复（自动备份、同机原路径优先）；PSP/PS3/3DS 共享存档会按游戏拆分；QAM 可关闭/关闭模拟器部分
 - **PS1 多碟**：安装目录多张 `.cue`/`.chd` 时自动生成 `freedeckcy-multidisc.m3u`，DuckStation 直接启动；同目录多游戏按标题/目录消歧，仍歧义会明确失败
-- **百度网盘**：QAM **扫码登录**（BDUSS/Cookie，无需 App Key）；百度分享链接可解析、转存、下载并安装；也可选 OpenAPI（需开发者应用）作为回退
+- **百度网盘（对齐 freedeck-go）**：QAM 扫码登录（BDUSS/Cookie，无需 App Key）；分享先 `share/verify` 并带 `BDCLND` 打开；目录 100 条分页；转存前创建 `/FreedeckTmp`、`ondup=overwrite`；异步任务路径按文件名兜底；安装后清理临时文件；登录后补 passport auth 获取 pan STOKEN；OpenAPI 作为可选回退
 - **服务器 CSV 目录**：设置页「检查并更新游戏列表」用 ETag/Last-Modified + SHA256 判断；有变化才下载，提示新增数量，库页显示「最近更新」shelf
 - **可选启动文件**：目录 `executable_name` 指定 PC 主 exe / ROM；留空自动识别
 - **内置目录服务器**：默认 `http://171.215.30.40:8088/catalog.csv`，启动自动检查并验证 Ed25519 签名；设置页可覆盖
@@ -83,7 +83,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
-make package     # 产出 dist-artifacts/freedeckCY-v0.26.14.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.26.25.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -105,8 +105,8 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.26.14.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.26.14-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.26.25.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.26.25-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
@@ -126,7 +126,7 @@ pnpm build          # 产出 dist/index.js
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 348）
+.venv/bin/pytest -q          # 或 make test（用例数以输出为准，当前 540）
 make doctor                  # 环境诊断：运行时/Steam/state/日志/端口/网络（只读）
 make package-droiddeck       # ARM64 包（DroidDeck/Android 用）
 ```
@@ -175,7 +175,7 @@ CSV 资源清单 ──▶ 分享解析（天翼云盘开放接口 + Node 兜底
             7zz 解压到安装目录 ──▶ 写 shortcuts.vdf / config.vdf / grid 封面
                      │
                      ▼
-               Steam 库里出现游戏（需重启 Steam）
+               Steam 库里出现游戏（尝试免重启刷新，失败再重启 Steam）
 ```
 
 云存档走另一条：`Proton 前缀存档目录 → 7z + manifest.json → 天翼云盘 freedeckCYCloudSaves/`，恢复时反向操作并做冲突确认。
@@ -189,6 +189,9 @@ main.py                     Decky 插件入口（RPC 薄转发 + 后台维护循
 py_modules/
   tianyi_service.py         业务内核：下载/安装（分卷/自愈/重试）/卸载/云存档/登录/时长
   tianyi_client.py          天翼云盘协议：分享解析、直链、token、上传
+  baidu_client.py           百度网盘网页协议：分享 verify/列表/转存/直链/临时文件清理
+  baidu_qr.py               百度 Passport 扫码登录（BDUSS/STOKEN）
+  catalog_signature.py      目录 CSV 的 Ed25519 公钥验签
   tianyi_http.py            本地 HTTP 路由（41 条：3 页面/静态 + 38 REST）
   tianyi_store.py           state.json 数据模型与读写
   server_manager.py         aiohttp 生命周期、Host/Origin 校验、设置持久化
@@ -222,10 +225,14 @@ Makefile                    构建入口：runtime / catalog-json / ludusavi-man
 - 仅监听 `127.0.0.1`，并校验 `Host` 必须是回环地址（防 DNS rebinding）
 - 写请求若带 `Origin`，必须是本机页面；`Sec-Fetch-Site: cross-site` 直接拒绝
 - 不再返回 `Access-Control-Allow-Origin: *`；本地 API 请求体上限从 1GB 收到 16MB
-- `share_url` 只接受 `cloud.189.cn` / `*.189.cn`，避免被本地页面塞入任意地址
+- `share_url` 只接受 `cloud.189.cn` / `*.189.cn` / `pan.baidu.com`，避免被本地页面塞入任意地址
 - `state.json` 含登录 cookie，落盘后目录 0700、文件 0600
 
 云存档恢复覆盖同名文件前，会把原文件/目录就地改名为 `*.freedeckcy-bak-<YYYYmmdd_HHMMSS>`，失败可手工找回。
+
+## 独立 Web 提交系统
+
+玩家网页投稿 + 管理员/审核员后台 + SQLite + 服务器 CSV 的独立项目不在本仓库、也不在插件包内；插件只负责通过 `catalog_url` 下载并验签服务器 CSV。
 
 ## 游戏提交（仓库）
 
@@ -238,7 +245,7 @@ Makefile                    构建入口：runtime / catalog-json / ludusavi-man
 
 ## 已知问题
 
-- **Decky 更新后仍看到网页游戏库**：v0.23.0 起游戏库优先打开原生 modal，v0.24.0 增加返回/Steam 库按钮；页面顶部显示 `原生 UI · v0.26.14`，QAM 主页显示 `QAM 原生 UI v0.26.14`。如果看不到版本标识或仍打开网页，说明前端 `dist` 未更新，重装/重载插件（必要时重启 Decky Loader）后再试。
+- **Decky 更新后仍看到网页游戏库**：v0.23.0 起游戏库优先打开原生 modal，v0.24.0 增加返回/Steam 库按钮；页面顶部显示 `原生 UI · v0.26.25`，QAM 主页显示 `QAM 原生 UI v0.26.25`。如果看不到版本标识或仍打开网页，说明前端 `dist` 未更新，重装/重载插件（必要时重启 Decky Loader）后再试。
 
 完整清单（含已修复/未修复与 P0/P1/P2 分级）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「问题清单」，后续计划见 [docs/ROADMAP.md](docs/ROADMAP.md)。简要版：
 
@@ -250,7 +257,7 @@ Makefile                    构建入口：runtime / catalog-json / ludusavi-man
 - **模拟器已接入 10 个平台（PC / FC / NDS / PSP / GBA / 3DS / PS2 / PS1 / PS3 / MD / Switch）**：全部首次安装在线下载官方包，**插件包不集成模拟器**；3DS/PS2/PS3 只有 x86_64 官方包，DroidDeck（aarch64）会自动隐藏这三个平台
 - **3DS / SteamOS**：SteamOS 上 3DS 优先走官方 Flatpak（首次安装自动装，约数百 MB 运行时），避免官方 AppImage 在 Steam Deck 上的兼容问题；无 Flatpak 环境回退 AppImage
 - **模拟器边界**：所有平台首次安装都需联网下载官方包（约 15–99MB）；PS1/PS2 BIOS、PS3 固件、3DS system files、Switch keys/固件都要自备，放到 `~/.local/share/freedeckCY/bios/<platform>/`（支持 zip/7z 压缩包，安装时自动解压部署）；3DS/PS2/PS3 仅 x86_64；解包目录会多占空间；ARM64 未真机验证
-- **百度网盘边界**：默认扫码登录（BDUSS/Cookie，网页版接口，非官方 OpenAPI）；Cookie 失效需重新扫码；OpenAPI 仅作为需要开发者资质时的可选回退；转存受百度账号空间/接口配额限制
+- **百度网盘边界**：默认扫码登录（BDUSS/Cookie，网页版接口，非官方 OpenAPI）；Cookie 失效需重新扫码；OpenAPI 仅作为需要开发者资质时的可选回退；转存受百度账号空间/接口配额限制；删除临时文件可能触发百度安全验证，失败不影响已下载文件
 - **模拟器云存档边界**：PS1/PS2 单片记忆卡、Switch 存档目录仍无法按游戏拆分，恢复会整卡覆盖（需确认）；3DS/Switch 整目录可能较大，可在 QAM 关闭「包含模拟器存档」
 - **自动云存档边界**：PC 存档覆盖 Ludusavi 清单/Proton 前缀；模拟器存档 v0.15.0 起支持上传、v0.16.0 起支持恢复（见上一条）；首次自动上传依赖清单匹配/登录态
 - **DroidDeck 适配未真机验证**：FEX / ARM Proton / Android 存储映射可能有差异，排障见 [docs/DROIDDECK.md](docs/DROIDDECK.md)
