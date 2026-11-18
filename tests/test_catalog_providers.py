@@ -56,3 +56,18 @@ def test_same_provider_duplicates_are_not_merged(tmp_path):
     result = catalog.list(page_size=10)
     assert result["total"] == 2
     assert all("providers" not in item for item in result["items"])
+
+
+def test_single_baidu_entry_is_valid_and_labeled(tmp_path):
+    path = tmp_path / "catalog.csv"
+    _write_catalog(path, [
+        _row("b1", "b", "https://pan.baidu.com/s/1AbCdEf", title="Baidu Only"),
+    ])
+    catalog = GameCatalog(str(path))
+    catalog.load()
+    result = catalog.list(page_size=10)
+    assert result["total"] == 1
+    item = result["items"][0]
+    assert item["provider"] == "baidu"
+    assert item["provider_label"] == "百度网盘"
+    assert "providers" not in item
