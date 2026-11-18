@@ -2,6 +2,24 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.27.18
+
+### 聚焦卡片顶部蓝框完整显示
+
+- 真机 CEF 测到焦点卡 `outline:2px`，货架 `overflow:auto` + `padding-top:3px` 把顶部蓝框裁掉 1–2px。
+- 货架顶部内边距改为 10px，网格同步改为 10px。
+- 结合卡片 `onGamepadFocus` 自动滚动和 `scroll-margin-top:84px`。
+- 555 passed。
+
+## v0.27.17
+
+### 游戏库聚焦卡片自动滚动
+
+- 真机 CEF 截图确认：聚焦卡片本身可见，但横向货架不会随焦点右移，边缘卡片被裁。
+- 卡片增加 `onGamepadFocus`，聚焦时 `scrollIntoView({ inline: "center", block: "nearest" })`。
+- 卡片增加 `scroll-margin-top:84px`，顶部蓝条/封面不被状态栏遮罩截断。
+- 包含 v0.27.16 更新按钮对齐/左右导航；555 passed。
+
 ## v0.27.16
 
 ### 插件更新按钮对齐/左右导航

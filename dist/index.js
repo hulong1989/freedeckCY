@@ -3146,14 +3146,14 @@ const LIBRARY_CSS = `
 .fdc-section-title { font-size: 15px; font-weight: 800; }
 .fdc-section-count { font-size: 11px; color: var(--fdc-muted); }
 .fdc-shelf-block { margin-bottom: 18px; }
-.fdc-shelf { display: flex; gap: 14px; overflow-x: auto; padding: 3px 8px 12px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; touch-action: pan-x; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
+.fdc-shelf { display: flex; gap: 14px; overflow-x: auto; padding: 10px 8px 12px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; touch-action: pan-x; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
 .fdc-shelf::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .fdc-root { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
 .fdc-root::-webkit-scrollbar { width: 6px; height: 6px; }
 .fdc-root::-webkit-scrollbar-track { background: transparent; }
 .fdc-root::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 999px; }
 .fdc-shelf .fdc-card-wrap { flex: 0 0 auto; scroll-snap-align: start; }
-.fdc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-items: start; gap: 18px; padding: 2px 8px 24px; width: 100%; box-sizing: border-box; }
+.fdc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-items: start; gap: 18px; padding: 10px 8px 24px; width: 100%; box-sizing: border-box; }
 .fdc-grid .fdc-card-wrap { width: 100% !important; }
 .fdc-card-wrap, .fdc-shelf-block { scroll-margin-top: 84px; }
 .fdc-card-wrap { display: flex; flex-direction: column; gap: 5px; min-width: 0; width: 100%; }
@@ -3216,13 +3216,20 @@ function LibrarySkeletonCard(props) {
 function LibraryCoverCard(props) {
     const [imageFailed, setImageFailed] = SP_REACT.useState(false);
     const [proxyFailed, setProxyFailed] = SP_REACT.useState(false);
+    const cardRef = SP_REACT.useRef(null);
+    const handleCardFocus = SP_REACT.useCallback(() => {
+        const node = cardRef.current;
+        if (!node)
+            return;
+        node.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }, []);
     const rawCoverUrl = imageFailed ? "" : String(props.coverUrl || "").trim();
     const coverUrl = rawCoverUrl && props.coverProxyBase && !proxyFailed ? `${props.coverProxyBase}?url=${encodeURIComponent(rawCoverUrl)}` : rawCoverUrl;
     const title = props.title || "未命名游戏";
     const providerLabel = String(props.providerLabel || "").trim();
     const providerClass = providerLabel.includes("百度") ? " fdc-provider-baidu" : providerLabel ? " fdc-provider-tianyi" : "";
     const metaParts = [String(props.platform || "pc").toUpperCase(), String(props.meta || "").trim()].filter(Boolean);
-    return (_local_SP_JSX.jsxs("div", { className: "fdc-card-wrap", style: { width: props.width ? `${props.width}px` : "100%" }, children: [_local_SP_JSX.jsxs(DFL.DialogButton, { className: "freedeckcy-cover-card fdc-card", onClick: props.onPress, disabled: Boolean(props.disabled), style: { width: "100%", minWidth: 0, boxSizing: "border-box", padding: 0, border: "1px solid rgba(255,255,255,0.10)", borderRadius: "12px", overflow: "hidden", display: "flex", flexDirection: "column", background: "#121a23" }, children: [_local_SP_JSX.jsxs("div", { className: "fdc-card-cover", children: [coverUrl ? (_local_SP_JSX.jsx("img", { src: coverUrl, alt: title, referrerPolicy: "no-referrer", decoding: "async", loading: "lazy", onError: () => { if (rawCoverUrl && coverUrl !== rawCoverUrl)
+    return (_local_SP_JSX.jsxs("div", { ref: cardRef, className: "fdc-card-wrap", style: { width: props.width ? `${props.width}px` : "100%", scrollMarginTop: "84px" }, children: [_local_SP_JSX.jsxs(DFL.DialogButton, { className: "freedeckcy-cover-card fdc-card", onClick: props.onPress, onGamepadFocus: handleCardFocus, disabled: Boolean(props.disabled), style: { width: "100%", minWidth: 0, boxSizing: "border-box", padding: 0, border: "1px solid rgba(255,255,255,0.10)", borderRadius: "12px", overflow: "hidden", display: "flex", flexDirection: "column", background: "#121a23" }, children: [_local_SP_JSX.jsxs("div", { className: "fdc-card-cover", children: [coverUrl ? (_local_SP_JSX.jsx("img", { src: coverUrl, alt: title, referrerPolicy: "no-referrer", decoding: "async", loading: "lazy", onError: () => { if (rawCoverUrl && coverUrl !== rawCoverUrl)
                                     setProxyFailed(true);
                                 else
                                     setImageFailed(true); } })) : (_local_SP_JSX.jsx("div", { className: "fdc-card-fallback", children: _local_SP_JSX.jsx("span", { children: title.slice(0, 2) }) })), _local_SP_JSX.jsx("div", { className: "fdc-card-shade" }), providerLabel ? (_local_SP_JSX.jsx("div", { className: `fdc-badge fdc-provider${providerClass}`, children: providerLabel })) : null, props.installed ? (_local_SP_JSX.jsx("div", { className: "fdc-badge fdc-installed", children: "已安装" })) : null, props.busyLabel ? (_local_SP_JSX.jsx("div", { className: "fdc-card-busy", children: props.busyLabel })) : null] }), _local_SP_JSX.jsxs("div", { className: "fdc-card-info", children: [_local_SP_JSX.jsx("div", { className: "fdc-card-title", title: title, children: title }), _local_SP_JSX.jsx("div", { className: "fdc-card-meta", children: metaParts.join(" · ") })] })] }), props.actions ? (_local_SP_JSX.jsx(DFL.Focusable, { style: { display: "flex", gap: "5px", width: "100%" }, children: props.actions })) : null] }));
