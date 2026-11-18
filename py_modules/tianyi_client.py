@@ -849,6 +849,7 @@ def _build_tls_context() -> ssl.SSLContext:
         env_cert_file = str(os.environ.get(env_var, "") or "").strip()
         if env_cert_file:
             candidates.append(env_cert_file)
+    candidates.append(str(Path(__file__).resolve().with_name("cacert.pem")))
     candidates.extend(list(TLS_CA_CANDIDATE_FILES))
 
     try:

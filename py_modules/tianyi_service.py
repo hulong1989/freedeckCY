@@ -8527,7 +8527,8 @@ class TianyiService:
         }
         try:
             timeout = aiohttp.ClientTimeout(total=10)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+            connector = aiohttp.TCPConnector(ssl=build_tls_context())
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
                 async with session.get(api_url, headers=headers) as response:
                     if int(response.status) != 200:
                         return {
@@ -8606,7 +8607,8 @@ class TianyiService:
             if sha_asset:
                 try:
                     timeout = aiohttp.ClientTimeout(total=15)
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                    sha_connector = aiohttp.TCPConnector(ssl=build_tls_context())
+                    async with aiohttp.ClientSession(timeout=timeout, connector=sha_connector) as session:
                         async with session.get(str(sha_asset.get("url")), headers={"User-Agent": "freedeckCY"}) as resp:
                             if int(resp.status) == 200:
                                 text = (await resp.text())[:4096]
@@ -9787,6 +9789,7 @@ class TianyiService:
         candidates: List[str] = []
         if env_cert_file:
             candidates.append(env_cert_file)
+        candidates.append(str(Path(__file__).resolve().with_name("cacert.pem")))
         candidates.extend(list(QR_CA_CANDIDATE_FILES))
 
         try:

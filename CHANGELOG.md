@@ -2,6 +2,16 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.38
+
+### 修复插件更新证书错误
+
+- 内置 `cacert.pem` CA bundle，兼容 Decky Python 缺少系统 CA 的环境。
+- 更新检查、Release SHA256 下载统一使用 `build_tls_context()`。
+- 修复：
+  `CERTIFICATE_VERIFY_FAILED unable to get local issuer certificate`
+- 新增 CA bundle 测试；测试 544 passed。
+
 ## v0.26.37
 
 ### CI 修复

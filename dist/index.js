@@ -128,7 +128,7 @@ function FaCloudDownloadAlt(props) {
 }
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.37";
+const PLUGIN_UI_BUILD = "0.26.38";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const restartSteamBackend = callable("restart_steam");
 const clearSteamRestartPending = callable("clear_steam_restart_pending");

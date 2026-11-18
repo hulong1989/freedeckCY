@@ -78,6 +78,7 @@ def _build_ssl_context() -> Tuple[ssl.SSLContext, Dict[str, Any]]:
     candidates: List[str] = []
     if env_cert_file:
         candidates.append(env_cert_file)
+    candidates.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "cacert.pem"))
     candidates.extend(list(_CA_CANDIDATE_FILES))
 
     try:
