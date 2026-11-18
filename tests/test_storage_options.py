@@ -124,3 +124,16 @@ def test_symlinked_mount_alias_deduped(tmp_path, monkeypatch):
     mounts = f"/dev/sda1 {real} ext4 rw 0 0\n/dev/sda1 {alias} ext4 rw 0 0\n"
     data = storage_options.detect_storage_options(mounts_text=mounts, home=str(tmp_path), disk_usage=_usage)
     assert len(data["external"]) == 1
+
+
+def test_internal_option_uses_home_downloads(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    data = storage_options.detect_storage_options(
+        mounts_text="",
+        home=str(home),
+        disk_usage=lambda path: SimpleNamespace(free=5 * 1024**3, total=50 * 1024**3),
+    )
+    internal = data["internal"]
+    assert internal["label"] == "内置硬盘"
+    assert internal["download_dir"] == str(home / "Downloads")

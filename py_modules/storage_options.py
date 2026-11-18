@@ -206,9 +206,9 @@ def detect_storage_options(
         internal_total = 0
     internal = {
         "kind": "internal",
-        "label": "内置存储",
+        "label": "内置硬盘",
         "mount": home_dir,
-        "download_dir": os.path.join(home_dir, "Downloads", "freedeckCY"),
+        "download_dir": os.path.join(home_dir, "Downloads"),
         "install_dir": os.path.join(home_dir, "Games", "freedeckCY"),
         "free_bytes": internal_free,
         "total_bytes": internal_total,
