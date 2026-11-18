@@ -3053,8 +3053,8 @@ function GameDetailModal(props) {
 const LIBRARY_CSS = `
 .fdc-root { --fdc-bg: #0b0f14; --fdc-panel: rgba(18,26,35,0.84); --fdc-line: rgba(255,255,255,0.10); --fdc-text: #f2f6fb; --fdc-muted: #9eacbb; --fdc-accent: #65d6c0; --fdc-blue: #72b8ff; background: radial-gradient(1100px 520px at 50% -20%, #162a33 0%, var(--fdc-bg) 55%); color: var(--fdc-text); }
 .fdc-topbar { position: relative; top: auto; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; margin: 0 -6px 10px; background: rgba(11,15,20,0.94); border-bottom: 1px solid var(--fdc-line); }
-.fdc-topbar button, .fdc-search-row button { flex: 0 0 auto !important; width: auto !important; white-space: nowrap; }
-.fdc-heading { flex: 1 1 220px; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: 2px; }
+.fdc-topbar button, .fdc-search-row button { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; white-space: nowrap; padding-left: 10px !important; padding-right: 10px !important; }
+.fdc-heading { flex: 1 1 180px; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: 2px; }
 .fdc-title { font-size: 20px; font-weight: 800; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fdc-subtitle { font-size: 11px; color: var(--fdc-muted); }
 .fdc-tabs { display: flex; flex-wrap: nowrap; gap: 6px; flex: 0 0 auto; }
