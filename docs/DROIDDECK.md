@@ -102,7 +102,7 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | 模拟器 BIOS/固件部署（v0.12.0） | ✅ 安装后自动部署 `bios/<platform>/`（支持压缩包，7zz 解压缓存）；aarch64 可用 PS1/NDS/Switch 的部署与 GBA/PSP 全屏配置；PS2/PS3/3DS 仅 x86_64 |
 | 仓库游戏提交（v0.13.0） | ✅ 网页库「提交游戏」按钮打开 GitHub Issue 表单；或直接 PR `submissions/*.json`。无设备特定逻辑，DroidDeck 与 Steam Deck 行为一致 |
 | 模拟器存档上传/恢复（v0.15.0 / v0.16.0） | ✅ aarch64 可用：按 proot 内 HOME 发现/恢复 GBA/PSP/NDS/PS1/FC/MD/Switch 存档；恢复走白名单目标 + `*.freedeckcy-bak-*` 备份，冲突需确认；PSP 按 PARAM.SFO 拆分；PS1 多碟 m3u 可用；3DS 拆分随平台隐藏（仅 x86_64） |
-| Decky 原生游戏库（v0.20.0；v0.27.20） | ✅ aarch64 可用：QAM 原生封面网格/Hero/筛选/详情页/已安装动作；不依赖网页与本地 HTTP |
+| Decky 原生游戏库（v0.20.0；v0.27.20） | ✅ aarch64 可用：QAM 原生库（Hero+分类货架，搜索/筛选后网格）/详情页/已安装动作；不依赖网页与本地 HTTP |
 | 手柄/触控板（v0.27） | ✅ DroidDeck 触控/手柄走 Decky 焦点系统：A/B、方向键、L1/R1、L2/R2、触控滚动；与 Steam Deck 共用同一实现 |
 | 库页时长隔离（v0.25.0） | ✅ aarch64 可用：仅插件安装/补录游戏显示时长块；Steam 原有游戏 `managed=false` 不插入、不查 HLTB |
 | 原生库返回/关闭（v0.24.0） | ✅ aarch64 可用：「返回 / Steam 库 / 刷新」工具栏（v0.27.3 起普通流式）+ 标题栏；modal 用 `onClose`，route 用 `NavigateBack`；「Steam 库」走 `NavigateToLibraryTab`（不可用则回退） |

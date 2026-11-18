@@ -10,7 +10,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 > 合规提示：项目 README 自述"仅限研发测试、资源源自互联网、24 小时内删除"，代码会解析第三方云盘分享链接并绕过官方客户端下载。这属于版权与云盘服务条款的高风险区，请自行评估后使用。
 
-**关键事实**：它没有自建服务器。资源清单是仓库内的 CSV 文件（`defaults/tianyi_catalog/`，一条记录 = 游戏名 + 天翼或百度分享链接 + 解压后 exe 相对路径），下载直链在运行时由对应网盘接口现取。
+**关键事实**：目录默认从内置服务器拉取并验签，服务器不可用时用仓库内 CSV 兜底（`defaults/tianyi_catalog/`，一条记录 = 游戏名 + 天翼或百度分享链接 + 解压后 exe 相对路径），下载直链在运行时由对应网盘接口现取。
 
 ---
 
@@ -197,7 +197,7 @@ Steam Deck (Game Mode)
 │        ├── Aria2Manager        ──▶ aria2c 子进程（运行时元数据 + flock 复用，JSON-RPC 控制）
 │        ├── SevenZipManager     ──▶ 7zz 子进程（解压/打包；解压前 `7z t` 校验）
 │        ├── SteamShortcuts      ──▶ ~/.steam/.../shortcuts.vdf、config.vdf、userdata/*/grid/
-│        ├── EmulatorManager     ──▶ mGBA AppImage（--appimage-extract 解包后原生运行；GBA 安装）
+│        ├── EmulatorManager     ──▶ 10 平台注册表（首次在线下载，AppImage/zip 解包后原生运行）
 │        ├── TianyiClient        ──▶ cloud.189.cn / api.cloud.189.cn（Cookie + MD5/AES/RSA 签名）
 │        └── 封面缓存             ──▶ ~/.local/share/freedeckCY/tianyi/cover_cache.json（TTL 7 天）
 │
@@ -206,13 +206,13 @@ Steam Deck (Game Mode)
 │   ├── /_healthz                    健康检查
 │   ├── /tianyi/library              Vue 游戏库橱窗  ── 由 Steam 内置浏览器打开
 │   ├── /tianyi/library/login-bridge 二维码登录桥
-│   └── /api/tianyi/*                38 条 REST 路由（给 Vue 页用）
+│   └── /api/tianyi/*                REST 路由（旧网页/脚本用；原生库走 callable）
 │
 └── 外部依赖
     ├── open.e.189.cn        二维码登录
     ├── api.cloud.189.cn     accessToken / 直链 / 分片上传
     ├── node (>=18)          分享解析兜底、云存档上传（stdin/stdout JSON 子进程）
-    └── mGBA (AppImage)      GBA 模拟器（x64/arm64，内置 AppImage 或系统/Flatpak）
+    └── 模拟器官方 release   10 平台首次安装在线下载（插件包不集成）
 ```
 
 ### 5.2 三条"控制面"、一条"数据面"
@@ -709,13 +709,13 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 ## 6. 链路 A：从点"安装"到 Steam 库里出现游戏
 
 ```text
-[Vue 库页]点击卡片
-   │ POST /api/tianyi/install/prepare  {game_id 或 share_url}
+[Decky 原生库]点击卡片
+   │ callable prepare_tianyi_install  {game_id 或 share_url}
    ▼
 _build_install_plan()
-   ├─ share_url 只接受天翼域名（cloud.189.cn / *.189.cn，_is_tianyi_share_url）
+   ├─ share_url 接受天翼（cloud.189.cn / *.189.cn）或百度（pan.baidu.com / yun.baidu.com / eyun.baidu.com）
    ├─ 查 CSV → share_url / openpath / title / platform
-   ├─ platform 校验：pc + 注册表平台（gba/psp/nds）放行；其它平台拒绝
+   ├─ platform 校验：pc + available_platforms(arch)（10 个模拟器平台，按架构裁剪）放行
    ├─ 模拟器平台：emulator_status(platform) 判断（未安装也可返回 source=download）
    │    └─ 用 openpath 的 ROM 文件名 resolve_share(target_name, max_pages=40) 分页查找
    │         └─ 分享里找不到目标 ROM → 报错（附已扫描文件示例）
@@ -754,7 +754,7 @@ _post_process_completed_task()               ← 按安装目录加锁，整组�
    ├─ 全部成功 → _finalize_group_install()
    │    ├─ 写 TianyiInstalledGame 记录（体积 = 组内各包之和；gba 另存 platform/emulator/rom_path/launcher_path）
    │    ├─ 只以"代表任务"（created_at 最早）注册一次 Steam（见 6.5）
-   │    │    └─ 模拟器平台：find_rom_file(platform) → ensure_emulator(platform)（PSP/NDS 首次按需下载）
+   │    │    └─ 模拟器平台：find_rom_file(platform) → ensure_emulator(platform)（模拟器首次按需下载）
    │    │         → 生成 launch-freedeckcy.sh → 快捷方式 Exe=脚本、LaunchOptions 带 token、Proton=none
    │    └─ auto_delete_package 为真则删除组内全部压缩包
    └─ 任一包失败 → 整组不注册 Steam；已解压文件保留，install_message 汇总
@@ -773,7 +773,7 @@ Steam 库里出现游戏（写完后备份 + 回读校验；需重启 Steam 生�
 | 封面缓存 | `~/.local/share/freedeckCY/tianyi/cover_cache.json`（0600，正缓存 7 天 / 负缓存 30 分钟） |
 | 运行时二进制 | `defaults/runtime/{aria2,7z}/<arch>/`、`defaults/runtime/node/<arch>/bin/node`（模拟器不在包内） |
 | 模拟器解包产物 | `~/.local/share/freedeckCY/emulators/<platform>/<arch>/squashfs-root/`（AppRun，不依赖 FUSE；FC/MD 共用 `mesen/`；GBA 兼容旧 `emulators/<arch>/`） |
-| 按需下载的模拟器资产 | `~/.local/share/freedeckCY/emulators/<platform>/<arch>/<官方资产名>`（PSP/NDS 首次安装时下载） |
+| 按需下载的模拟器资产 | `~/.local/share/freedeckCY/emulators/<platform>/<arch>/<官方资产名>`（所有模拟器首次安装时下载） |
 | GBA 启动脚本 | `<install_dir>/launch-freedeckcy.sh`（`exec <mGBA> -f <rom>`） |
 | 日志 | `/tmp/freedeckcy.log` |
 
@@ -1007,7 +1007,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 | 环节 | 做法 |
 |---|---|
-| 下载入口校验 | `_build_install_plan` 只接受天翼域名（`cloud.189.cn`、`h5.cloud.189.cn`、`api.cloud.189.cn` 或 `*.189.cn`）的 `share_url`，防止本地页面把任意 URL 塞进下载链路 |
+| 下载入口校验 | `_build_install_plan` 接受天翼（`cloud.189.cn`、`h5.cloud.189.cn`、`api.cloud.189.cn` 或 `*.189.cn`）或百度（`pan.baidu.com`/`yun.baidu.com`/`eyun.baidu.com`）`share_url`，其它域名拒绝 |
 | 分享解析 | `checkAccessCode`（提取码换 shareId）→ `getShareInfoByCodeV2`（拿 fileId/isFolder）→ `listShareDir`（列目录，pageSize=60）。同一接口准备多套"请求画像"（host × GET/POST/form），逐个试；都失败再抓分享落地页 HTML 里抠 shareId；最后 Node 兜底。签名头只有 `Sign-Type:1`，**鉴权完全靠 Cookie** |
 | 直链 | `api.cloud.189.cn/open/file/getFileDownloadUrl.action`，签名 = `MD5(AccessToken=..&Timestamp=..&dt=1&fileId=..&shareId=..)`，头带 `Accesstoken/Signature/Timestamp` |
 | accessToken | 从 `ssoH5` 的 302 跳转 URL 里提取 |
@@ -1077,7 +1077,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 2. ~~`post_processed` 在解压之前就置 `True`~~：**本次补全已修复**——改为安装工作结束后才置真；解压中崩溃/插件重启后，后台维护会重新拾起未处理任务。
 3. ~~多文件游戏并发解压到同一目录、`installed_games` 记录互相覆盖~~：**本次补全已修复**——按安装目录加 `asyncio.Lock` 串行，并按 `group_id` 整组一次性安装、只写一条记录（体积为各包之和）、只注册一次 Steam。
 4. ~~云存档恢复先删后拷且无备份；路径包含判断用 `startswith` 可被 `../` 逃逸~~：**本次补全已修复**——覆盖前就地改名 `*.freedeckcy-bak-<时间戳>`（结果回传 `backed_up_files`），路径边界改用 `_is_within_dir()`（commonpath）。
-5. ~~本地 HTTP 无鉴权、CORS 全开、请求体上限 1 GB、`share_url` 可被塞任意地址~~：**本次补全已修复**——Host/Origin 校验 + `Sec-Fetch-Site: cross-site` 拒绝；`client_max_size` 收到 **16 MB**；`share_url` 只接受天翼域名；`state.json` 目录 0700 / 文件 0600。
+5. ~~本地 HTTP 无鉴权、CORS 全开、请求体上限 1 GB、`share_url` 可被塞任意地址~~：**本次补全已修复**——Host/Origin 校验 + `Sec-Fetch-Site: cross-site` 拒绝；`client_max_size` 收到 **16 MB**；`share_url` 只接受天翼/百度域名；`state.json` 目录 0700 / 文件 0600。
 
 ### P1：容易踩的坑
 

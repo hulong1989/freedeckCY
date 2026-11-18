@@ -311,7 +311,7 @@ PACKAGE_ARCH=aarch64 bash scripts/package.sh
 PACKAGE_ARCH=all     bash scripts/package.sh   # → ...-universal.zip（x86_64 + aarch64 都保留）
 ```
 
-- `PACKAGE_ARCH` 取值：`x86_64`（默认，无后缀）/ `aarch64`（`-arm64`）/ `all`（`-universal`）；单架构打包会裁剪 `defaults/runtime/{aria2,7z,node,mgba}/*/<其它arch>`，避免包体积翻倍；打包脚本会检查 `mgba/<arch>/mGBA.AppImage`，缺失只警告（GBA 安装后无法启动）；
+- `PACKAGE_ARCH` 取值：`x86_64`（默认，无后缀）/ `aarch64`（`-arm64`）/ `all`（`-universal`）；单架构打包会裁剪 `defaults/runtime/{aria2,7z,node}/*/<其它arch>`，避免包体积翻倍；插件包不包含模拟器，模拟器首次安装在线下载；
 - **插件包不包含任何模拟器**（v0.10.0 起删除 `make emulator-runtime` / `scripts/fetch_emulator.sh`）：GBA/PSP/NDS/PS1/FC/MD 的官方包都首次安装时从 GitHub release 下载（需要网络），包体积约 45MB（此前含 mGBA 时约 68MB）；PS1 的 BIOS 也不随包，由用户自备（放 `~/.local/share/freedeckCY/bios/ps1/`）；
 - 确认 arm64 二进制：`file defaults/runtime/aria2/aarch64/aria2c`（应显示 `ELF 64-bit … ARM aarch64`）、`ls defaults/runtime/7z/aarch64/7zz defaults/runtime/node/aarch64/bin/node`；缺哪个就重跑 `make runtime ARCH=aarch64`（模拟器不打包，无需准备）；
 - 打包前可先用 `bash scripts/fetch_runtime.sh --only 7z --arch aarch64 --force` 单独补一个组件；
@@ -597,7 +597,7 @@ cat ~/.local/share/freedeckCY/tianyi/state.json | python3 -m json.tool | grep -A
 # installed_games: platform、emulator、rom_path、launcher_path、steam_app_id
 ```
 
-Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:tianyi:<token>`，**Proton 映射为 none**（原生 Linux）。日志关键字：`Auto add emulator game to Steam failed`、`Auto add emulator game to Steam exception`、`Resolve emulator cover failed`。**除 GBA 外都不在包内**，首次安装需要联网下载（失败会在安装消息/日志里给出 HTTP 状态或解包错误）。
+Steam 条目 Exe 是 `launch-freedeckcy.sh`，`LaunchOptions` 带 `freedeckcy:tianyi:<token>`，**Proton 映射为 none**（原生 Linux）。日志关键字：`Auto add emulator game to Steam failed`、`Auto add emulator game to Steam exception`、`Resolve emulator cover failed`。**所有模拟器都不在包内**，首次安装需要联网下载（失败会在安装消息/日志里给出 HTTP 状态或解包错误）。
 
 ### 6.9 自动云存档调试（Ludusavi + gamewatch，v0.8.0）
 
@@ -724,7 +724,7 @@ make validate-catalog                      # 合并后再跑目录体检
 
 - 平台别名：`windows/win→pc`、`ns→switch`、`3d→3ds`、`psx/playstation→ps1`、`genesis→md` 等；最终只接受 11 个平台；
 - 必填 `name/platform/share_url/openpath`；`openpath` 必须是分享内相对路径、不能含 `..`；
-- `share_url` 必须是 `https://cloud.189.cn/...`，能解析出 `/t/<shareCode>` 或 `/web/share?code=`；`access_code` 4–8 位字母/数字（链接已有 `pwd=` 可空）；
+- `share_url` 支持天翼 `https://cloud.189.cn/...`（`/t/<shareCode>`、`/web/share?code=`）或百度分享链接；`access_code` 4–8 位字母/数字（链接已有 `pwd=` 可空）；
 - `filesize_z` 非负整数；`executable_name` 仅 PC（模拟器留空只会 warning）；
 - 重复 shareCode：同时对比目录 CSV 已有行与本批其它提交；重复是 ERROR；
 - 没有 `submissions/*.json` 时校验通过（CI 不红）。
@@ -1021,7 +1021,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 | **上传被跳过（reason=unchanged）** | 存档指纹和上次上传相同（相对路径+大小+mtime 未变）。确属未变化是预期；想强制上传：退出插件后删除 `state.json` 里对应游戏的 `cloud_save_fingerprints` 条目，或删除整个字段后重载插件 |
 | **Ludusavi 清单未命中（退回 proton_prefix/install_fallback）** | ① 确认 `defaults/ludusavi/manifest.json.gz` 存在（`make ludusavi-manifest`，发布包自带）；② 上传状态 `diagnostics.collect` 里看 `ludusavi.matched/path_count` 与 `source_strategy`；③ 标题差异大时只能靠 Steam AppID 匹配（先看快捷方式是否解析出 appid）；④ 封面/标题含特殊字符时 `normalize_title()` 会去掉非字母数字/CJK 字符 |
 | **提交校验报 platform 不支持** | 平台只支持 `pc/gba/psp/nds/ps1/fc/md/3ds/ps2/ps3/switch`；别名只认常见写法（windows→pc、ns→switch、3d→3ds、psx→ps1 等），其它拼写会直接报错。改 JSON 里的 `platform` 后重跑 `make validate-submissions` |
-| **提交校验报链接不是 cloud.189.cn** | `share_url` 必须是 `https://cloud.189.cn/...`；支持 `/t/<shareCode>` 与 `/web/share?code=<shareCode>`，其它域名/短链先展开成天翼云盘原始分享链接 |
+| **提交校验报链接不是 cloud.189.cn** | `share_url` 支持天翼 `https://cloud.189.cn/...`（`/t/<shareCode>`、`/web/share?code=`）或百度分享链接（`pan.baidu.com`），其它域名/短链先展开成对应网盘原始分享链接 |
 | **openpath 缺失/包含 ..** | `openpath` 是分享根目录下游戏文件或压缩包的相对路径（如 `Stardew Valley/Stardew Valley.7z`），不能以 `/` 开头、不能含 `..`；安装器靠它分页定位文件 |
 | **提交报重复 shareCode** | 同一分享链接已在目录 CSV 或本批其它 JSON 里；用 `python scripts/validate_submissions.py --json` 看具体 shareCode，换链接或删除重复文件 |
 | **诊断自检某几项失败** | 设置 → 诊断「运行自检」看 status/detail/fix；runtime_* 检查包内 `defaults/runtime/<component>/<arch>/`，steam 检查登录/`FREEDECKCY_STEAM_ROOT`，network/baidu_qr 检查连通性；自检不自动修复 |
@@ -1073,8 +1073,8 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 
 - **资源源**：天翼云盘 + 百度网盘扫码/Cookie（OpenAPI 可选回退）均已实现；模拟器资源在首次安装时按需下载；独立 Web 提交/管理系统不在本仓库、不进插件包。
 - **仅支持 SteamOS / Linux（含 DroidDeck 的 proot 环境）**：依赖 `7zz`、Proton、Steam 的 Linux 目录结构；Windows / macOS 无法运行。Steam 根目录支持原生 / Flatpak / **DroidDeck 双客户端**，SD 卡/第二块盘通过 `libraryfolders.vdf` 扫描。
-- **作者已停止维护**：上游不再更新，接口失效只能自行修；release 与仓库版本存在代差（仓库落后）。
-- **仅早期版本**：`package.json` 版本 0.8.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
+- **作者已停止维护**：上游不再更新，接口失效只能自行修；上游 release 与本仓库版本存在代差；本仓库当前 0.27.20 已领先上游。
+- **本仓库已是完整维护版**：`package.json` 版本 0.27.20，功能以本仓库文档为准；上游 v0.6 仅作历史对照。
 - **DroidDeck 适配未真机验证**：ARM64 运行环境、FEX/ARM Proton、Android 存储映射都可能有差异；实测失败时优先参考 [DROIDDECK.md](DROIDDECK.md) 的排障与日志收集。
 - **目录数据需保持干净**：新增/合并目录后必须跑 `make normalize-catalog` 与 `make validate-catalog`（CI 对内置目录执行 `--strict`）；「模拟器」是清洗后的兜底分类，不是真实游戏分类。
 - **模拟器存档恢复/拆分（v0.16.0）**：PSP/PS3 用 PARAM.SFO、3DS 用 NCSD title id 拆分，PS1/PS2/Switch 仍整卡/整目录；恢复目标受 `restore_roots` 白名单限制，跨设备 3DS 可能退化到根目录；覆盖前有 `*.freedeckcy-bak-<时间戳>` 备份，共享卡冲突需确认；PS1 多碟自动 m3u 需要多张 `.cue/.chd`，已有 m3u 优先。
