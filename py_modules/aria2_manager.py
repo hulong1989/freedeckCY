@@ -614,6 +614,18 @@ class Aria2Manager:
         """恢复任务。"""
         await self._rpc_call("aria2.unpause", [gid])
 
+    async def pause_all(self) -> None:
+        """暂停全部活动任务。"""
+        await self._rpc_call("aria2.pauseAll")
+
+    async def resume_all(self) -> None:
+        """恢复全部已暂停任务。"""
+        await self._rpc_call("aria2.unpauseAll")
+
+    async def set_global_download_limit(self, limit: int) -> None:
+        """设置 aria2 全局下载限速（字节/秒，0=不限）。"""
+        await self._rpc_call("aria2.changeGlobalOption", [{"max-overall-download-limit": str(max(0, int(limit)))}])
+
     async def remove(self, gid: str) -> None:
         """移除任务。"""
         try:

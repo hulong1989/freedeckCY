@@ -26,7 +26,7 @@ def _service(tmp_path):
     service.catalog = type(
         "Catalog",
         (),
-        {"csv_path": "", "json_path": "", "entries": [1, 2], "source": "csv", "load": lambda self: None},
+        {"csv_path": "", "json_path": "", "entries": [1, 2], "source": "csv", "load": lambda self: None, "get_by_game_id": lambda self, game_id: None},
     )()
     service._invalidate_panel_cache = lambda **kwargs: None
     return service, state_dir
@@ -102,3 +102,30 @@ def test_catalog_update_skips_same_hash(tmp_path, monkeypatch):
     result = asyncio.run(service.update_catalog_csv())
     assert result["updated"] is False
     assert result["reason"] == "already_latest"
+
+
+def test_catalog_update_records_added_games(tmp_path, monkeypatch):
+    service, state_dir = _service(tmp_path)
+    initial = _valid_csv()
+    updated = initial + "999,New Game,5,动作冒险,https://cloud.189.cn/t/newgame,,New Game/New Game.7z,100,100 B,pc,,,0\n".encode("utf-8")
+
+    async def _fetch_initial(url, **kwargs):
+        return initial, {"ETag": '"v1"'}, 200
+
+    monkeypatch.setattr(service, "_fetch_catalog_csv", _fetch_initial)
+    first = asyncio.run(service.update_catalog_csv())
+    assert first["updated"] is True
+    assert first["added_count"] == 0
+
+    async def _fetch_updated(url, **kwargs):
+        return updated, {"ETag": '"v2"'}, 200
+
+    monkeypatch.setattr(service, "_fetch_catalog_csv", _fetch_updated)
+    second = asyncio.run(service.update_catalog_csv())
+    assert second["updated"] is True
+    assert second["added_count"] == 1
+    assert (state_dir / "catalog.csv.meta.json").is_file()
+    update = service.get_catalog_update()
+    assert update["added_count"] == 1
+    assert update["added"][0]["title"] == "New Game"
+    assert (state_dir / "catalog.csv.meta.json").is_file()

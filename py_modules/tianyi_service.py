@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import csv
 import hashlib
 import io
 import json
@@ -916,6 +917,7 @@ class TianyiService:
             "tasks": tasks,
             "settings": asdict(self.store.settings),
             "library_url": library_url,
+            "cover_proxy_base": self.get_cover_proxy_base(),
             "login_capture": await self.get_login_capture_status(),
             "baidu_login": {
                 "logged_in": self.store.baidu_login.logged_in,
@@ -2232,6 +2234,16 @@ class TianyiService:
         return dict(self._capture_state)
 
     @staticmethod
+    def _parse_catalog_rows(data: bytes) -> list[Dict[str, str]]:
+        try:
+            import io
+
+            text = data.decode("utf-8-sig")
+            return list(csv.DictReader(io.StringIO(text)))
+        except Exception:
+            return []
+
+    @staticmethod
     def _validate_catalog_csv(data: bytes) -> Dict[str, Any]:
         """校验服务器目录 CSV，返回 (ok, message, row_count)。"""
         if not data:
@@ -2292,6 +2304,51 @@ class TianyiService:
             raise RuntimeError("服务器返回 304 但没有本地目录")
         return data
 
+    @staticmethod
+    def _catalog_update_meta_path(state_dir: str) -> str:
+        return os.path.join(state_dir, "catalog.csv.meta.json")
+
+    def get_catalog_update(self, max_items: int = 12) -> Dict[str, Any]:
+        """返回上次目录更新的新增游戏（用于最近更新 shelf/提醒）。"""
+        state_dir = os.path.dirname(self.store.state_file)
+        meta_path = self._catalog_update_meta_path(state_dir)
+        payload: Dict[str, Any] = {}
+        if os.path.isfile(meta_path):
+            try:
+                with open(meta_path, "r", encoding="utf-8") as fh:
+                    loaded = json.load(fh)
+                if isinstance(loaded, dict):
+                    payload = loaded
+            except Exception:
+                payload = {}
+        items = []
+        for item in list(payload.get("added") or [])[: max(0, int(max_items or 12))]:
+            if not isinstance(item, dict):
+                continue
+            game_id = str(item.get("game_id", "") or "").strip()
+            if not game_id:
+                continue
+            entry = self.catalog.get_by_game_id(game_id)
+            if entry is None:
+                continue
+            items.append(
+                {
+                    "game_id": entry.game_id,
+                    "title": entry.title,
+                    "platform": entry.platform,
+                    "categories": entry.categories,
+                    "size_text": _format_size_bytes(max(0, int(entry.size_bytes or 0))) if int(entry.size_bytes or 0) > 0 else "",
+                    "cover_url": entry.cover_url,
+                    "cover_portrait_url": entry.cover_portrait_url,
+                }
+            )
+        return {
+            "updated_at": int(payload.get("updated_at", 0) or 0),
+            "added_count": int(payload.get("added_count", 0) or 0),
+            "added": list(payload.get("added") or []),
+            "items": items,
+        }
+
     async def update_catalog_csv(self, url: str = "") -> Dict[str, Any]:
         """检查服务器目录是否比本地新，只有变化才下载替换。"""
         target_url = str(url or "").strip()
@@ -2349,7 +2406,28 @@ class TianyiService:
         if not validation.get("ok"):
             raise ValueError(str(validation.get("message") or "目录 CSV 校验失败"))
         server_sha = hashlib.sha256(data).hexdigest()
+        old_ids: set[str] = set()
+        if local_exists:
+            try:
+                with open(target_path, "rb") as fh:
+                    old_rows = self._parse_catalog_rows(fh.read())
+                old_ids = {str(row.get("game_id", "") or "").strip() for row in old_rows if str(row.get("game_id", "") or "").strip()}
+            except Exception:
+                old_ids = set()
+        added: list[Dict[str, str]] = []
+        if local_exists:
+            for row in self._parse_catalog_rows(data):
+                game_id = str(row.get("game_id", "") or "").strip()
+                if not game_id or game_id in old_ids:
+                    continue
+                added.append({"game_id": game_id, "title": str(row.get("title", "") or "").strip()})
+        added_meta = {
+            "added_count": len(added),
+            "added": added[:500],
+        }
         if local_exists and local_sha and server_sha == local_sha:
+            preserved_added = local_meta.get("added") if local_meta.get("sha256") == server_sha else []
+            preserved_count = local_meta.get("added_count", 0) if local_meta.get("sha256") == server_sha else 0
             new_meta = {
                 "url": target_url,
                 "etag": headers.get("ETag", ""),
@@ -2357,6 +2435,8 @@ class TianyiService:
                 "sha256": server_sha,
                 "updated_at": int(time.time()),
                 "rows": int(validation.get("row_count", 0) or 0),
+                "added_count": int(preserved_count or 0),
+                "added": list(preserved_added or [])[:500],
             }
             self._write_catalog_meta(meta_path, new_meta)
             return {
@@ -2394,6 +2474,7 @@ class TianyiService:
             "sha256": server_sha,
             "updated_at": int(time.time()),
             "rows": int(validation.get("row_count", 0) or 0),
+            **added_meta,
         }
         self._write_catalog_meta(meta_path, new_meta)
         # 本地下载的 CSV 优先；清掉内存中的 JSON 覆盖，立即生效。
@@ -2412,6 +2493,8 @@ class TianyiService:
             "server_last_modified": headers.get("Last-Modified", ""),
             "sha256": server_sha,
             "url": target_url,
+            "added_count": int(added_meta["added_count"]),
+            "added": list(added_meta["added"]),
             "message": "已下载服务器最新目录",
         }
 
@@ -2764,6 +2847,84 @@ class TianyiService:
         if app_id > 0:
             return f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/capsule_616x353.jpg"
         return ""
+
+    def get_cover_proxy_base(self) -> str:
+        """返回封面代理 URL 前缀；本地服务未运行时返回空。"""
+        if not bool(getattr(self.plugin, "server_running", False)):
+            return ""
+        port = int(getattr(self.plugin, "server_port", 0) or 0)
+        if port <= 0:
+            return ""
+        return f"http://127.0.0.1:{port}/api/tianyi/cover-image"
+
+    async def fetch_cover_image(self, url: str, *, max_bytes: int = 8 * 1024 * 1024) -> Tuple[bytes, str]:
+        """拉取并磁盘缓存封面图（仅允许 Steam/封面 CDN 域名）。"""
+        raw = str(url or "").strip()
+        if not raw or len(raw) > 2048:
+            raise ValueError("封面 URL 无效")
+        parsed = urlparse(raw)
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("封面 URL 协议不支持")
+        host = str(parsed.hostname or "").strip().lower().rstrip(".")
+        allowed_suffixes = (
+            "steamstatic.com",
+            "steamcdn-a.akamaihd.net",
+            "akamaihd.net",
+            "steamgriddb.com",
+            "steamusercontent.com",
+        )
+        if not any(host == suffix or host.endswith("." + suffix) for suffix in allowed_suffixes):
+            raise ValueError("封面域名不允许")
+        state_dir = os.path.dirname(self.store.state_file)
+        cache_dir = os.path.join(state_dir, "cover_cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        cached_path = ""
+        cached_type = ""
+        for ext, content_type in ((".jpg", "image/jpeg"), (".png", "image/png"), (".webp", "image/webp"), (".gif", "image/gif")):
+            candidate = os.path.join(cache_dir, digest + ext)
+            if os.path.isfile(candidate):
+                try:
+                    if time.time() - os.path.getmtime(candidate) < 30 * 86400:
+                        cached_path, cached_type = candidate, content_type
+                        break
+                except OSError:
+                    pass
+        if cached_path:
+            try:
+                with open(cached_path, "rb") as fh:
+                    return fh.read(), cached_type
+            except OSError:
+                pass
+        timeout = aiohttp.ClientTimeout(total=20, connect=10)
+        connector = aiohttp.TCPConnector(ssl=build_tls_context())
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            async with session.get(raw, headers={"User-Agent": "freedeckCY/cover-proxy"}, allow_redirects=False) as response:
+                if response.status >= 400:
+                    raise RuntimeError(f"封面下载失败 HTTP {response.status}")
+                content_type = str(response.headers.get("Content-Type", "") or "").split(";", 1)[0].strip().lower()
+                if not content_type.startswith("image/"):
+                    raise RuntimeError("服务器返回的不是图片")
+                data = bytearray()
+                async for chunk in response.content.iter_chunked(64 * 1024):
+                    data.extend(chunk)
+                    if len(data) > max_bytes:
+                        raise RuntimeError("封面图片超过大小限制")
+        ext = { "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif" }.get(content_type, ".jpg")
+        temp_path = os.path.join(cache_dir, digest + ext + ".tmp")
+        final_path = os.path.join(cache_dir, digest + ext)
+        try:
+            with open(temp_path, "wb") as fh:
+                fh.write(data)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temp_path, final_path)
+        except Exception:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        return bytes(data), content_type
 
     def _build_store_square_cover_url(self, app_id: int) -> str:
         """优先返回更适合方形裁切的 Steam 竖版素材 URL。"""
@@ -6506,6 +6667,7 @@ class TianyiService:
     async def _create_tasks_from_plan(self, *, plan: Dict[str, Any], split: int) -> List[TianyiTaskRecord]:
         """根据安装计划创建 aria2 下载任务。"""
         await self.aria2.ensure_running()
+        await self.apply_saved_download_speed_limit()
         provider = str(plan.get("provider", "tianyi") or "tianyi").strip()
         share_ctx = plan.get("share_ctx") if isinstance(plan.get("share_ctx"), dict) else {}
         share_url = str(plan.get("share_url", "") or "").strip()
@@ -7159,6 +7321,52 @@ class TianyiService:
         self.store.save()
         self._invalidate_panel_cache(tasks=True)
         return _task_to_view(task)
+
+    async def pause_all_tasks(self) -> Dict[str, Any]:
+        """暂停全部下载任务。"""
+        await self.aria2.pause_all()
+        changed = 0
+        for task in self.store.tasks:
+            if task.status in {"active", "queued", "waiting", "downloading", "pending"}:
+                task.status = "paused"
+                task.updated_at = _now_wall_ts()
+                changed += 1
+        self.store.save()
+        self._invalidate_panel_cache(tasks=True)
+        return {"paused": changed}
+
+    async def resume_all_tasks(self) -> Dict[str, Any]:
+        """恢复全部已暂停任务。"""
+        await self.aria2.resume_all()
+        changed = 0
+        for task in self.store.tasks:
+            if task.status == "paused":
+                task.status = "active"
+                task.updated_at = _now_wall_ts()
+                changed += 1
+        self.store.save()
+        self._invalidate_panel_cache(tasks=True)
+        return {"resumed": changed}
+
+    async def apply_saved_download_speed_limit(self) -> None:
+        """把持久化的限速应用到当前 aria2 实例。"""
+        limit = max(0, int(getattr(self.store.settings, "download_speed_limit", 0) or 0))
+        if limit <= 0:
+            return
+        try:
+            await self.aria2.set_global_download_limit(limit)
+        except Exception as exc:
+            config.logger.debug("应用下载限速失败: %s", exc)
+
+    async def set_download_speed_limit(self, limit: int) -> Dict[str, Any]:
+        """设置全局下载限速（KB/s，0=不限）。"""
+        value = max(0, min(10 * 1024 * 1024, int(limit or 0)))
+        self.store.set_settings(download_speed_limit=value * 1024)
+        try:
+            await self.aria2.set_global_download_limit(value * 1024)
+        except Exception as exc:
+            config.logger.debug("aria2 未运行时暂存下载限速: %s", exc)
+        return {"limit": value, "limit_bytes": value * 1024}
 
     async def remove_task(self, task_id: str) -> Dict[str, Any]:
         """移除任务。"""

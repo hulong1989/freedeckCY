@@ -323,6 +323,20 @@ async def handle_catalog(request: web.Request, plugin: Any) -> web.Response:
         return _json_error_from_exception(exc)
 
 
+async def handle_cover_image(request: web.Request, plugin: Any) -> web.Response:
+    """封面本地代理：磁盘缓存，减少 QAM 直连 CDN 的卡顿。"""
+    url = str(request.query.get("url", "") or "").strip()
+    try:
+        data, content_type = await _service(plugin).fetch_cover_image(url)
+    except Exception as exc:
+        return web.Response(status=404, text=f"cover unavailable: {_redact_text(str(exc))}")
+    return web.Response(
+        body=data,
+        content_type=content_type,
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
+
+
 async def handle_catalog_cover(request: web.Request, plugin: Any) -> web.Response:
     """按标题解析游戏封面。"""
     try:
@@ -776,6 +790,7 @@ def setup_routes(app: web.Application, plugin: Any) -> None:
 
     app.router.add_get("/api/tianyi/catalog", lambda request: handle_catalog(request, plugin))
     app.router.add_get("/api/tianyi/catalog/cover", lambda request: handle_catalog_cover(request, plugin))
+    app.router.add_get("/api/tianyi/cover-image", lambda request: handle_cover_image(request, plugin))
     app.router.add_get("/api/tianyi/installed", lambda request: handle_installed_games(request, plugin))
     app.router.add_post("/api/tianyi/installed/launch", lambda request: handle_installed_launch(request, plugin))
     app.router.add_post("/api/tianyi/installed/open-folder", lambda request: handle_installed_open_folder(request, plugin))

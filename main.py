@@ -481,6 +481,28 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def get_tianyi_catalog_update(self, payload=None, max_items: int = 12) -> dict:
+        """设置页：返回上次目录更新新增游戏，用于最近更新 shelf。"""
+        try:
+            if isinstance(payload, dict):
+                max_items = int(payload.get("max_items", max_items) or max_items)
+            data = self._get_tianyi_service().get_catalog_update(max_items=max(1, min(50, max_items)))
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def get_tianyi_cover_proxy_base(self) -> dict:
+        """返回本地封面缓存代理前缀；服务未运行则 base 为空。"""
+        try:
+            base = ""
+            if bool(getattr(self, "server_running", False)):
+                port = int(getattr(self, "server_port", 0) or 0)
+                if port > 0:
+                    base = f"http://127.0.0.1:{port}/api/tianyi/cover-image"
+            return {"status": "success", "data": {"base": base}}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def list_tianyi_catalog(self, payload=None, query: str = "", page: int = 1, page_size: int = 20, platform: str = "", category: str = "", sort: str = "") -> dict:
         """原生 QAM 游戏库：分页查询目录。"""
         try:
@@ -620,6 +642,32 @@ class Plugin:
             if isinstance(payload, dict):
                 task_id = str(payload.get("task_id", task_id))
             data = await self._get_tianyi_service().retry_task(task_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def pause_all_tianyi_tasks(self) -> dict:
+        """全部暂停下载。"""
+        try:
+            data = await self._get_tianyi_service().pause_all_tasks()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def resume_all_tianyi_tasks(self) -> dict:
+        """全部继续下载。"""
+        try:
+            data = await self._get_tianyi_service().resume_all_tasks()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def set_tianyi_speed_limit(self, payload=None, limit_kb: int = 0) -> dict:
+        """设置下载限速（KB/s，0 不限）。"""
+        try:
+            if isinstance(payload, dict):
+                limit_kb = int(payload.get("limit_kb", limit_kb) or 0)
+            data = await self._get_tianyi_service().set_download_speed_limit(limit_kb)
             return {"status": "success", "data": data}
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}

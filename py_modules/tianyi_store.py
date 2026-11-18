@@ -108,6 +108,8 @@ class TianyiSettings:
     cloud_save_include_emulators: bool = True
     # 自定义目录服务器 CSV 地址（留空使用默认 GitHub raw）
     catalog_url: str = ""
+    # 全局下载限速（字节/秒，0=不限）
+    download_speed_limit: int = 0
 
 
 @dataclass
@@ -328,6 +330,7 @@ class TianyiStateStore:
                     cloud_save_auto_upload=_to_bool(settings_raw.get("cloud_save_auto_upload", True), True),
                     cloud_save_include_emulators=_to_bool(settings_raw.get("cloud_save_include_emulators", True), True),
                     catalog_url=str(settings_raw.get("catalog_url", "") or "").strip(),
+                    download_speed_limit=max(0, _to_int(settings_raw.get("download_speed_limit", 0), 0)),
                 )
 
             next_tasks: List[TianyiTaskRecord] = []
@@ -458,6 +461,7 @@ class TianyiStateStore:
         cloud_save_auto_upload: Optional[bool] = None,
         cloud_save_include_emulators: Optional[bool] = None,
         catalog_url: Optional[str] = None,
+        download_speed_limit: Optional[int] = None,
     ) -> None:
         """更新设置。"""
         with self._lock:
@@ -481,6 +485,8 @@ class TianyiStateStore:
                 self.settings.cloud_save_include_emulators = bool(cloud_save_include_emulators)
             if catalog_url is not None:
                 self.settings.catalog_url = str(catalog_url).strip()
+            if download_speed_limit is not None:
+                self.settings.download_speed_limit = max(0, int(download_speed_limit))
             self.save()
 
     def upsert_tasks(self, records: List[TianyiTaskRecord]) -> None:
