@@ -19,6 +19,13 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 ---
 
+## 截图
+
+| QAM 插件主页 | 原生游戏库 | 游戏详情 |
+|:---:|:---:|:---:|
+| <img src="docs/images/qam-home-en.png" width="280" alt="QAM 插件主页"> | <img src="docs/images/game-library-en.png" width="280" alt="原生游戏库"> | <img src="docs/images/game-detail-en.png" width="280" alt="游戏详情"> |
+| 中英双语切换、Game Library / Settings 入口 | 搜索、筛选、分类货架与已安装页签 | 详情、下载源选择与安装操作 |
+
 ## 当前状态
 
 | | 说明 |

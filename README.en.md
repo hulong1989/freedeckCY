@@ -19,6 +19,13 @@ A **Decky Loader plugin** for the Steam Deck: using resource catalogs from Tiany
 
 ---
 
+## Screenshots
+
+| QAM plugin home | Native game library | Game details |
+|:---:|:---:|:---:|
+| <img src="docs/images/qam-home-en.png" width="280" alt="QAM plugin home"> | <img src="docs/images/game-library-en.png" width="280" alt="Native game library"> | <img src="docs/images/game-detail-en.png" width="280" alt="Game details"> |
+| Bilingual language switch, Game Library / Settings entries | Search, filters, category shelves and installed tab | Details, download-source choice and install actions |
+
 ## Current Status
 
 | | Description |
