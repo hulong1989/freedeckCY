@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import tempfile
 from typing import Any
 from urllib.parse import urlparse
 
@@ -324,6 +325,32 @@ def _save_settings_backup(plugin: Any, settings: dict) -> None:
     os.replace(temp_path, path)
 
 
+def ensure_download_dir(plugin: Any) -> str:
+    """确保下载目录可写；不可写时回退到内置硬盘 ~/Downloads。"""
+    fallback = os.path.realpath(os.path.expanduser(config.DOWNLOADS_DIR))
+    candidate = str(getattr(plugin, "downloads_dir", "") or "").strip()
+    candidate = os.path.realpath(os.path.expanduser(candidate)) if candidate else fallback
+    for path, is_fallback in ((candidate, False), (fallback, True)):
+        try:
+            os.makedirs(path, exist_ok=True)
+            probe_dir = path if os.path.isdir(path) else os.path.dirname(path) or "."
+            fd, probe = tempfile.mkstemp(prefix=".freedeckcy-dir-", dir=probe_dir)
+            os.close(fd)
+            os.remove(probe)
+            plugin.downloads_dir = path
+            if is_fallback and path != candidate:
+                config.logger.warning(
+                    "下载目录不可写，已回退到内置硬盘: %s -> %s", candidate, path
+                )
+            return path
+        except Exception as exc:
+            if is_fallback:
+                config.logger.warning("内置下载目录也不可写: %s", exc)
+            else:
+                config.logger.warning("下载目录不可写，尝试内置硬盘: %s", exc)
+    return candidate
+
+
 async def load_settings(plugin: Any) -> None:
     """加载 freedeckCY 设置。"""
     settings: dict = {}
@@ -353,10 +380,7 @@ async def load_settings(plugin: Any) -> None:
     else:
         plugin.downloads_dir = config.DOWNLOADS_DIR
 
-    try:
-        os.makedirs(plugin.downloads_dir, exist_ok=True)
-    except Exception as exc:
-        config.logger.warning(f"Ensure download directory failed: {exc}")
+    ensure_download_dir(plugin)
 
 
 async def save_settings(plugin: Any) -> None:

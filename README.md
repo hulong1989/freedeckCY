@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.27.3**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.27.4**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,9 +21,9 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 | | 说明 |
 |---|---|
-| 当前版本 | **0.27.3**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 当前版本 | **0.27.4**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork；上游已停止维护 |
-| 测试 | **554 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
+| 测试 | **555 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
 | CI | Python 测试 / UI 构建 / 前端 hooks 作用域检查 / x86_64 与 aarch64 运行时冒烟 |
 | 数据目录 | `~/.local/share/freedeckCY/`（`state.json` 权限 0600，目录 0700） |
 | 资源目录 | `defaults/tianyi_catalog/freedeckcy_catalog.csv`（7084 条） |
@@ -120,8 +120,8 @@ Releases 提供带运行时二进制的安装包：
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.27.3.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.27.3-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.27.4.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.27.4-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后使用 **Decky → 开发者 → 从文件安装插件**，选择对应 zip，重启 Decky Loader。
 校验值见 Release 中的 `.sha256` 文件。
@@ -131,7 +131,7 @@ Releases 提供带运行时二进制的安装包：
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime              # 下载 aria2c / 7zz / node 到 defaults/runtime/
-make package              # 产出 dist-artifacts/freedeckCY-v0.27.3.zip
+make package              # 产出 dist-artifacts/freedeckCY-v0.27.4.zip
 ```
 
 ### 方式 C：DroidDeck / ARM64
@@ -173,7 +173,7 @@ pnpm check:ui       # hooks 依赖作用域检查
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test，当前 554 个用例
+.venv/bin/pytest -q          # 或 make test，当前 555 个用例
 make check-ui                # 前端 hooks 作用域检查
 make doctor                  # 环境诊断（只读）
 make package-droiddeck       # ARM64 包
@@ -303,6 +303,8 @@ Web 1.4.0 起，提交表单支持分别填写天翼云盘链接和百度网盘�
 只提交分享链接，不要上传游戏文件；字段与规则见 [submissions/README.md](https://github.com/hulong1989/freedeckCY/blob/main/submissions/README.md)。
 
 ## 已知问题
+
+- **下载目录不可写**：设置页保存的目录无写权限时，插件会自动回退到 `~/Downloads`，避免“天翼服务未初始化”。
 
 - **云盘接口不稳定**：天翼私有签名、百度网页接口都可能随官方调整失效。
 - **百度登录**：Cookie 失效后需要重新扫码；转存受账号空间/接口配额/安全验证影响；临时文件删除失败不影响已下载文件。

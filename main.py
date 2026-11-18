@@ -49,7 +49,7 @@ class Plugin:
         os.makedirs(self.downloads_dir, exist_ok=True)
 
         await server_manager.load_settings(self)
-        os.makedirs(self.downloads_dir, exist_ok=True)
+        server_manager.ensure_download_dir(self)
 
         self.tianyi_service = TianyiService(self)
         await self.tianyi_service.initialize()
