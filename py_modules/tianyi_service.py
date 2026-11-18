@@ -35,7 +35,13 @@ import config
 import catalog_signature
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
-from baidu_client import BaiduApiError, delete_baidu_home_file, fetch_baidu_download_url, resolve_baidu_share
+from baidu_client import (
+    BaiduApiError,
+    check_baidu_web_health,
+    delete_baidu_home_file,
+    fetch_baidu_download_url,
+    resolve_baidu_share,
+)
 from baidu_qr import BaiduQrError, complete_login, fetch_qr_image, poll_qr, request_qr
 from baidu_openapi_client import (
     BaiduOpenApiError,
@@ -1011,6 +1017,20 @@ class TianyiService:
             "user_account": state.user_account,
             "message": "已登录" if state.logged_in else "未登录",
         }
+
+    async def check_baidu_web_login_health(self) -> Dict[str, Any]:
+        """检查百度网页登录、bdstoken 和转存目录。"""
+        cookie = str(self.store.baidu_login.cookie or "").strip()
+        if not cookie:
+            return {
+                "ok": False,
+                "stage": "login",
+                "message": "未登录百度网盘，请先扫码登录",
+                "user": "",
+                "vip_type": 0,
+                "checks": [],
+            }
+        return await check_baidu_web_health(cookie)
 
     async def start_baidu_qr_login(self) -> Dict[str, Any]:
         """百度网页版扫码：返回二维码 data URL。"""
@@ -8520,6 +8540,20 @@ class TianyiService:
             return {"ok": False, "current": current, "message": f"检查更新失败: {exc}"}
 
         latest = str(payload.get("tag_name") or "").strip().lstrip("vV")
+        assets = []
+        for item in list(payload.get("assets") or []):
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            url = str(item.get("browser_download_url") or "").strip()
+            if not name or not url:
+                continue
+            assets.append({
+                "name": name,
+                "url": url,
+                "size": max(0, _safe_int(item.get("size"), 0)),
+                "digest": str(item.get("digest") or "").strip(),
+            })
         result = {
             "ok": True,
             "current": current,
@@ -8528,10 +8562,107 @@ class TianyiService:
             "url": str(payload.get("html_url") or ""),
             "name": str(payload.get("name") or ""),
             "published_at": str(payload.get("published_at") or ""),
+            "assets": assets,
         }
         self._update_cache = result
         self._update_cache_at = now
         return dict(result)
+
+    async def download_update(self) -> Dict[str, Any]:
+        """下载并校验官方 Release 更新包，返回本地路径（不自动覆盖插件）。"""
+        update = await self.check_update()
+        if not update.get("ok"):
+            return {"ok": False, "message": str(update.get("message") or "检查更新失败")}
+        if not update.get("has_update"):
+            return {
+                "ok": False,
+                "current": update.get("current", ""),
+                "latest": update.get("latest", ""),
+                "message": "当前已经是最新版本",
+            }
+        assets = [item for item in list(update.get("assets") or []) if isinstance(item, dict)]
+        machine = str(platform.machine() or "").lower()
+        arch_suffix = "-arm64.zip" if machine in {"aarch64", "arm64"} else ".zip"
+        if arch_suffix == "-arm64.zip":
+            candidates = [item for item in assets if str(item.get("name") or "").endswith("-arm64.zip")]
+        else:
+            candidates = [
+                item
+                for item in assets
+                if str(item.get("name") or "").endswith(".zip")
+                and not str(item.get("name") or "").endswith("-arm64.zip")
+            ]
+        if not candidates:
+            return {"ok": False, "message": "Release 中没有匹配当前架构的插件包"}
+        asset = candidates[0]
+        asset_name = str(asset.get("name") or "")
+        asset_url = str(asset.get("url") or "")
+        expected_sha = ""
+        digest = str(asset.get("digest") or "").strip()
+        if digest.lower().startswith("sha256:"):
+            expected_sha = digest.split(":", 1)[1].strip().lower()
+        if not expected_sha:
+            sha_asset = next((item for item in assets if str(item.get("name") or "") == asset_name + ".sha256"), None)
+            if sha_asset:
+                try:
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.get(str(sha_asset.get("url")), headers={"User-Agent": "freedeckCY"}) as resp:
+                            if int(resp.status) == 200:
+                                text = (await resp.text())[:4096]
+                                match = re.search(r"\b([0-9a-fA-F]{64})\b", text)
+                                if match:
+                                    expected_sha = match.group(1).lower()
+                except Exception as exc:
+                    return {"ok": False, "message": f"读取 SHA256 失败: {exc}"}
+        if not expected_sha:
+            return {"ok": False, "message": "Release 缺少 SHA256 校验值，已拒绝下载"}
+        target_dir = str(getattr(self.plugin, "downloads_dir", "") or "").strip() or str(self.store.settings.download_dir or "") or os.path.expanduser("~/Downloads")
+        target_dir = os.path.realpath(os.path.expanduser(target_dir))
+        await asyncio.to_thread(os.makedirs, target_dir, exist_ok=True)
+        target_path = os.path.join(target_dir, asset_name)
+        digest_calc = hashlib.sha256()
+        total = 0
+        timeout = aiohttp.ClientTimeout(total=300, connect=20)
+        try:
+            connector = aiohttp.TCPConnector(ssl=build_tls_context())
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                async with session.get(asset_url, headers={"User-Agent": "freedeckCY"}) as resp:
+                    if int(resp.status) != 200:
+                        return {"ok": False, "message": f"下载更新包失败 HTTP {int(resp.status)}"}
+                    fd, temp_path = tempfile.mkstemp(prefix=".freedeckcy_update_", suffix=".zip", dir=target_dir)
+                    try:
+                        with os.fdopen(fd, "wb") as fh:
+                            async for chunk in resp.content.iter_chunked(1024 * 1024):
+                                total += len(chunk)
+                                if total > 256 * 1024 * 1024:
+                                    raise ValueError("更新包超过 256MB")
+                                digest_calc.update(chunk)
+                                fh.write(chunk)
+                            fh.flush()
+                            os.fsync(fh.fileno())
+                        actual_sha = digest_calc.hexdigest()
+                        if expected_sha and actual_sha != expected_sha:
+                            raise ValueError("更新包 SHA256 校验失败")
+                        os.replace(temp_path, target_path)
+                    except Exception:
+                        try:
+                            os.unlink(temp_path)
+                        except OSError:
+                            pass
+                        raise
+        except Exception as exc:
+            return {"ok": False, "message": f"下载更新包失败: {exc}"}
+        return {
+            "ok": True,
+            "current": update.get("current", ""),
+            "latest": update.get("latest", ""),
+            "path": _redact_text(target_path),
+            "filename": asset_name,
+            "size": total,
+            "sha256": digest_calc.hexdigest(),
+            "message": "更新包已下载并校验；请用 Decky → 开发者 → 从文件安装插件",
+        }
 
     def _install_lock_for(self, target_dir: str) -> asyncio.Lock:
         """获取某个安装目录的互斥锁（分卷/多包游戏会共用同一目标目录）。"""

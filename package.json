@@ -1,6 +1,6 @@
 {
   "name": "freedeckcy",
-  "version": "0.26.25",
+  "version": "0.26.27",
   "description": "Steam Deck 天翼云盘游戏下载/安装/云存档（Decky 插件）",
   "type": "module",
   "scripts": {

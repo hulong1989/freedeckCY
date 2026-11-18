@@ -93,7 +93,7 @@ function FaCloudDownloadAlt (props) {
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.25";
+const PLUGIN_UI_BUILD = "0.26.27";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const restartSteamBackend = callable("restart_steam");
 const clearSteamRestartPending = callable("clear_steam_restart_pending");
@@ -109,6 +109,8 @@ const launchTianyiInstalledGame = callable("launch_tianyi_installed_game");
 const openTianyiInstalledFolder = callable("open_tianyi_installed_folder");
 const scanTianyiInstalledGames = callable("scan_tianyi_installed_games");
 const runTianyiDiagnostics = callable("run_tianyi_diagnostics");
+const checkTianyiUpdate = callable("check_tianyi_update");
+const downloadTianyiUpdate = callable("download_tianyi_update");
 const exportTianyiDiagnosticsFile = callable("export_tianyi_diagnostics_file");
 const uninstallTianyiInstalled = callable("uninstall_tianyi_installed_game");
 const getTianyiLoginUrl = callable("get_tianyi_login_url");
@@ -118,6 +120,7 @@ const startBaiduQrLogin = callable("start_baidu_qr_login");
 const pollBaiduQrLogin = callable("poll_baidu_qr_login");
 const cancelBaiduQrLogin = callable("cancel_baidu_qr_login");
 const clearBaiduLogin = callable("clear_baidu_login");
+const checkBaiduWebHealth = callable("check_baidu_web_health");
 const getBaiduOpenapiAuthorizeUrl = callable("get_baidu_openapi_authorize_url");
 const setBaiduOpenapiApp = callable("set_baidu_openapi_app");
 const exchangeBaiduOpenapiCode = callable("exchange_baidu_openapi_code");
@@ -1305,6 +1308,10 @@ function SettingsPage() {
     const [diagnosticsExportBusy, setDiagnosticsExportBusy] = SP_REACT.useState(false);
     const [diagnosticsExportMessage, setDiagnosticsExportMessage] = SP_REACT.useState("");
     const [diagnosticsError, setDiagnosticsError] = SP_REACT.useState("");
+    const [updateInfo, setUpdateInfo] = SP_REACT.useState(null);
+    const [checkingUpdate, setCheckingUpdate] = SP_REACT.useState(false);
+    const [downloadingUpdate, setDownloadingUpdate] = SP_REACT.useState(false);
+    const [updateMessage, setUpdateMessage] = SP_REACT.useState("");
     const [activeTab, setActiveTab] = SP_REACT.useState("paths");
     const [settings, setSettings] = SP_REACT.useState(EMPTY_SETTINGS);
     const [storageOptions, setStorageOptions] = SP_REACT.useState([]);
@@ -1312,6 +1319,8 @@ function SettingsPage() {
     const [baiduWebLogin, setBaiduWebLogin] = SP_REACT.useState(EMPTY_BAIDU_WEB_STATE);
     const [baiduQr, setBaiduQr] = SP_REACT.useState({ stage: "idle" });
     const [baiduQrBusy, setBaiduQrBusy] = SP_REACT.useState(false);
+    const [baiduHealth, setBaiduHealth] = SP_REACT.useState(null);
+    const [checkingBaiduHealth, setCheckingBaiduHealth] = SP_REACT.useState(false);
     const baiduQrPollBusyRef = SP_REACT.useRef(false);
     const baiduQrPollFailuresRef = SP_REACT.useRef(0);
     const [baiduLogin, setBaiduLogin] = SP_REACT.useState(EMPTY_BAIDU_OPENAPI_STATE);
@@ -1741,6 +1750,7 @@ function SettingsPage() {
                 throw new Error(result.message || "退出百度网盘失败");
             setBaiduWebLogin(result.data || EMPTY_BAIDU_WEB_STATE);
             setBaiduQr({ stage: "idle" });
+            setBaiduHealth(null);
             toaster.toast({ title: "freedeckCY", body: "已退出百度网盘" });
         }
         catch (error) {
@@ -1750,6 +1760,66 @@ function SettingsPage() {
             setBaiduQrBusy(false);
         }
     }, [baiduQrBusy]);
+    const onCheckBaiduHealth = SP_REACT.useCallback(async () => {
+        if (checkingBaiduHealth)
+            return;
+        setCheckingBaiduHealth(true);
+        try {
+            const result = await withTimeout(checkBaiduWebHealth(), 30000, "百度登录检查超时");
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "百度登录检查失败");
+            }
+            setBaiduHealth(result.data);
+            toaster.toast({ title: "freedeckCY", body: String(result.data.message || "检查完成"), duration: 5000 });
+        }
+        catch (error) {
+            setBaiduHealth({ ok: false, message: errorText(error), checks: [] });
+            toastError(error);
+        }
+        finally {
+            setCheckingBaiduHealth(false);
+        }
+    }, [checkingBaiduHealth]);
+    const onCheckUpdate = SP_REACT.useCallback(async () => {
+        if (checkingUpdate)
+            return;
+        setCheckingUpdate(true);
+        setUpdateMessage("");
+        try {
+            const result = await withTimeout(checkTianyiUpdate(), 30000, "检查更新超时");
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "检查更新失败");
+            }
+            setUpdateInfo(result.data);
+            setUpdateMessage(String(result.data.message || (result.data.has_update ? `发现新版本 ${result.data.latest}` : "当前已是最新版本")));
+        }
+        catch (error) {
+            setUpdateMessage(errorText(error));
+        }
+        finally {
+            setCheckingUpdate(false);
+        }
+    }, [checkingUpdate]);
+    const onDownloadUpdate = SP_REACT.useCallback(async () => {
+        if (downloadingUpdate)
+            return;
+        setDownloadingUpdate(true);
+        setUpdateMessage("");
+        try {
+            const result = await withTimeout(downloadTianyiUpdate(), 300000, "下载更新包超时");
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "下载更新包失败");
+            }
+            setUpdateMessage(String(result.data.message || "更新包已下载"));
+            toaster.toast({ title: "freedeckCY", body: String(result.data.message || "更新包已下载"), duration: 7000 });
+        }
+        catch (error) {
+            setUpdateMessage(errorText(error));
+        }
+        finally {
+            setDownloadingUpdate(false);
+        }
+    }, [downloadingUpdate]);
     const onRunDiagnostics = SP_REACT.useCallback(async () => {
         if (diagnosticsBusy)
             return;
@@ -2172,7 +2242,7 @@ function SettingsPage() {
                                         ? `当前已登录：${login.user_account || "未知账号"}`
                                         : "当前未登录" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearLogin, disabled: clearingLogin || saving || !login.logged_in, children: clearingLogin ? "注销中..." : "注销天翼云账号" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8\uFF08\u626B\u7801\u767B\u5F55\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduWebLogin.logged_in
                                         ? `已登录：${baiduWebLogin.user_account || "百度账号"}`
-                                        : "未登录（扫码后使用 BDUSS/Cookie，无需开放平台 App Key）" }) }), baiduQr.stage === "failed" || baiduQr.stage === "expired" ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#ffb4a8", lineHeight: 1.5 }, children: baiduQr.message || "扫码失败，请重试" }) })) : null, baiduQr.stage === "waiting" || baiduQr.stage === "scanned" ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }, children: [baiduQr.qr_data_url ? (SP_JSX.jsx("img", { src: baiduQr.qr_data_url, alt: "\u767E\u5EA6\u626B\u7801\u767B\u5F55", style: { width: "180px", height: "180px", background: "#fff", padding: "8px", borderRadius: "8px" } })) : (SP_JSX.jsxs("div", { style: { fontSize: "12px" }, children: ["\u4E8C\u7EF4\u7801\u56FE\u7247\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u6253\u5F00\uFF1A", SP_JSX.jsx("div", { style: { wordBreak: "break-all" }, children: baiduQr.qrcode_url })] })), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: baiduQr.message || "请用百度 App 扫码" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onCancelBaiduQr, children: "\u53D6\u6D88\u626B\u7801" })] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartBaiduQr, disabled: baiduQrBusy, children: baiduQrBusy ? "获取中..." : "扫码登录百度网盘" }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearBaiduWeb, disabled: baiduQrBusy || !baiduWebLogin.logged_in, children: "\u9000\u51FA\u767E\u5EA6\u7F51\u76D8" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8 OpenAPI\uFF08\u53EF\u9009\uFF0C\u9700\u5F00\u53D1\u8005\u8D44\u8D28\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduLogin.logged_in
+                                        : "未登录（扫码后使用 BDUSS/Cookie，无需开放平台 App Key）" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onCheckBaiduHealth(), disabled: checkingBaiduHealth || !baiduWebLogin.logged_in, children: checkingBaiduHealth ? "检查中..." : "检查登录状态" }) }), baiduHealth ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "4px", width: "100%", fontSize: "11px", lineHeight: 1.5 }, children: [SP_JSX.jsx("div", { style: { color: baiduHealth.ok ? "#9fe6a8" : "#ffb4a8", fontWeight: 600 }, children: baiduHealth.message || "检查完成" }), ...(Array.isArray(baiduHealth.checks) ? baiduHealth.checks.map((check, index) => (SP_JSX.jsx("div", { style: { color: check.status === "fail" ? "#ffb4a8" : check.status === "warn" ? "#ffd479" : "#b9c9d8" }, children: `${check.label || check.id || "检查"}：${check.detail || ""}` }, `${check.id || "check"}-${index}`))) : [])] }) })) : null, baiduQr.stage === "failed" || baiduQr.stage === "expired" ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#ffb4a8", lineHeight: 1.5 }, children: baiduQr.message || "扫码失败，请重试" }) })) : null, baiduQr.stage === "waiting" || baiduQr.stage === "scanned" ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }, children: [baiduQr.qr_data_url ? (SP_JSX.jsx("img", { src: baiduQr.qr_data_url, alt: "\u767E\u5EA6\u626B\u7801\u767B\u5F55", style: { width: "180px", height: "180px", background: "#fff", padding: "8px", borderRadius: "8px" } })) : (SP_JSX.jsxs("div", { style: { fontSize: "12px" }, children: ["\u4E8C\u7EF4\u7801\u56FE\u7247\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u6253\u5F00\uFF1A", SP_JSX.jsx("div", { style: { wordBreak: "break-all" }, children: baiduQr.qrcode_url })] })), SP_JSX.jsx("div", { style: { fontSize: "12px" }, children: baiduQr.message || "请用百度 App 扫码" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onCancelBaiduQr, children: "\u53D6\u6D88\u626B\u7801" })] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onStartBaiduQr, disabled: baiduQrBusy, children: baiduQrBusy ? "获取中..." : "扫码登录百度网盘" }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onClearBaiduWeb, disabled: baiduQrBusy || !baiduWebLogin.logged_in, children: "\u9000\u51FA\u767E\u5EA6\u7F51\u76D8" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u767E\u5EA6\u7F51\u76D8 OpenAPI\uFF08\u53EF\u9009\uFF0C\u9700\u5F00\u53D1\u8005\u8D44\u8D28\uFF09", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: baiduLogin.logged_in
                                         ? `已授权：${baiduLogin.user_account || "百度账号"}`
                                         : baiduLogin.configured
                                             ? "已配置应用，待授权"
@@ -2192,7 +2262,9 @@ function SettingsPage() {
         {
             id: "diagnostics",
             title: "诊断",
-            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u81EA\u68C0", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u68C0\u67E5\u63D2\u4EF6\u7248\u672C\u3001\u72B6\u6001/\u4E0B\u8F7D/\u5B89\u88C5\u76EE\u5F55\u3001aria2/7zz/node\u3001Steam \u5FEB\u6377\u65B9\u5F0F\u3001SD \u5361\u3001\u7F51\u7EDC\u4E0E\u767E\u5EA6\u626B\u7801\u63A5\u53E3\u3002" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onRunDiagnostics(), disabled: diagnosticsBusy, children: diagnosticsBusy ? "自检中..." : "运行自检" }) }), diagnosticsError ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, color: "#ffb4a8", wordBreak: "break-word" }, children: `自检失败：${diagnosticsError}` }) })) : null, diagnosticsReport ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6 }, children: `v${diagnosticsReport.version || "?"} · ${diagnosticsReport.arch || "-"} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}` }) }), (diagnosticsReport.checks || []).map((check, checkIndex) => {
+            content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u66F4\u65B0", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: updateInfo
+                                        ? `当前 ${updateInfo.current || "?"} · 最新 ${updateInfo.latest || "?"}`
+                                        : "检查 GitHub Release，下载并校验更新包；不会自动覆盖运行中的插件。" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onCheckUpdate(), disabled: checkingUpdate || downloadingUpdate, children: checkingUpdate ? "检查中..." : "检查更新" }), updateInfo?.has_update ? (SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onDownloadUpdate(), disabled: downloadingUpdate, children: downloadingUpdate ? "下载中..." : "下载更新包" })) : null] }) }), updateMessage ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, color: updateInfo?.has_update ? "#ffd479" : "#b9c0cc", wordBreak: "break-word" }, children: updateMessage }) })) : null] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u81EA\u68C0", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u68C0\u67E5\u63D2\u4EF6\u7248\u672C\u3001\u72B6\u6001/\u4E0B\u8F7D/\u5B89\u88C5\u76EE\u5F55\u3001aria2/7zz/node\u3001Steam \u5FEB\u6377\u65B9\u5F0F\u3001SD \u5361\u3001\u7F51\u7EDC\u4E0E\u767E\u5EA6\u626B\u7801\u63A5\u53E3\u3002" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onRunDiagnostics(), disabled: diagnosticsBusy, children: diagnosticsBusy ? "自检中..." : "运行自检" }) }), diagnosticsError ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, color: "#ffb4a8", wordBreak: "break-word" }, children: `自检失败：${diagnosticsError}` }) })) : null, diagnosticsReport ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6 }, children: `v${diagnosticsReport.version || "?"} · ${diagnosticsReport.arch || "-"} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}` }) }), (diagnosticsReport.checks || []).map((check, checkIndex) => {
                                         const status = String(check.status || "skip").toLowerCase();
                                         const color = status === "ok"
                                             ? "#9fe6a8"
@@ -2256,6 +2328,12 @@ function SettingsPage() {
         cloudSaveRestoreSummaryText,
         cloudSaveRestoreState.message,
         cloudSaveRestoreState.progress,
+        updateInfo,
+        checkingUpdate,
+        downloadingUpdate,
+        updateMessage,
+        onCheckUpdate,
+        onDownloadUpdate,
         diagnosticsReport,
         diagnosticsBusy,
         diagnosticsExportBusy,
@@ -2267,6 +2345,9 @@ function SettingsPage() {
         baiduQr,
         baiduQrBusy,
         baiduWebLogin,
+        baiduHealth,
+        checkingBaiduHealth,
+        onCheckBaiduHealth,
         baiduLogin,
         baiduAppKey,
         baiduSecretKey,

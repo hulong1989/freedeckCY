@@ -323,5 +323,5 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 扫描补 Steam（v0.21.0）只写 `shortcuts.vdf`，需重启 Steam/切用户/重开库页才可见；模拟器未安装不自动下载；PC 找不到 exe/ROM 会跳过并记 `shortcut_error`。
 - 存储位置选择依赖 `/proc/mounts` 与 proot 内可写权限；Android 的 `/storage/emulated/0` 等路径可见性/可写性因设备而异，插件不自动挂载/格式化；不会检测 Steam 库同盘。
 - 扫描已安装依赖 proot 内 `settings.install_dir` 可见、目录名与目录标题匹配；只扫一层；v0.21.0 起会自动补建 Steam 快捷方式（模拟器未安装不下载，记 `shortcut_error`；Steam 需重启/切用户/重开库页才显示）；百度扫码要求手机 App 与网络可达 `passport.baidu.com`。
-- 本版测试基线：`make test` → 540 passed（2026-11 v0.26.25）。
+- 本版测试基线：`make test` → 541 passed（2026-11 v0.26.27）。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。

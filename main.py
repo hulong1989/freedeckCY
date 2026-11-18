@@ -323,6 +323,14 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def check_baidu_web_health(self) -> dict:
+        """检查百度网页登录健康状态。"""
+        try:
+            data = await self._get_tianyi_service().check_baidu_web_login_health()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def start_baidu_qr_login(self) -> dict:
         """百度网页版扫码登录：获取二维码。"""
         try:
@@ -461,6 +469,22 @@ class Plugin:
         """把诊断包写到下载目录。"""
         try:
             data = await self._get_tianyi_service().export_diagnostics_to_downloads()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def check_tianyi_update(self) -> dict:
+        """检查 GitHub Release 更新。"""
+        try:
+            data = await self._get_tianyi_service().check_update()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def download_tianyi_update(self) -> dict:
+        """下载并校验更新包（不自动覆盖插件）。"""
+        try:
+            data = await self._get_tianyi_service().download_update()
             return {"status": "success", "data": data}
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}

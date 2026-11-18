@@ -1800,3 +1800,135 @@ async def delete_baidu_home_file(*, cookie: str, path: str) -> bool:
         if errno != 0:
             raise BaiduApiError(f"删除百度临时文件失败 errno={errno}", diagnostics={"stage": "delete", "payload": payload})
         return True
+
+
+async def check_baidu_web_health(cookie: str) -> Dict[str, Any]:
+    """检查网页百度登录状态、bdstoken 和 /FreedeckTmp 可用性。"""
+    cookie_dict = _parse_cookie_header(cookie)
+    has_bduss = _has_bduss(cookie_dict)
+    has_stoken = any(str(name).upper().startswith("STOKEN") for name in cookie_dict)
+    checks: List[Dict[str, Any]] = [
+        {"id": "bduss", "label": "BDUSS", "status": "ok" if has_bduss else "fail",
+         "detail": "已获取登录 Cookie" if has_bduss else "未登录，请先扫码"},
+        {"id": "stoken", "label": "STOKEN", "status": "ok" if has_stoken else "warn",
+         "detail": "已获取网盘 STOKEN" if has_stoken else "缺少 STOKEN，转存可能失败（重新扫码可补齐）"},
+    ]
+    if not has_bduss:
+        return {
+            "ok": False,
+            "stage": "login",
+            "message": "未登录百度网盘，请先扫码登录",
+            "user": "",
+            "vip_type": 0,
+            "checks": checks,
+        }
+    timeout = aiohttp.ClientTimeout(total=20)
+    headers = {
+        "User-Agent": _UA,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Referer": "https://pan.baidu.com/disk/home",
+    }
+    ssl_context, tls_diag = _build_ssl_context()
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
+        session.cookie_jar.update_cookies(cookie_dict, response_url=URL("https://pan.baidu.com/"))
+
+        async def get_json(url: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            async with session.get(url, params=params) as response:
+                if response.status == 401:
+                    raise BaiduApiError("百度登录已失效", diagnostics={"stage": "http", "status": 401})
+                if response.status >= 400:
+                    body = await response.text()
+                    raise BaiduApiError(
+                        f"百度接口 HTTP {response.status}",
+                        diagnostics={"stage": "http", "status": response.status, "body_head": body[:200]},
+                    )
+                payload = await response.json(content_type=None)
+                return payload if isinstance(payload, dict) else {}
+
+        try:
+            user_payload = await get_json("https://pan.baidu.com/rest/2.0/xpan/nas", {"method": "uinfo"})
+        except BaiduApiError as exc:
+            diag = getattr(exc, "diagnostics", {}) or {}
+            return {
+                "ok": False,
+                "stage": "login_invalid",
+                "message": "百度登录已失效，请重新扫码登录",
+                "user": "",
+                "vip_type": 0,
+                "checks": checks + [{"id": "user", "label": "账号信息", "status": "fail", "detail": str(exc)}],
+                "tls": tls_diag,
+                "context": diag,
+            }
+        user_errno = int(user_payload.get("errno", 0) or 0)
+        if user_errno != 0:
+            return {
+                "ok": False,
+                "stage": "login_invalid",
+                "message": "百度登录已失效，请重新扫码登录",
+                "user": "",
+                "vip_type": 0,
+                "checks": checks + [{"id": "user", "label": "账号信息", "status": "fail", "detail": f"errno={user_errno}"}],
+                "tls": tls_diag,
+            }
+        user_name = str(user_payload.get("baidu_name") or user_payload.get("netdisk_name") or "").strip()
+        vip_type = int(user_payload.get("vip_type", 0) or 0)
+        checks.append({"id": "user", "label": "账号信息", "status": "ok", "detail": user_name or "已登录"})
+
+        try:
+            token_payload = await get_json(
+                "https://pan.baidu.com/api/gettemplatevariable",
+                {"fields": json.dumps(["bdstoken"], ensure_ascii=False)},
+            )
+            token_errno = int(token_payload.get("errno", 0) or 0)
+            bdstoken = str(((token_payload.get("result") or {}).get("bdstoken")) if isinstance(token_payload.get("result"), dict) else "").strip()
+        except BaiduApiError as exc:
+            token_errno = -1
+            bdstoken = ""
+            checks.append({"id": "bdstoken", "label": "bdstoken", "status": "fail", "detail": str(exc)})
+        else:
+            checks.append({
+                "id": "bdstoken",
+                "label": "bdstoken",
+                "status": "ok" if (token_errno == 0 and bdstoken) else "fail",
+                "detail": "获取成功" if (token_errno == 0 and bdstoken) else f"获取失败 errno={token_errno}",
+            })
+
+        tmp_folder_ok = False
+        try:
+            folder_payload = await get_json(
+                "https://pan.baidu.com/api/filemetas",
+                {"target": json.dumps(["/FreedeckTmp"], ensure_ascii=False), "dlink": "1", "web": "5"},
+            )
+            folder_errno = int(folder_payload.get("errno", 0) or 0)
+            tmp_folder_ok = folder_errno == 0
+            checks.append({
+                "id": "tmp_folder",
+                "label": "转存目录",
+                "status": "ok" if tmp_folder_ok else "warn",
+                "detail": "可访问 /FreedeckTmp" if tmp_folder_ok else f"目录不存在或不可访问 errno={folder_errno}（首次下载会自动创建）",
+            })
+        except BaiduApiError as exc:
+            checks.append({"id": "tmp_folder", "label": "转存目录", "status": "warn", "detail": str(exc)})
+
+    login_ok = bool(bdstoken) and user_errno == 0
+    if not login_ok:
+        message = "百度登录已失效或 bdstoken 不可用，请重新扫码登录"
+    elif not has_stoken:
+        message = "登录可用，但缺少 STOKEN；转存失败时请重新扫码"
+    elif not tmp_folder_ok:
+        message = "登录正常；/FreedeckTmp 尚未创建，首次下载会自动创建"
+    else:
+        message = "百度登录正常，转存目录可用"
+    return {
+        "ok": login_ok,
+        "stage": "ok" if login_ok else "login_invalid",
+        "message": message,
+        "user": user_name,
+        "vip_type": vip_type,
+        "bdstoken_ok": bool(bdstoken),
+        "tmp_folder_ok": tmp_folder_ok,
+        "checks": checks,
+        "tls": tls_diag,
+    }
