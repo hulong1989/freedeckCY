@@ -9786,10 +9786,9 @@ class TianyiService:
         }
 
         env_cert_file = str(os.environ.get("SSL_CERT_FILE", "") or "").strip()
-        candidates: List[str] = []
+        candidates: List[str] = [str(Path(__file__).resolve().with_name("cacert.pem"))]
         if env_cert_file:
             candidates.append(env_cert_file)
-        candidates.append(str(Path(__file__).resolve().with_name("cacert.pem")))
         candidates.extend(list(QR_CA_CANDIDATE_FILES))
 
         try:

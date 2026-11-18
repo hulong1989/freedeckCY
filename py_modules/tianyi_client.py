@@ -844,12 +844,13 @@ def _headers(cookie: str) -> Dict[str, str]:
 
 def _build_tls_context() -> ssl.SSLContext:
     """构建统一 TLS 上下文，兼容 SteamOS 证书链差异。"""
-    candidates: List[str] = []
+    # 内置 CA 优先：部分 Decky 环境会把 SSL_CERT_FILE 指向不完整 CA，
+    # 若先读环境变量会导致 GitHub 证书链验证失败。
+    candidates: List[str] = [str(Path(__file__).resolve().with_name("cacert.pem"))]
     for env_var in ("FREEDECKCY_TLS_CA_FILE", "SSL_CERT_FILE"):
         env_cert_file = str(os.environ.get(env_var, "") or "").strip()
         if env_cert_file:
             candidates.append(env_cert_file)
-    candidates.append(str(Path(__file__).resolve().with_name("cacert.pem")))
     candidates.extend(list(TLS_CA_CANDIDATE_FILES))
 
     try:

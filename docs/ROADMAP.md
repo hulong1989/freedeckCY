@@ -399,4 +399,4 @@
 - 架构与问题清单：[ARCHITECTURE.md](ARCHITECTURE.md)
 - 与作者 v0.6 的能力对照：[ARCHITECTURE.md](ARCHITECTURE.md) §13
 - 本地开发、调试、故障排查：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 当前测试基线：`make test` → 545 passed（2026-11 v0.26.29）
+- 当前测试基线：`make test` → 546 passed（2026-11 v0.26.29）
