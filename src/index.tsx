@@ -93,7 +93,7 @@ function FaCloudDownloadAlt (props) {
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.45";
+const PLUGIN_UI_BUILD = "0.26.46";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const restartSteamBackend = callable("restart_steam");
 const clearSteamRestartPending = callable("clear_steam_restart_pending");
@@ -3038,6 +3038,17 @@ function GameDetailModal(props) {
         .map((item) => item.trim())
         .filter(Boolean)
         .slice(0, 6);
+    const providerOptions = Array.isArray(props.item.providers) && props.item.providers.length
+        ? props.item.providers
+        : [{
+                game_id: props.item.game_id,
+                provider: props.item.provider || "other",
+                provider_label: props.item.provider_label || "默认网盘",
+                title: title,
+                size_text: props.item.size_text || "",
+            }];
+    const [selectedProviderId, setSelectedProviderId] = SP_REACT.useState(providerOptions[0]?.game_id || props.item.game_id || "");
+    const selectedProvider = providerOptions.find((option) => String(option.game_id || "") === String(selectedProviderId || "")) || providerOptions[0];
     return (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "14px", width: "min(560px, 90vw)", maxHeight: "78vh", overflowY: "auto" }, children: [SP_JSX.jsxs("div", { style: { display: "grid", gridTemplateColumns: "156px minmax(0, 1fr)", gap: "16px", alignItems: "start" }, children: [SP_JSX.jsxs("div", { style: {
                             position: "relative",
                             width: "156px",
@@ -3046,7 +3057,7 @@ function GameDetailModal(props) {
                             background: libraryCoverGradient(props.item.platform),
                             border: "1px solid rgba(255,255,255,0.10)",
                             boxShadow: "0 14px 34px rgba(0,0,0,0.34)",
-                        }, children: [coverUrl ? (SP_JSX.jsx("img", { src: String(coverUrl).replace(/_2x(\.(?:jpg|jpeg|png|webp))/i, "$1"), alt: title, referrerPolicy: "no-referrer", decoding: "async", loading: "lazy", onError: () => setImageFailed(true), style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } })) : (SP_JSX.jsx("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100%", padding: "16px", textAlign: "center", fontSize: "15px", fontWeight: 700, color: "#eef5fb" }, children: primaryTitle })), props.installed ? (SP_JSX.jsx("div", { style: { position: "absolute", top: "8px", right: "8px", padding: "2px 7px", fontSize: "10px", fontWeight: 700, color: "#dff7e4", background: "rgba(20,105,56,0.92)", border: "1px solid rgba(160,255,190,0.45)" }, children: "\u5DF2\u5B89\u88C5" })) : null] }), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "24px", lineHeight: 1.2, fontWeight: 800, color: "#f2f6fb", wordBreak: "break-word" }, children: primaryTitle }), secondaryTitle ? (SP_JSX.jsx("div", { style: { fontSize: "13px", lineHeight: 1.4, color: "rgba(236,241,246,0.68)", wordBreak: "break-word" }, children: secondaryTitle })) : null, SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: [SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#eaf2fa", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }, children: String(props.item.platform || "pc").toUpperCase() }), SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#eaf2fa", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }, children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#dcefff", background: "rgba(83,181,255,0.12)", border: "1px solid rgba(83,181,255,0.22)" }, children: tag }, tag)))] }), SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.55, color: "rgba(220,230,240,0.72)" }, children: "\u4E0B\u8F7D\u5B8C\u6210\u540E\u4F1A\u81EA\u52A8\u89E3\u538B\u5E76\u5199\u5165 Steam \u5FEB\u6377\u65B9\u5F0F\uFF1B\u9996\u6B21\u5B89\u88C5\u540E\u6309\u63D0\u793A\u91CD\u542F Steam \u5373\u53EF\u5728\u5E93\u4E2D\u770B\u5230\u3002" })] })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "10px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: props.onInstall, disabled: props.busy || props.installed, style: { flex: 1, minHeight: "42px", background: "rgba(67,181,129,0.24)", border: "1px solid rgba(120,255,180,0.42)", color: "#eafff3" }, children: props.installed ? "已安装" : props.busy ? "处理中..." : "安装" }), SP_JSX.jsx(DFL.DialogButton, { onClick: props.onClose, style: { flex: 1, minHeight: "42px" }, children: "\u9000\u51FA" })] })] }));
+                        }, children: [coverUrl ? (SP_JSX.jsx("img", { src: String(coverUrl).replace(/_2x(\.(?:jpg|jpeg|png|webp))/i, "$1"), alt: title, referrerPolicy: "no-referrer", decoding: "async", loading: "lazy", onError: () => setImageFailed(true), style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } })) : (SP_JSX.jsx("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100%", padding: "16px", textAlign: "center", fontSize: "15px", fontWeight: 700, color: "#eef5fb" }, children: primaryTitle })), props.installed ? (SP_JSX.jsx("div", { style: { position: "absolute", top: "8px", right: "8px", padding: "2px 7px", fontSize: "10px", fontWeight: 700, color: "#dff7e4", background: "rgba(20,105,56,0.92)", border: "1px solid rgba(160,255,190,0.45)" }, children: "\u5DF2\u5B89\u88C5" })) : null] }), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "24px", lineHeight: 1.2, fontWeight: 800, color: "#f2f6fb", wordBreak: "break-word" }, children: primaryTitle }), secondaryTitle ? (SP_JSX.jsx("div", { style: { fontSize: "13px", lineHeight: 1.4, color: "rgba(236,241,246,0.68)", wordBreak: "break-word" }, children: secondaryTitle })) : null, SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }, children: [SP_JSX.jsx("span", { style: { fontSize: "12px", opacity: 0.72 }, children: "下载源" }), ...providerOptions.map((option) => SP_JSX.jsx(DFL.DialogButton, { onClick: () => setSelectedProviderId(option.game_id), style: { width: "auto", minWidth: "auto", padding: "5px 10px", border: String(selectedProviderId || "") === String(option.game_id || "") ? "1px solid rgba(120,220,255,0.72)" : "1px solid rgba(255,255,255,0.18)", background: String(selectedProviderId || "") === String(option.game_id || "") ? "rgba(83,181,255,0.28)" : "rgba(255,255,255,0.08)" }, children: option.provider_label || "网盘" }, option.game_id))] }), SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: [SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#eaf2fa", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }, children: String(props.item.platform || "pc").toUpperCase() }), SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#eaf2fa", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }, children: props.item.size_text || "大小未知" }), categoryTags.map((tag) => (SP_JSX.jsx("span", { style: { padding: "3px 8px", fontSize: "11px", color: "#dcefff", background: "rgba(83,181,255,0.12)", border: "1px solid rgba(83,181,255,0.22)" }, children: tag }, tag)))] }), SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.55, color: "rgba(220,230,240,0.72)" }, children: "\u4E0B\u8F7D\u5B8C\u6210\u540E\u4F1A\u81EA\u52A8\u89E3\u538B\u5E76\u5199\u5165 Steam \u5FEB\u6377\u65B9\u5F0F\uFF1B\u9996\u6B21\u5B89\u88C5\u540E\u6309\u63D0\u793A\u91CD\u542F Steam \u5373\u53EF\u5728\u5E93\u4E2D\u770B\u5230\u3002" })] })] }), SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "10px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => props.onInstall(selectedProvider), disabled: props.busy || props.installed, style: { flex: 1, minHeight: "42px", background: "rgba(67,181,129,0.24)", border: "1px solid rgba(120,255,180,0.42)", color: "#eafff3" }, children: props.installed ? "已安装" : props.busy ? "处理中..." : providerOptions.length > 1 ? `安装（${selectedProvider?.provider_label || "网盘"}）` : "安装" }), SP_JSX.jsx(DFL.DialogButton, { onClick: props.onClose, style: { flex: 1, minHeight: "42px" }, children: "\u9000\u51FA" })] })] }));
 }
 const LIBRARY_CARD_WIDTH = 133;
 const LIBRARY_CARD_HEIGHT = 200;
@@ -3583,14 +3594,14 @@ function LibraryPage({ onClose }) {
     const onOpenDetail = SP_REACT.useCallback((item) => {
         let modal = null;
         try {
-            modal = DFL.showModal(SP_JSX.jsx(GameDetailModal, { item: item, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busy: Boolean(busyKey), onInstall: () => {
+            modal = DFL.showModal(SP_JSX.jsx(GameDetailModal, { item: item, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busy: Boolean(busyKey), onInstall: (selectedItem) => {
                     try {
                         modal?.Close();
                     }
                     catch {
                         // 忽略关闭失败。
                     }
-                    void onPrepareInstall(item);
+                    void onPrepareInstall(selectedItem || item);
                 }, onClose: () => {
                     try {
                         modal?.Close();

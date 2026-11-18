@@ -13,6 +13,7 @@ import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 import decky
 
@@ -54,6 +55,7 @@ class GameCatalogEntry:
     cover_url: str = ""
     cover_portrait_url: str = ""
     steam_appid: int = 0
+    server: str = ""
 
     def to_dict(self) -> Dict[str, object]:
         """转为前端可用字典。"""
@@ -146,6 +148,47 @@ def _is_valid_tianyi_url(url: str) -> bool:
     if "/t/" in value:
         return True
     return "/web/share" in value and "code=" in value
+
+
+PROVIDER_LABELS = {
+    "tianyi": "天翼云盘",
+    "baidu": "百度网盘",
+    "other": "其他网盘",
+}
+
+
+def _provider_for(server: str, down_url: str) -> str:
+    """把 CSV server 字段/分享链接归一为 tianyi / baidu。"""
+    raw = str(server or "").strip().lower()
+    if raw in {"t", "tianyi", "189", "cloud189", "cloud.189.cn"}:
+        return "tianyi"
+    if raw in {"b", "baidu", "pan", "yun", "pan.baidu.com"}:
+        return "baidu"
+    if _is_valid_baidu_url(down_url):
+        return "baidu"
+    if _is_valid_tianyi_url(down_url):
+        return "tianyi"
+    return "other"
+
+
+def _provider_label(provider: str) -> str:
+    return PROVIDER_LABELS.get(str(provider or "").strip().lower(), PROVIDER_LABELS["other"])
+
+
+def _provider_options_for_group(entries: List[GameCatalogEntry]) -> List[Dict[str, str]]:
+    options = []
+    for entry in entries:
+        provider = _provider_for(entry.server, entry.down_url)
+        options.append({
+            "game_id": entry.game_id,
+            "server": entry.server,
+            "provider": provider,
+            "provider_label": _provider_label(provider),
+            "title": entry.title,
+            "size_text": entry.size_text,
+        })
+    options.sort(key=lambda item: (0 if item["provider"] == "tianyi" else 1, item["provider_label"]))
+    return options
 
 
 def _pick_existing(candidates: List[Path]) -> str:
@@ -263,6 +306,7 @@ def _entry_from_json_item(item: object) -> Optional[GameCatalogEntry]:
             item.get("cover_portrait_url") or item.get("square_cover_url") or ""
         ).strip(),
         steam_appid=_safe_int(item.get("steam_appid") or item.get("app_id") or 0),
+        server=str(item.get("server") or "").strip(),
     )
 
 
@@ -495,6 +539,7 @@ class GameCatalog:
                     cover_url=str(row.get("cover_url", "") or "").strip(),
                     cover_portrait_url=str(row.get("cover_portrait_url", "") or "").strip(),
                     steam_appid=_safe_int(row.get("steam_appid", "0")),
+                    server=str(row.get("server", "") or "").strip(),
                 )
                 self.entries.append(entry)
 
@@ -634,11 +679,40 @@ class GameCatalog:
         elif sort_key == "platform":
             matched = sorted(matched, key=lambda item: (item.platform, item.title.lower()))
 
+        # 同一标题+平台、不同网盘的两条记录合并为一个游戏卡片，
+        # 详情页让用户选择下载源；同网盘重复条目保持原样，避免误合并。
+        groups: Dict[tuple, List[GameCatalogEntry]] = {}
+        for entry in matched:
+            key = (_normalize_title(entry.title).lower(), entry.platform)
+            groups.setdefault(key, []).append(entry)
+        display_items: List[tuple] = []
+        consumed: set = set()
+        for entry in matched:
+            if entry.game_id in consumed:
+                continue
+            key = (_normalize_title(entry.title).lower(), entry.platform)
+            group = groups.get(key, [])
+            providers = {_provider_for(item.server, item.down_url) for item in group}
+            if len(group) == 2 and len(providers) == 2:
+                primary = group[0]
+                display_items.append((primary, _provider_options_for_group(group)))
+                consumed.update(item.game_id for item in group)
+            else:
+                display_items.append((entry, []))
+
         start = (normalized_page - 1) * normalized_size
         end = start + normalized_size
+        page_items = []
+        for entry, providers in display_items[start:end]:
+            item = entry.to_dict()
+            item["provider"] = _provider_for(entry.server, entry.down_url)
+            item["provider_label"] = _provider_label(item["provider"])
+            if providers:
+                item["providers"] = providers
+            page_items.append(item)
 
         return {
-            "total": len(matched),
+            "total": len(display_items),
             "page": normalized_page,
             "page_size": normalized_size,
             "platform": platform_filter,
@@ -646,7 +720,7 @@ class GameCatalog:
             "sort": sort_key,
             "platforms": self.platform_counts(base_entries),
             "categories": self.category_counts(entries=base_entries),
-            "items": [e.to_dict() for e in matched[start:end]],
+            "items": page_items,
         }
 
     def get_by_game_id(self, game_id: str) -> Optional[GameCatalogEntry]:

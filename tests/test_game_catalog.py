@@ -167,6 +167,7 @@ def test_to_dict_contains_frontend_fields(catalog: GameCatalog) -> None:
         "cover_url",
         "cover_portrait_url",
         "steam_appid",
+        "server",
     }
     assert payload["game_id"] == "1001"
 
