@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.26.27**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.26.28**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,7 +21,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 
 | | 说明 |
 |---|---|
-| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.26.27**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号从 0.1.0 起步、当前 **0.26.28**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 上游现状 | 作者已停止维护；Releases 里的 v0.5/v0.6 与 NewFreedeck v0.1–0.3 才是功能更全的产品（百度网盘、模拟器、资源池），**这些代码不在本仓库**。第三轮已对照 v0.6 对齐了部分底层能力，差异见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 本次补全 | 三轮工程补全 + v0.1.1 四件套：① 运行时/打包、P0 修复、接口加固、文档/测试/CI；② 分卷分组、aria2 重启恢复、完整性校验、多库/SD 卡、权限收紧；③ 对照 v0.6：多分卷只解主卷、aria2 运行时复用、直链原地换链、解压前 settle/预检、隔离自愈、Steam 写前备份与去重；④ 卸载回收 Proton 前缀、`7z t` 校验+自动重下、失败任务重试、`make doctor` |
 | 数据目录 | `gl/` 是作者手工囤的 CSV 数据，代码**不读取**；实际资源清单是 `defaults/tianyi_catalog/*.csv` |
@@ -48,12 +48,12 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **模拟器闭环（10 平台）**：GBA（mGBA）/ PSP（PPSSPP）/ NDS（melonDS）/ PS1（DuckStation）/ FC/MD（Mesen2）/ 3DS（Azahar，支持 .cia 自动安装）/ PS2（PCSX2）/ PS3（RPCS3）/ Switch（Eden）；全部首次安装在线下载官方包（不集成进插件包），启动脚本走原生 Linux、不写 Proton
 - **自动云存档**：Ludusavi 清单（53k+ 游戏）+ gamewatch 进程检测；游戏退出后只上传该游戏，存档未变化自动跳过；PC + **10 个模拟器平台**的存档都能纳入；支持模拟器存档恢复（自动备份、同机原路径优先）；PSP/PS3/3DS 共享存档会按游戏拆分；QAM 可关闭/关闭模拟器部分
 - **PS1 多碟**：安装目录多张 `.cue`/`.chd` 时自动生成 `freedeckcy-multidisc.m3u`，DuckStation 直接启动；同目录多游戏按标题/目录消歧，仍歧义会明确失败
-- **百度网盘（对齐 freedeck-go）**：QAM 扫码登录（BDUSS/Cookie，无需 App Key）；分享先 `share/verify` 并带 `BDCLND` 打开；目录 100 条分页；转存前创建 `/FreedeckTmp`、`ondup=overwrite`；异步任务路径按文件名兜底；安装后清理临时文件；登录后补 passport auth 获取 pan STOKEN；OpenAPI 作为可选回退；设置页可检查 BDUSS/STOKEN/bdstoken/转存目录健康状态
+- **百度网盘（对齐 freedeck-go）**：QAM 扫码登录（BDUSS/Cookie，无需 App Key）；分享先 `share/verify` 并带 `BDCLND` 打开；目录 100 条分页；转存前创建 `/FreedeckTmp`、`ondup=overwrite`；异步任务路径按文件名兜底；安装后清理临时文件；登录后补 passport auth 获取 pan STOKEN；OpenAPI 作为可选回退；后端可检查 BDUSS/STOKEN/bdstoken/转存目录健康状态（设置页入口在 v0.26.28 暂隐藏，待修复渲染问题）
 - **服务器 CSV 目录**：设置页「检查并更新游戏列表」用 ETag/Last-Modified + SHA256 判断；有变化才下载，提示新增数量，库页显示「最近更新」shelf
 - **可选启动文件**：目录 `executable_name` 指定 PC 主 exe / ROM；留空自动识别
 - **内置目录服务器**：默认 `http://171.215.30.40:8088/catalog.csv`，启动自动检查并验证 Ed25519 签名；设置页可覆盖
 - **目录更新提示**：自动更新后 QAM 弹窗显示新增游戏
-- **插件内更新**：检查 Release、下载并校验当前架构更新包，使用 Decky 从文件安装
+- **插件内更新**：后端支持检查 Release、下载并校验当前架构更新包；设置页入口在 v0.26.28 暂隐藏
 - **免重启刷新**：安装后尝试 SteamClient Refresh，失败保留重启 Steam
 - **封面本地缓存**：`/api/tianyi/cover-image` 磁盘缓存封面，失败回退直连 CDN
 - **下载批量管理**：全部暂停/继续、全局下载限速
@@ -84,7 +84,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime     # 下载 aria2c / 7zz / node 到 defaults/runtime/（按组件与架构分目录）
-make package     # 产出 dist-artifacts/freedeckCY-v0.26.27.zip
+make package     # 产出 dist-artifacts/freedeckCY-v0.26.28.zip
 ```
 
 把 zip 传到 Steam Deck，用 **Decky → 开发者 → 从文件安装插件** 选择它，然后重启插件加载器。
@@ -106,8 +106,8 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.26.27.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.26.27-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.26.28.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.26.28-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后用 **Decky → 开发者 → 从文件安装插件** 选择对应 zip 即可；校验值见 Release 里的 `.sha256` 文件。
 
@@ -246,7 +246,7 @@ Makefile                    构建入口：runtime / catalog-json / ludusavi-man
 
 ## 已知问题
 
-- **Decky 更新后仍看到网页游戏库**：v0.23.0 起游戏库优先打开原生 modal，v0.24.0 增加返回/Steam 库按钮；页面顶部显示 `原生 UI · v0.26.27`，QAM 主页显示 `QAM 原生 UI v0.26.27`。如果看不到版本标识或仍打开网页，说明前端 `dist` 未更新，重装/重载插件（必要时重启 Decky Loader）后再试。
+- **Decky 更新后仍看到网页游戏库**：v0.23.0 起游戏库优先打开原生 modal，v0.24.0 增加返回/Steam 库按钮；页面顶部显示 `原生 UI · v0.26.28`，QAM 主页显示 `QAM 原生 UI v0.26.28`。如果看不到版本标识或仍打开网页，说明前端 `dist` 未更新，重装/重载插件（必要时重启 Decky Loader）后再试。
 
 完整清单（含已修复/未修复与 P0/P1/P2 分级）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「问题清单」，后续计划见 [docs/ROADMAP.md](docs/ROADMAP.md)。简要版：
 

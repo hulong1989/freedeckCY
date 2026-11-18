@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.26.27**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.26.28**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -866,7 +866,7 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 
 **入口（v0.23.0）**：QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)`**，失败才 `Navigation.Navigate("/freedeckcy/library")`；`routerHook.addRoute` 仍注册全屏入口，卸载移除。旧的网页库（`defaults/tianyi_library_ui/`）保留为备用（桌面浏览器/回退），两者共用同一后端。
 
-**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。当前源码 `PLUGIN_UI_BUILD` 与 `package.json` 均为 `0.26.27`。
+**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。当前源码 `PLUGIN_UI_BUILD` 与 `package.json` 均为 `0.26.28`。
 
 **返回/关闭测试（v0.24.0）**：
 
