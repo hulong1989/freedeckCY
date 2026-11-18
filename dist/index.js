@@ -676,9 +676,11 @@ function useI18nRoot(elementRef) {
         let attempts = 0;
         const run = () => {
             const node = elementRef?.current || fallbackRef.current;
-            const doc = node?.ownerDocument || (typeof document !== "undefined" ? document : null);
-            if (!doc || !doc.body) {
-                if (attempts++ < 40)
+            const doc = node?.ownerDocument;
+            // 不能回退到全局 document：Decky 组件可能在共享 context 执行，
+            // 全局 document 不是 QAM/BigPicture 文档，会静默监听错对象。
+            if (!node || !doc || !doc.body) {
+                if (attempts++ < 80)
                     window.setTimeout(run, 50);
                 return;
             }

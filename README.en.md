@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **About this project**: freedeckCY is a derivative fork of [Freedeck](https://github.com/panyiwei-home/Freedeck);
-> its version numbers start at **0.1.0** and are currently at **0.28.9**, which is not continuous with the original repository's 0.2–0.3 versions; the upstream author has stopped maintaining the project.
+> its version numbers start at **0.1.0** and are currently at **0.28.10**, which is not continuous with the original repository's 0.2–0.3 versions; the upstream author has stopped maintaining the project.
 > Differences from upstream (already aligned / stronger here / not adopted) are documented in [docs/ARCHITECTURE.en.md](docs/ARCHITECTURE.en.md) §13.
 >
 > QQ group: **1136434612** (usage discussion / issue reports; please mention freedeckCY when joining)
@@ -23,7 +23,7 @@ A **Decky Loader plugin** for the Steam Deck: using resource catalogs from Tiany
 
 | | Description |
 |---|---|
-| Current version | **0.28.9** (see [CHANGELOG.md](CHANGELOG.md) / [English summary](CHANGELOG.en.md)) |
+| Current version | **0.28.10** (see [CHANGELOG.md](CHANGELOG.md) / [English summary](CHANGELOG.en.md)) |
 | Code baseline | Forked from upstream Freedeck's early version (0.2) dated 2026-02; upstream is no longer maintained |
 | Tests | **555 passed**, covering offline logic for catalog, installation, cloud saves, Baidu, emulators, storage, updates and more |
 | CI | Python tests / UI build / frontend hooks scope check / x86_64 and aarch64 runtime smoke tests |
@@ -135,8 +135,8 @@ Releases provide installation packages with bundled runtime binaries:
 
 | Package | Applicable device |
 |---|---|
-| `freedeckCY-v0.28.9.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.28.9-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.28.10.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.28.10-arm64.zip` | DroidDeck / Android ARM64 |
 
 After downloading, use **Decky → Developer → Install plugin from file**, select the corresponding zip, and restart Decky Loader.
 Checksums are available in the `.sha256` files attached to the Release.
@@ -146,7 +146,7 @@ Checksums are available in the `.sha256` files attached to the Release.
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime              # download aria2c / 7zz / node to defaults/runtime/
-make package              # produces dist-artifacts/freedeckCY-v0.28.9.zip
+make package              # produces dist-artifacts/freedeckCY-v0.28.10.zip
 ```
 
 ### Option C: DroidDeck / ARM64

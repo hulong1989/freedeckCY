@@ -2,6 +2,14 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.28.10
+
+### 语言 observer 不再回退到错误 document
+
+- 真机确认：组件在共享 context 里拿不到 root ref 时，旧代码回退到全局 `document`，observer 监听错文档。
+- 现在只使用真实 root 的 `ownerDocument`，ref 未就绪时重试最多 80 次，不再监听共享 context。
+- 语言切换即可生效；555 passed。
+
 ## v0.28.9
 
 ### 语言可随时切换
