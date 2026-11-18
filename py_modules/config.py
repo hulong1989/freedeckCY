@@ -1,5 +1,6 @@
 # config.py - freedeckCY 配置与日志
 
+import base64
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -64,10 +65,27 @@ HOME_DIR = str(Path.home())
 DOWNLOADS_DIR = str(Path.home() / "Downloads")
 SHARE_DIR = str(Path.home() / ".local" / "share")
 DECKY_SEND_DIR = os.path.join(SHARE_DIR, "freedeckCY")
-# 内置目录服务器：插件启动自动检查，有更新才下载到本地。
-# 目录服务器地址不内置，用户在插件设置里填写自己的地址。
-# 可通过 FREEDECKCY_CATALOG_CSV_URL 环境变量或 catalog_url 设置覆盖。
-DEFAULT_CATALOG_CSV_URL = ""
+# 内置目录服务器：地址编码存放，设置页不显示；用户填写 catalog_url 后覆盖。
+# 也可通过 FREEDECKCY_CATALOG_CSV_URL 环境变量覆盖。
+_BUILTIN_CATALOG_KEY = b"freedeckcy-v1"
+_BUILTIN_CATALOG_DATA = "DgYRFV5KTFpUSANEAFNcVlVKUVNRW0kVTh4FExEECAoERQAKWw=="
+
+
+def _decode_builtin_catalog_url() -> str:
+    try:
+        raw = base64.b64decode(_BUILTIN_CATALOG_DATA)
+        key = _BUILTIN_CATALOG_KEY
+        return bytes(byte ^ key[index % len(key)] for index, byte in enumerate(raw)).decode("utf-8")
+    except Exception:
+        return ""
+
+
+def _default_catalog_url() -> str:
+    override = str(os.environ.get("FREEDECKCY_CATALOG_CSV_URL", "") or "").strip()
+    return override or _decode_builtin_catalog_url()
+
+
+DEFAULT_CATALOG_CSV_URL = _default_catalog_url()
 
 # 服务配置
 # 仅监听回环地址，禁止局域网访问。

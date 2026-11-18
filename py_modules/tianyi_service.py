@@ -953,8 +953,8 @@ class TianyiService:
             "tasks": tasks,
             "settings": {
                 **asdict(self.store.settings),
-                "catalog_url": str(getattr(self.store.settings, "catalog_url", "") or "").strip()
-                or str(getattr(config, "DEFAULT_CATALOG_CSV_URL", "") or "").strip(),
+                # 内置地址只在后端使用，不回显到设置页；用户填写后才显示/覆盖。
+                "catalog_url": str(getattr(self.store.settings, "catalog_url", "") or "").strip(),
             },
             "library_url": library_url,
             "cover_proxy_base": self.get_cover_proxy_base(),

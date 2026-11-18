@@ -51,7 +51,7 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **百度网盘（对齐 freedeck-go）**：QAM 扫码登录（BDUSS/Cookie，无需 App Key）；分享先 `share/verify` 并带 `BDCLND` 打开；目录 100 条分页；转存前创建 `/FreedeckTmp`、`ondup=overwrite`；异步任务路径按文件名兜底；安装后清理临时文件；登录后补 passport auth 获取 pan STOKEN；OpenAPI 作为可选回退；后端可检查 BDUSS/STOKEN/bdstoken/转存目录健康状态（设置页入口在 v0.26.29 暂隐藏，待修复渲染问题）
 - **服务器 CSV 目录**：设置页「检查并更新游戏列表」用 ETag/Last-Modified + SHA256 判断；有变化才下载，提示新增数量，库页显示「最近更新」shelf
 - **可选启动文件**：目录 `executable_name` 指定 PC 主 exe / ROM；留空自动识别
-- **目录服务器**：不内置真实地址；在设置页填写自己的 `catalog.csv` 地址，启动时自动检查并验证 Ed25519 签名
+- **目录服务器**：内置服务器地址但不回显；设置页留空用内置，手动填写后覆盖，启动时验证 Ed25519 签名
 - **目录更新提示**：自动更新后 QAM 弹窗显示新增游戏
 - **插件内更新**：后端支持检查 Release、下载并校验当前架构更新包；设置页入口在 v0.26.29 暂隐藏
 - **免重启刷新**：安装后尝试 SteamClient Refresh，失败保留重启 Steam
