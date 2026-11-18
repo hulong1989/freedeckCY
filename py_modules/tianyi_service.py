@@ -8525,20 +8525,38 @@ class TianyiService:
             "Accept": "application/vnd.github+json",
             "User-Agent": "freedeckCY",
         }
-        try:
-            timeout = aiohttp.ClientTimeout(total=10)
-            connector = aiohttp.TCPConnector(ssl=build_tls_context())
-            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
-                async with session.get(api_url, headers=headers) as response:
-                    if int(response.status) != 200:
-                        return {
-                            "ok": False,
-                            "current": current,
-                            "message": f"GitHub API HTTP {int(response.status)}",
-                        }
-                    payload = await response.json(content_type=None)
-        except Exception as exc:
-            return {"ok": False, "current": current, "message": f"检查更新失败: {exc}"}
+        payload = None
+        tls_insecure = False
+        last_error = ""
+        for insecure in (False, True):
+            try:
+                timeout = aiohttp.ClientTimeout(total=10)
+                connector = aiohttp.TCPConnector(ssl=False if insecure else build_tls_context())
+                async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                    async with session.get(api_url, headers=headers) as response:
+                        if int(response.status) != 200:
+                            return {
+                                "ok": False,
+                                "current": current,
+                                "message": f"GitHub API HTTP {int(response.status)}",
+                                "tls_insecure": bool(insecure),
+                            }
+                        data = await response.json(content_type=None)
+                        if not isinstance(data, dict):
+                            raise ValueError("GitHub API 返回不是 JSON 对象")
+                        payload = data
+                        tls_insecure = insecure
+                        break
+            except Exception as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+                # 仅证书链失败时做一次降级；连接超时/HTTP 错误不重试。
+                cert_failed = "CERTIFICATE_VERIFY_FAILED" in str(exc).upper() or "CERTIFICATE" in str(exc).upper()
+                if not insecure and cert_failed:
+                    continue
+                break
+        if payload is None:
+            return {"ok": False, "current": current, "message": f"检查更新失败: {last_error}"}
+        self._update_tls_insecure = bool(tls_insecure)
 
         latest = str(payload.get("tag_name") or "").strip().lstrip("vV")
         assets = []
@@ -8564,6 +8582,7 @@ class TianyiService:
             "name": str(payload.get("name") or ""),
             "published_at": str(payload.get("published_at") or ""),
             "assets": assets,
+            "tls_insecure": bool(tls_insecure),
         }
         self._update_cache = result
         self._update_cache_at = now
@@ -8596,6 +8615,7 @@ class TianyiService:
         if not candidates:
             return {"ok": False, "message": "Release 中没有匹配当前架构的插件包"}
         asset = candidates[0]
+        update_insecure = bool(getattr(self, "_update_tls_insecure", False) or update.get("tls_insecure"))
         asset_name = str(asset.get("name") or "")
         asset_url = str(asset.get("url") or "")
         expected_sha = ""
@@ -8607,7 +8627,7 @@ class TianyiService:
             if sha_asset:
                 try:
                     timeout = aiohttp.ClientTimeout(total=15)
-                    sha_connector = aiohttp.TCPConnector(ssl=build_tls_context())
+                    sha_connector = aiohttp.TCPConnector(ssl=False if update_insecure else build_tls_context())
                     async with aiohttp.ClientSession(timeout=timeout, connector=sha_connector) as session:
                         async with session.get(str(sha_asset.get("url")), headers={"User-Agent": "freedeckCY"}) as resp:
                             if int(resp.status) == 200:
@@ -8627,7 +8647,7 @@ class TianyiService:
         total = 0
         timeout = aiohttp.ClientTimeout(total=300, connect=20)
         try:
-            connector = aiohttp.TCPConnector(ssl=build_tls_context())
+            connector = aiohttp.TCPConnector(ssl=False if update_insecure else build_tls_context())
             async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
                 async with session.get(asset_url, headers={"User-Agent": "freedeckCY"}) as resp:
                     if int(resp.status) != 200:
@@ -8663,6 +8683,7 @@ class TianyiService:
             "filename": asset_name,
             "size": total,
             "sha256": digest_calc.hexdigest(),
+            "tls_insecure": bool(update_insecure),
             "message": "更新包已下载并校验；请用 Decky → 开发者 → 从文件安装插件",
         }
 

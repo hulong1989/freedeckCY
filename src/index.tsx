@@ -93,7 +93,7 @@ function FaCloudDownloadAlt (props) {
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.40";
+const PLUGIN_UI_BUILD = "0.26.41";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const restartSteamBackend = callable("restart_steam");
 const clearSteamRestartPending = callable("clear_steam_restart_pending");
@@ -1791,7 +1791,8 @@ function SettingsPage() {
                 throw new Error(result.message || "检查更新失败");
             }
             setUpdateInfo(result.data);
-            setUpdateMessage(String(result.data.message || (result.data.has_update ? `发现新版本 ${result.data.latest}` : "当前已是最新版本")));
+            const updateText = String(result.data.message || (result.data.has_update ? `发现新版本 ${result.data.latest}` : "当前已是最新版本"));
+            setUpdateMessage(result.data.tls_insecure ? `${updateText}（TLS 证书校验失败，已降级）` : updateText);
         }
         catch (error) {
             setUpdateMessage(errorText(error));
@@ -1810,8 +1811,9 @@ function SettingsPage() {
             if (result.status !== "success" || !result.data) {
                 throw new Error(result.message || "下载更新包失败");
             }
-            setUpdateMessage(String(result.data.message || "更新包已下载"));
-            toaster.toast({ title: "freedeckCY", body: String(result.data.message || "更新包已下载"), duration: 7000 });
+            const downloadText = String(result.data.message || "更新包已下载");
+            setUpdateMessage(result.data.tls_insecure ? `${downloadText}（TLS 证书校验失败，已降级）` : downloadText);
+            toaster.toast({ title: "freedeckCY", body: downloadText, duration: 7000 });
         }
         catch (error) {
             setUpdateMessage(errorText(error));
