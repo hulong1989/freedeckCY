@@ -60,6 +60,8 @@ function translatePatterns(value: string): string {
         [/已显示\s*(\d+)\s*\/\s*(\d+)/g, "Showing $1 / $2"],
         [/第\s*(\d+)\s*\/\s*(\d+)\s*页/g, "Page $1 / $2"],
         [/剩余\s*([^）)]+)/g, "Free $1"],
+        [/（剩余\s*/g, " (Free "],
+        [/剩余\s*/g, "Free "],
         [/已登录[:：]\s*/g, "Signed In: "],
         [/未登录/g, "Not Signed In"],
         [/（账号）/g, " (Account)"],
