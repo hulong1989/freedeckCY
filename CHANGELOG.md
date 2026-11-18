@@ -2,6 +2,19 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.26.42
+
+### 从自有服务器检查插件更新
+
+- 更新检查优先请求目录服务器：
+  - `GET /api/update/latest`
+  - `GET /api/update/latest.json.sig`
+- 使用现有 Ed25519 公钥验签更新清单。
+- 更新包从服务器 `/api/update/asset/...` 下载并校验 SHA256。
+- 自有服务器不可用时回退 GitHub Release。
+- 需要 Web 系统 1.3.0+ 并在后台发布更新清单。
+- 测试 546 passed。
+
 ## v0.26.41
 
 ### GitHub 更新证书降级

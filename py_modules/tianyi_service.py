@@ -25,7 +25,7 @@ import zipfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote, urljoin, urlparse
 
 import aiohttp
 import decky
@@ -8513,6 +8513,73 @@ class TianyiService:
             "message": f"诊断包已导出：{_redact_text(path)}",
         }
 
+    async def _check_server_update(self, current: str) -> Optional[Dict[str, Any]]:
+        """从自有目录服务器读取并验签插件更新清单。"""
+        catalog_url = str(getattr(self.store.settings, "catalog_url", "") or "").strip()
+        if not catalog_url:
+            catalog_url = str(getattr(config, "DEFAULT_CATALOG_CSV_URL", "") or "").strip()
+        parsed = urlparse(catalog_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return None
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        latest_url = base + "/api/update/latest"
+        headers = {"Accept": "application/json", "User-Agent": "freedeckCY"}
+        try:
+            timeout = aiohttp.ClientTimeout(total=12)
+            connector = aiohttp.TCPConnector(ssl=build_tls_context())
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector, headers=headers) as session:
+                async with session.get(latest_url) as response:
+                    if int(response.status) != 200:
+                        return None
+                    raw = await response.read()
+                async with session.get(latest_url + ".json.sig") as response:
+                    if int(response.status) != 200:
+                        return None
+                    signature = (await response.text()).strip()
+        except Exception as exc:
+            logger.info("自有服务器更新检查不可用: %s", _describe_exception(exc))
+            return None
+        if not catalog_signature.verify_signature(raw, signature):
+            logger.warning("自有服务器更新清单签名无效")
+            return None
+        try:
+            manifest = json.loads(raw.decode("utf-8"))
+        except Exception:
+            return None
+        if not isinstance(manifest, dict):
+            return None
+        latest = str(manifest.get("version", "") or "").strip().lstrip("vV")
+        if not latest:
+            return None
+        assets = []
+        for item in list(manifest.get("assets") or []):
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name", "") or "").strip()
+            url = str(item.get("url", "") or "").strip()
+            sha256 = str(item.get("sha256", "") or "").strip().lower()
+            if not name or not url or not sha256:
+                continue
+            absolute_url = urljoin(base + "/", url)
+            assets.append({
+                "name": name,
+                "url": absolute_url,
+                "size": max(0, _safe_int(item.get("size"), 0)),
+                "digest": f"sha256:{sha256}",
+                "arch": str(item.get("arch", "") or "").strip(),
+            })
+        return {
+            "ok": True,
+            "source": "server",
+            "current": current,
+            "latest": latest,
+            "has_update": _parse_version(latest) > _parse_version(current),
+            "url": latest_url,
+            "name": str(manifest.get("notes", "") or ""),
+            "published_at": str(manifest.get("published_at", "") or ""),
+            "assets": assets,
+        }
+
     async def check_update(self) -> Dict[str, Any]:
         """检查 GitHub 最新 release（1 小时缓存）。"""
         now = time.time()
@@ -8520,6 +8587,11 @@ class TianyiService:
             return dict(self._update_cache)
 
         current = self._plugin_version() or "0.0.0"
+        server_result = await self._check_server_update(current)
+        if server_result and server_result.get("ok"):
+            self._update_cache = server_result
+            self._update_cache_at = now
+            return dict(server_result)
         api_url = "https://api.github.com/repos/hulong1989/freedeckCY/releases/latest"
         headers = {
             "Accept": "application/vnd.github+json",
