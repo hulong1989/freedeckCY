@@ -3,7 +3,7 @@
 > English summary of recent releases. The full historical changelog is in [CHANGELOG.md](CHANGELOG.md).
 > [中文](CHANGELOG.md) | English
 
-## v0.28.12
+## v0.28.13
 
 - Language selector buttons now flex to the panel width and align with the Game Library button.
 - Removed temporary i18n diagnostic DOM attributes.

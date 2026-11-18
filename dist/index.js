@@ -239,6 +239,10 @@ const EN_MISSING = {
     "安装到": "Install to",
     "内置硬盘（剩余": "Internal Drive (Free",
     "SD 卡 / 外置：": "SD Card / External: ",
+    "当前": "Current",
+    "最新": "Latest",
+    "当前版本": "Current version",
+    "最新版本": "Latest version",
 };
 
 // @ts-nocheck

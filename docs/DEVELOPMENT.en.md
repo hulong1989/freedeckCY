@@ -2,7 +2,7 @@
 
 # freedeckCY Development Guide
 
-This document is for secondary developers and corresponds to freedeckCY **v0.28.12**: how to run it locally, change code, apply patches, and troubleshoot. For installing, building, and troubleshooting DroidDeck (Android/ARM64), see [DROIDDECK.en.md](DROIDDECK.en.md) separately. For architecture and protocol details see [ARCHITECTURE.en.md](ARCHITECTURE.en.md); for a capability comparison with the author's v0.6 see [ARCHITECTURE.en.md](ARCHITECTURE.en.md) §13; for follow-up work see [ROADMAP.en.md](ROADMAP.en.md).
+This document is for secondary developers and corresponds to freedeckCY **v0.28.13**: how to run it locally, change code, apply patches, and troubleshoot. For installing, building, and troubleshooting DroidDeck (Android/ARM64), see [DROIDDECK.en.md](DROIDDECK.en.md) separately. For architecture and protocol details see [ARCHITECTURE.en.md](ARCHITECTURE.en.md); for a capability comparison with the author's v0.6 see [ARCHITECTURE.en.md](ARCHITECTURE.en.md) §13; for follow-up work see [ROADMAP.en.md](ROADMAP.en.md).
 
 > Prerequisite: this project supports **SteamOS / Linux** only. The development machine can be a Steam Deck, or a Linux desktop with Decky Loader installed; on Windows / macOS you can only edit code, not run it fully.
 
@@ -290,7 +290,7 @@ make package PACKAGE_ARGS="--out-dir /tmp/freedeckcy-build"
 bash scripts/package.sh --help          # view all options
 ```
 
-- The version comes from the `version` field in `package.json` (currently `0.28.12`);
+- The version comes from the `version` field in `package.json` (currently `0.28.13`);
 - The zip's **top-level directory must be the plugin directory `freedeckCY/`** (Decky local install looks for `top-level-dir/plugin.json`; files placed directly at the root are silently ignored); underneath are `main.py`, `plugin.json`, `package.json`, `LICENSE`, `README.md`, plus `dist/`, `py_modules/`, `backend/`, `defaults/`;
 - The packaging script excludes `__pycache__`, `*.pyc`, `.DS_Store`, `node_modules`, `.git`, `tests`, `scripts`, `.github`, `docs`, `gl`, `dist-artifacts` (anything outside the whitelist is not packaged);
 - By default it reuses the committed `dist/index.js` and does not force a `pnpm build`; use `bash scripts/package.sh --build-ui` when the frontend needs rebuilding (requires pnpm on PATH);
@@ -932,7 +932,7 @@ Checklist:
 | Update buttons misaligned / left-right doesn't work | The two buttons must share one `Focusable flow-children="row"` + DialogButton, not two ButtonItems |
 | Search/filter buttons sit lower | Use a placeholder in the search box, not a label; buttons use `align-items:center` |
 
-### 6.14.1 Bilingual UI Debugging (v0.28.12)
+### 6.14.1 Bilingual UI Debugging (v0.28.13)
 
 - Language key: `localStorage["freedeckcy.language"]`, value `zh` or `en`; on first open with no value, the language picker is shown first.
 - Reset the language for retesting: run `localStorage.removeItem("freedeckcy.language")` in CEF, then reload the plugin.
