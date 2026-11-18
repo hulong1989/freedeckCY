@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.26.49**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.26.50**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -21,9 +21,9 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 | | 说明 |
 |---|---|
-| 当前版本 | **0.26.49**（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 当前版本 | **0.26.50**（见 [CHANGELOG.md](CHANGELOG.md)） |
 | 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork；上游已停止维护 |
-| 测试 | **553 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
+| 测试 | **554 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
 | CI | Python 测试 / UI 构建 / 前端 hooks 作用域检查 / x86_64 与 aarch64 运行时冒烟 |
 | 数据目录 | `~/.local/share/freedeckCY/`（`state.json` 权限 0600，目录 0700） |
 | 资源目录 | `defaults/tianyi_catalog/freedeckcy_catalog.csv`（7084 条） |
@@ -48,7 +48,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 - **存储位置**：
   - 下载目录支持「内置硬盘 / SD 卡 / 外置存储」一键切换。
   - 内置硬盘固定 `~/Downloads`；外置使用 `<SD>/freedeckCY/downloads`，并显示剩余空间。
-  - 安装目录支持外置存储切换。
+  - 安装目录同样支持「内置硬盘 / SD 卡 / 外置存储」切换；内置安装目录固定 `~/Games/freedeckCY`。
 - **可选启动文件**：目录 `executable_name` 指定 PC 主 exe / ROM；留空自动识别。
 - **免重启刷新**：安装后尝试 SteamClient Refresh，失败则提示重启 Steam。
 
@@ -119,8 +119,8 @@ Releases 提供带运行时二进制的安装包：
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.26.49.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.26.49-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.26.50.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.26.50-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后使用 **Decky → 开发者 → 从文件安装插件**，选择对应 zip，重启 Decky Loader。
 校验值见 Release 中的 `.sha256` 文件。
@@ -130,7 +130,7 @@ Releases 提供带运行时二进制的安装包：
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime              # 下载 aria2c / 7zz / node 到 defaults/runtime/
-make package              # 产出 dist-artifacts/freedeckCY-v0.26.49.zip
+make package              # 产出 dist-artifacts/freedeckCY-v0.26.50.zip
 ```
 
 ### 方式 C：DroidDeck / ARM64
@@ -172,7 +172,7 @@ pnpm check:ui       # hooks 依赖作用域检查
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test，当前 553 个用例
+.venv/bin/pytest -q          # 或 make test，当前 554 个用例
 make check-ui                # 前端 hooks 作用域检查
 make doctor                  # 环境诊断（只读）
 make package-droiddeck       # ARM64 包

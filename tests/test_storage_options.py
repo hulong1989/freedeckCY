@@ -137,3 +137,14 @@ def test_internal_option_uses_home_downloads(tmp_path):
     internal = data["internal"]
     assert internal["label"] == "内置硬盘"
     assert internal["download_dir"] == str(home / "Downloads")
+
+
+def test_internal_option_uses_home_games(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    data = storage_options.detect_storage_options(
+        mounts_text="",
+        home=str(home),
+        disk_usage=lambda path: SimpleNamespace(free=5 * 1024**3, total=50 * 1024**3),
+    )
+    assert data["internal"]["install_dir"] == str(home / "Games" / "freedeckCY")
