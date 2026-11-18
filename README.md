@@ -10,7 +10,7 @@
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
 
-Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清单，把「下载 → 解压 → 装进 Steam 库」做成 QAM 里的几个按钮，另带云存档、游玩时长、模拟器与诊断。
+Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清单，把「下载 → 解压 → 装进 Steam 库」做成 Decky 插件面板里的几个按钮，另带云存档、游玩时长、模拟器与诊断。
 
 > ⚠️ **免责声明**
 > 本项目从互联网收集游戏资源分享链接，属于**盗版资源分发**，违反云盘服务条款，也涉及版权风险。仓库中的工程补全只做依赖、打包、缺陷修复、文档与测试，**不建议也不认可**在实际设备上部署使用。请支持正版。
@@ -33,7 +33,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 ### 游戏库与下载
 
-- **Decky 原生游戏库**：QAM 内浏览、搜索、平台/分类筛选、排序、分页、加载更多、已安装页，不依赖网页。
+- **Decky 原生游戏库**：插件内浏览、搜索、平台/分类筛选、排序、分页、加载更多、已安装页，不依赖网页。
 - **单/双网盘资源**：
   - 单天翼条目、单百度条目都可直接入目录。
   - 同一游戏同时有天翼和百度时自动合并，详情页让用户选择「天翼云盘 / 百度网盘」。
@@ -54,7 +54,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 ### 百度网盘
 
-- **QAM 扫码登录**：Passport `getqrcode → unicast → qrbdusslogin`，保存 `BDUSS/STOKEN/PTOKEN` 及扫码会话 Cookie。
+- **扫码登录百度网盘**：Passport `getqrcode → unicast → qrbdusslogin`，保存 `BDUSS/STOKEN/PTOKEN` 及扫码会话 Cookie。
 - **登录健康检查**：设置页检查 BDUSS、STOKEN、账号信息、bdstoken、`/FreedeckTmp` 转存目录。
 - **分享解析**：`share/verify` 取 `BDCLND` → 打开 `/s/1...` 页面 → `share/list` 100 条/页分页。
 - **转存下载**：创建 `/FreedeckTmp` → `share/transfer`（`ondup=overwrite`）→ `filemetas` → dlink 302，安装后清理临时文件。
@@ -81,7 +81,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
   - 服务器不可用时回退 GitHub Release。
   - 手动点「检查更新」强制绕过缓存；自动缓存 2 分钟。
   - 更新包固定保存到内置硬盘 `~/Downloads`，不再跟随 SD 卡下载目录。
-- **插件内更新**：QAM 设置「诊断 → 插件更新」检查、下载、校验；使用 Decky「从文件安装插件」升级。
+- **插件内更新**：插件设置「诊断 → 插件更新」检查、下载、校验；使用 Decky「从文件安装插件」升级。
 - **诊断与自检**：检查插件版本、目录、运行时、Steam、SD 卡、网络、百度扫码、任务与日志；一键导出脱敏 zip。
 
 ### 云存档、模拟器与时长
@@ -145,7 +145,7 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 ## 首次使用
 
 1. 安装插件并重启 Decky Loader。
-2. QAM → freedeckCY → 设置：
+2. Decky 快捷菜单 → freedeckCY → 设置：
    - 路径 → 下载目录：选择「内置硬盘」或 SD 卡。
    - 路径 → 安装目录：选择内置或外置。
    - 游戏目录：默认使用内置服务器，无需填写。
@@ -159,7 +159,7 @@ make package-droiddeck    # 产出 dist-artifacts/freedeckCY-v<version>-arm64.zi
 
 改 `py_modules/` 后重载 Decky 插件即可，无需构建。
 
-### React QAM
+### React 插件面板
 
 ```bash
 pnpm install
@@ -258,7 +258,7 @@ py_modules/
   steam_shortcuts.py        Steam 快捷方式/Proton/封面/备份
   archive_bundle.py         多分卷识别
   cacert.pem                内置 CA bundle
-src/index.tsx               QAM 面板（构建产物 dist/）
+src/index.tsx               Decky 面板（构建产物 dist/）
 scripts/check-ui-scope.mjs  前端 hooks 作用域检查
 defaults/tianyi_catalog     资源清单（7084 条）与封面索引
 defaults/ludusavi           存档清单（53,549 游戏）
@@ -266,7 +266,7 @@ submissions/                仓库游戏提交 JSON / schema
 backend/*.js                Node 辅助脚本（分享解析兜底、云存档上传）
 scripts/                    运行时获取/打包/诊断/目录校验/提交合并
 docs/                       架构/开发/路线图/DroidDeck
-tests/                      pytest 用例（553 个）
+tests/                      pytest 用例（554 个）
 CHANGELOG.md                版本变更
 Makefile                    runtime / package / package-droiddeck / test / check-ui / doctor / ...
 ```
