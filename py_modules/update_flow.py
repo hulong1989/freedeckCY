@@ -57,6 +57,11 @@ def _redact_update_path(value: str) -> str:
     return text
 
 
+def _default_update_download_dir() -> str:
+    """插件更新包固定写本机内置硬盘 ~/Downloads，不跟随 SD 卡下载目录。"""
+    return os.path.join(os.path.expanduser("~"), "Downloads")
+
+
 def _describe_exception(exc: BaseException) -> str:
     text = str(exc).strip()
     return f"{type(exc).__name__}: {text}" if text else type(exc).__name__
@@ -263,8 +268,7 @@ class UpdateFlowMixin:
                     return {"ok": False, "message": f"读取 SHA256 失败: {exc}"}
         if not expected_sha:
             return {"ok": False, "message": "Release 缺少 SHA256 校验值，已拒绝下载"}
-        target_dir = str(getattr(self.plugin, "downloads_dir", "") or "").strip() or str(self.store.settings.download_dir or "") or os.path.expanduser("~/Downloads")
-        target_dir = os.path.realpath(os.path.expanduser(target_dir))
+        target_dir = os.path.realpath(_default_update_download_dir())
         await asyncio.to_thread(os.makedirs, target_dir, exist_ok=True)
         target_path = os.path.join(target_dir, asset_name)
         digest_calc = hashlib.sha256()
