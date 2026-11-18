@@ -1099,7 +1099,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### P2：工程性
 
-21. `tianyi_service.py` 约 9500 行、单类 100+ 方法；`src/index.tsx` 约 3705 行单文件。已补 `tests/`（555 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+21. `tianyi_service.py` 约 10700 行、单类 100+ 方法；`src/index.tsx` 约 3705 行单文件。已补 `tests/`（555 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
 22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
 23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
 24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）
