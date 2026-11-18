@@ -2,6 +2,16 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.27.3
+
+### 真机 QAM 布局修复
+
+- 真机 CDP 测得 QAM viewport 为 `854×534`。
+- 确认 `position: sticky; top: 60px` 在 QAM 滚动容器内把工具栏下推 60px，导致与搜索行重叠、上方大片空白。
+- 顶部工具栏改为普通流式布局（`position: relative`），不再 sticky。
+- 移除旧的 sticky 偏移，搜索/Hero 恢复正常流式排列。
+- 554 passed。
+
 ## v0.27.2
 
 ### 游戏库顶部工具栏错位修复
