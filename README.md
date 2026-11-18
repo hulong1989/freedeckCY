@@ -51,7 +51,9 @@ Steam Deck 的 **Decky Loader 插件**：用一份天翼云盘资源清单，把
 - **百度网盘**：QAM **扫码登录**（BDUSS/Cookie，无需 App Key）；百度分享链接可解析、转存、下载并安装；也可选 OpenAPI（需开发者应用）作为回退
 - **服务器 CSV 目录**：设置页「检查并更新游戏列表」用 ETag/Last-Modified + SHA256 判断；有变化才下载，提示新增数量，库页显示「最近更新」shelf
 - **可选启动文件**：目录 `executable_name` 指定 PC 主 exe / ROM；留空自动识别
-- **内置目录服务器**：默认 `http://171.215.30.40:8088/catalog.csv`，启动自动检查；设置页可覆盖
+- **内置目录服务器**：默认 `http://171.215.30.40:8088/catalog.csv`，启动自动检查并验证 Ed25519 签名；设置页可覆盖
+- **目录更新提示**：自动更新后 QAM 弹窗显示新增游戏
+- **免重启刷新**：安装后尝试 SteamClient Refresh，失败保留重启 Steam
 - **封面本地缓存**：`/api/tianyi/cover-image` 磁盘缓存封面，失败回退直连 CDN
 - **下载批量管理**：全部暂停/继续、全局下载限速
 - **游戏提交/自动合并**：网页库「提交游戏」打开 GitHub Issue 表单；维护者加 `auto-merge` 标签后 Action 立即合并，另有每 6 小时定时合并任务；也支持 `submissions/*.json` PR
@@ -208,7 +210,7 @@ backend/*.js                Node 辅助脚本（分享解析兜底、云盘上�
 scripts/                    运行时获取（aria2/7zz/node）/ 打包（含 ARM64）/ 诊断 / 目录合并 / 目录体检 / 分类清洗 / 远程目录 / 清单转换
 docs/                       架构 / 开发 / 路线图（ARCHITECTURE / DEVELOPMENT / ROADMAP）
 catalog-json/               NewFreedeck 兼容目录 JSON + schema（可直接读/自托管）
-tests/                      pytest 用例（539 个）
+tests/                      pytest 用例（540 个）
 CHANGELOG.md                版本变更记录
 Makefile                    构建入口：runtime / catalog-json / ludusavi-manifest / package / package-droiddeck / test / doctor / validate-catalog / validate-submissions / normalize-catalog / clean
 ```

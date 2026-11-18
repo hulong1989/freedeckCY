@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from pathlib import Path
 
 import config
+import catalog_signature
 import game_catalog
 from tianyi_service import TianyiService
 from tianyi_store import TianyiStateStore
@@ -32,6 +34,13 @@ def _service(tmp_path):
     return service, state_dir
 
 
+_TEST_SEED = base64.b64decode("8z76iFzq39hqP6ziMyW91OWohFDuwJ/NWEY+vg+1zYc=")
+
+
+def _signature_for(data: bytes) -> str:
+    return base64.b64encode(catalog_signature.sign(_TEST_SEED, data)).decode("ascii")
+
+
 def test_catalog_update_downloads_and_reloads(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DECKY_SEND_DIR", str(tmp_path / "state"))
     service, state_dir = _service(tmp_path)
@@ -41,6 +50,9 @@ def test_catalog_update_downloads_and_reloads(tmp_path, monkeypatch):
         return _valid_csv(), {"ETag": '"v1"', "Last-Modified": "Wed, 01 Jan 2026 00:00:00 GMT"}, 200
 
     monkeypatch.setattr(service, "_fetch_catalog_csv", _fetch)
+    async def _fetch_sig(url):
+        return _signature_for(_valid_csv())
+    monkeypatch.setattr(service, "_fetch_catalog_signature", _fetch_sig)
     result = asyncio.run(service.update_catalog_csv())
     assert result["updated"] is True
     assert result["total"] == 2
@@ -98,6 +110,9 @@ def test_catalog_update_skips_same_hash(tmp_path, monkeypatch):
         return csv_data, {"ETag": '"v1"'}, 200
 
     monkeypatch.setattr(service, "_fetch_catalog_csv", _fetch)
+    async def _fetch_sig(url):
+        return _signature_for(csv_data)
+    monkeypatch.setattr(service, "_fetch_catalog_signature", _fetch_sig)
     (state_dir / "catalog.csv").write_bytes(csv_data)
     result = asyncio.run(service.update_catalog_csv())
     assert result["updated"] is False
@@ -113,6 +128,9 @@ def test_catalog_update_records_added_games(tmp_path, monkeypatch):
         return initial, {"ETag": '"v1"'}, 200
 
     monkeypatch.setattr(service, "_fetch_catalog_csv", _fetch_initial)
+    async def _sig_initial(url):
+        return _signature_for(initial)
+    monkeypatch.setattr(service, "_fetch_catalog_signature", _sig_initial)
     first = asyncio.run(service.update_catalog_csv())
     assert first["updated"] is True
     assert first["added_count"] == 0
@@ -121,6 +139,9 @@ def test_catalog_update_records_added_games(tmp_path, monkeypatch):
         return updated, {"ETag": '"v2"'}, 200
 
     monkeypatch.setattr(service, "_fetch_catalog_csv", _fetch_updated)
+    async def _sig_updated(url):
+        return _signature_for(updated)
+    monkeypatch.setattr(service, "_fetch_catalog_signature", _sig_updated)
     second = asyncio.run(service.update_catalog_csv())
     assert second["updated"] is True
     assert second["added_count"] == 1

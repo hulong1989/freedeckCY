@@ -481,6 +481,14 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def clear_tianyi_catalog_update_notice(self) -> dict:
+        """清除目录更新提示。"""
+        try:
+            data = self._get_tianyi_service().clear_catalog_update_notice()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def get_tianyi_catalog_update(self, payload=None, max_items: int = 12) -> dict:
         """设置页：返回上次目录更新新增游戏，用于最近更新 shelf。"""
         try:

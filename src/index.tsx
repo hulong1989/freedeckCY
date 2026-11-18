@@ -93,10 +93,11 @@ function FaCloudDownloadAlt (props) {
 
 const SETTINGS_ROUTE = "/freedeckcy/settings";
 const LIBRARY_ROUTE = "/freedeckcy/library";
-const PLUGIN_UI_BUILD = "0.26.23";
+const PLUGIN_UI_BUILD = "0.26.24";
 const getTianyiPanelState = callable("get_tianyi_panel_state");
 const restartSteamBackend = callable("restart_steam");
 const clearSteamRestartPending = callable("clear_steam_restart_pending");
+const clearTianyiCatalogUpdateNotice = callable("clear_tianyi_catalog_update_notice");
 const getTianyiStorageOptions = callable("get_tianyi_storage_options");
 const listTianyiCatalog = callable("list_tianyi_catalog");
 const refreshTianyiCatalog = callable("refresh_tianyi_catalog");
@@ -241,6 +242,7 @@ const EMPTY_STATE = {
     settings: EMPTY_SETTINGS,
     library_url: "",
     steam_restart: { pending: false },
+    catalog_update_notice: {},
 };
 function getGamepadTabClassMap() {
     const map = DFL.gamepadTabbedPageClasses;
@@ -2366,6 +2368,23 @@ function steamRestartKey(pending) {
         return "";
     return `${String(pending.game_id || "")}:${String(pending.app_id || "")}:${String(pending.title || "")}`;
 }
+async function tryRefreshSteamLibrary() {
+    const client = window.SteamClient;
+    const apps = client && client.Apps;
+    if (!apps)
+        return false;
+    for (const methodName of ["Refresh", "RefreshApps", "RefreshLibrary"]) {
+        const method = apps[methodName];
+        if (typeof method !== "function")
+            continue;
+        try {
+            await method.call(apps);
+            return true;
+        }
+        catch { }
+    }
+    return false;
+}
 function Content() {
     const [loading, setLoading] = SP_REACT.useState(true);
     const [state, setState] = SP_REACT.useState(EMPTY_STATE);
@@ -2373,11 +2392,13 @@ function Content() {
     const [uninstallingKey, setUninstallingKey] = SP_REACT.useState("");
     const [taskActionKey, setTaskActionKey] = SP_REACT.useState("");
     const [restartingSteam, setRestartingSteam] = SP_REACT.useState(false);
+    const [refreshingSteamLibrary, setRefreshingSteamLibrary] = SP_REACT.useState(false);
     const [previewingKey, setPreviewingKey] = SP_REACT.useState("");
     const [batchBusy, setBatchBusy] = SP_REACT.useState("");
     const [speedDraft, setSpeedDraft] = SP_REACT.useState("0");
     const syncingRef = SP_REACT.useRef(false);
     const latestStateRef = SP_REACT.useRef(EMPTY_STATE);
+    const catalogNoticeRef = SP_REACT.useRef("");
     const dismissedSteamRestartRef = SP_REACT.useRef(new Set());
     const syncState = SP_REACT.useCallback(async (pollMode = PANEL_POLL_MODE_IDLE) => {
         if (syncingRef.current)
@@ -2401,6 +2422,7 @@ function Content() {
                 library_url: next.library_url || "",
                 power_diagnostics: next.power_diagnostics || {},
                 steam_restart: next.steam_restart || { pending: false },
+                catalog_update_notice: next.catalog_update_notice || {},
             };
             if (normalized.steam_restart?.pending) {
                 const key = steamRestartKey(normalized.steam_restart);
@@ -2415,6 +2437,23 @@ function Content() {
             syncingRef.current = false;
         }
     }, []);
+    SP_REACT.useEffect(() => {
+        const notice = state.catalog_update_notice || {};
+        const count = Number(notice.added_count || 0);
+        if (count <= 0)
+            return;
+        const key = `${notice.updated_at || 0}:${count}`;
+        if (catalogNoticeRef.current === key)
+            return;
+        catalogNoticeRef.current = key;
+        const titles = Array.isArray(notice.titles) ? notice.titles.filter(Boolean).slice(0, 3) : [];
+        toaster.toast({
+            title: "freedeckCY 目录已更新",
+            body: `新增 ${count} 个游戏${titles.length ? `：${titles.join("、")}` : ""}`,
+            duration: 6000,
+        });
+        void clearTianyiCatalogUpdateNotice().catch(() => undefined);
+    }, [state.catalog_update_notice]);
     SP_REACT.useEffect(() => {
         let alive = true;
         let firstRun = true;
@@ -2780,6 +2819,27 @@ function Content() {
                 void performTaskAction("remove", task);
             }, onCancel: () => { } }));
     }, [performTaskAction, taskActionKey]);
+    const trySteamRefresh = SP_REACT.useCallback(async () => {
+        if (refreshingSteamLibrary)
+            return;
+        setRefreshingSteamLibrary(true);
+        try {
+            const refreshed = await tryRefreshSteamLibrary();
+            if (!refreshed) {
+                toaster.toast({ title: "freedeckCY", body: "当前 Steam 不支持免重启刷新，请手动重启", duration: 5000 });
+                return;
+            }
+            await clearSteamRestartPending();
+            setState((prev) => ({ ...prev, steam_restart: { pending: false } }));
+            toaster.toast({ title: "freedeckCY", body: "已请求 Steam 刷新快捷方式" });
+        }
+        catch (error) {
+            toastError(error);
+        }
+        finally {
+            setRefreshingSteamLibrary(false);
+        }
+    }, [clearSteamRestartPending, refreshingSteamLibrary]);
     const dismissSteamRestart = SP_REACT.useCallback(async () => {
         const pending = state.steam_restart;
         const key = steamRestartKey(pending);
@@ -2838,7 +2898,7 @@ function Content() {
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
-                            }, title: loginStatusText, children: loginStatusText }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.55 }, children: `QAM 原生 UI v${PLUGIN_UI_BUILD}` }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [!state.login.logged_in && (SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLogin, disabled: openingLogin, children: openingLogin ? "登录入口准备中..." : "登录" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenLibrary, disabled: openingLogin, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenSettings, children: "\u8BBE\u7F6E" })] })] }), state.steam_restart?.pending && (SP_JSX.jsxs(DFL.PanelSection, { title: "Steam \u5FEB\u6377\u65B9\u5F0F\u5DF2\u5199\u5165", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.45 }, children: `「${state.steam_restart.title || "游戏"}」已安装并写入 Steam 快捷方式。重启 Steam 后才会显示在库中。` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void restartSteamNow(), disabled: restartingSteam, style: { flex: 1 }, children: restartingSteam ? "正在重启..." : "现在重启" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void dismissSteamRestart(), disabled: restartingSteam, style: { flex: 1 }, children: "\u7A0D\u540E" })] }) })] })), visibleTasks.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `下载列表（${visibleTasks.length}）`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onPauseAllTasks(), disabled: Boolean(batchBusy), style: { width: "auto", flex: "0 0 auto" }, children: batchBusy === "pause" ? "暂停中..." : "全部暂停" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onResumeAllTasks(), disabled: Boolean(batchBusy), style: { width: "auto", flex: "0 0 auto" }, children: batchBusy === "resume" ? "继续中..." : "全部继续" }), SP_JSX.jsx("div", { style: { flex: "1 1 120px", minWidth: "100px" }, children: SP_JSX.jsx(DFL.TextField, { label: `限速 KB/s（当前 ${Math.round(Number(state.settings.download_speed_limit || 0) / 1024)}，0 不限）`, value: speedDraft, onChange: (event) => setSpeedDraft(getTextFieldValue(event)) }) }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onApplySpeedLimit(), disabled: Boolean(batchBusy), style: { width: "auto", flex: "0 0 auto" }, children: batchBusy === "speed" ? "应用中..." : "应用限速" })] }) }), ...visibleTasks.slice(0, 20).map((task) => {
+                            }, title: loginStatusText, children: loginStatusText }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "10px", opacity: 0.55 }, children: `QAM 原生 UI v${PLUGIN_UI_BUILD}` }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [!state.login.logged_in && (SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onLogin, disabled: openingLogin, children: openingLogin ? "登录入口准备中..." : "登录" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenLibrary, disabled: openingLogin, children: "\u6E38\u620F\u5E93" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onOpenSettings, children: "\u8BBE\u7F6E" })] })] }), state.steam_restart?.pending && (SP_JSX.jsxs(DFL.PanelSection, { title: "Steam \u5FEB\u6377\u65B9\u5F0F\u5DF2\u5199\u5165", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.45 }, children: `「${state.steam_restart.title || "游戏"}」已安装并写入 Steam 快捷方式。重启 Steam 后才会显示在库中。` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void trySteamRefresh(), disabled: restartingSteam || refreshingSteamLibrary, style: { flex: 1 }, children: refreshingSteamLibrary ? "刷新中..." : "免重启刷新" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void restartSteamNow(), disabled: restartingSteam || refreshingSteamLibrary, style: { flex: 1 }, children: restartingSteam ? "正在重启..." : "现在重启" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void dismissSteamRestart(), disabled: restartingSteam, style: { flex: 1 }, children: "\u7A0D\u540E" })] }) })] })), visibleTasks.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `下载列表（${visibleTasks.length}）`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onPauseAllTasks(), disabled: Boolean(batchBusy), style: { width: "auto", flex: "0 0 auto" }, children: batchBusy === "pause" ? "暂停中..." : "全部暂停" }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onResumeAllTasks(), disabled: Boolean(batchBusy), style: { width: "auto", flex: "0 0 auto" }, children: batchBusy === "resume" ? "继续中..." : "全部继续" }), SP_JSX.jsx("div", { style: { flex: "1 1 120px", minWidth: "100px" }, children: SP_JSX.jsx(DFL.TextField, { label: `限速 KB/s（当前 ${Math.round(Number(state.settings.download_speed_limit || 0) / 1024)}，0 不限）`, value: speedDraft, onChange: (event) => setSpeedDraft(getTextFieldValue(event)) }) }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onApplySpeedLimit(), disabled: Boolean(batchBusy), style: { width: "auto", flex: "0 0 auto" }, children: batchBusy === "speed" ? "应用中..." : "应用限速" })] }) }), ...visibleTasks.slice(0, 20).map((task) => {
                     const taskId = String(task.task_id || "");
                     const status = String(task.status || "");
                     const canPause = status === "active" || status === "waiting";

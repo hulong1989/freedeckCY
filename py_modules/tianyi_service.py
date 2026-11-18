@@ -32,6 +32,7 @@ import decky
 from yarl import URL
 
 import config
+import catalog_signature
 from archive_bundle import build_bundle_index, looks_like_multi_volume_name
 from aria2_manager import Aria2Error, Aria2Manager
 from baidu_client import BaiduApiError, fetch_baidu_download_url, resolve_baidu_share
@@ -506,6 +507,7 @@ class TianyiService:
         self._launcher_repair_task: Optional[asyncio.Task] = None
         self._launcher_repair_done = False
         self._catalog_auto_update_task: Optional[asyncio.Task] = None
+        self._catalog_update_notice: Dict[str, Any] = {}
         self._baidu_device_lock = asyncio.Lock()
         self._baidu_device_login: Dict[str, Any] = {}
         self._baidu_qr_lock = asyncio.Lock()
@@ -959,6 +961,7 @@ class TianyiService:
             "baidu_openapi_login": self._baidu_openapi_payload(),
             "power_diagnostics": power_diagnostics,
             "steam_restart": dict(self._steam_restart_pending or {"pending": False}),
+            "catalog_update_notice": dict(self._catalog_update_notice or {}),
         }
 
     def get_cloud_login_url(self) -> str:
@@ -2329,6 +2332,20 @@ class TianyiService:
                 data = await response.read()
         return data, response_headers, 200
 
+    async def _fetch_catalog_signature(self, url: str) -> str:
+        """下载目录签名文件 catalog.csv.sig。"""
+        signature_url = str(url or "").rstrip("/") + ".sig"
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        connector = aiohttp.TCPConnector(ssl=build_tls_context())
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            async with session.get(signature_url) as response:
+                if response.status != 200:
+                    raise RuntimeError(f"目录签名下载失败 HTTP {response.status}")
+                data = await response.read()
+        if len(data) > 4096:
+            raise RuntimeError("目录签名文件异常过大")
+        return data.decode("ascii", errors="strict").strip()
+
     async def _download_catalog_csv(self, url: str) -> bytes:
         """兼容旧调用：无条件下载。"""
         data, _headers, _status = await self._fetch_catalog_csv(url)
@@ -2437,6 +2454,9 @@ class TianyiService:
         validation = self._validate_catalog_csv(data)
         if not validation.get("ok"):
             raise ValueError(str(validation.get("message") or "目录 CSV 校验失败"))
+        signature = await self._fetch_catalog_signature(target_url)
+        if not catalog_signature.verify_signature(data, signature):
+            raise RuntimeError("目录签名校验失败，已保留本地目录")
         server_sha = hashlib.sha256(data).hexdigest()
         old_ids: set[str] = set()
         if local_exists:
@@ -2514,6 +2534,12 @@ class TianyiService:
         self.catalog.json_path = ""
         await asyncio.to_thread(self.catalog.load)
         self._invalidate_panel_cache()
+        if int(added_meta.get("added_count", 0) or 0) > 0:
+            self._catalog_update_notice = {
+                "added_count": int(added_meta.get("added_count", 0) or 0),
+                "titles": [str(item.get("title", "") or "") for item in list(added_meta.get("added") or [])[:5]],
+                "updated_at": int(time.time()),
+            }
         return {
             "updated": True,
             "reason": "updated",
@@ -6866,6 +6892,11 @@ class TianyiService:
                 "文件可能不完整，请移除任务后重新下载"
             )
         return True, ""
+
+    def clear_catalog_update_notice(self) -> Dict[str, Any]:
+        """清除目录更新提示（前端弹窗后调用）。"""
+        self._catalog_update_notice = {}
+        return {"ok": True, "pending": False}
 
     def clear_steam_restart_pending(self) -> Dict[str, Any]:
         """清除安装完成后的重启提示状态。"""
