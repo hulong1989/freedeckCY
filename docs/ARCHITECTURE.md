@@ -1,6 +1,6 @@
 # freedeckCY 架构说明
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.26.29**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.27.20**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -18,11 +18,11 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 这是阅读本仓库最容易踩的坑：**GitHub Releases 里的成品功能远多于仓库代码**。
 
-> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.26.29**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
+> 本仓库 **freedeckCY** 是上游 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支，版本号从 **0.1.0** 起步（与上游 0.2–0.3 不连续），当前 **0.27.20**。下面的"上游现状"描述的是上游仓库，不是本仓库已实现的功能。
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.26.29`，纯天翼云盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块 |
+| 本仓库 `main` | `package.json` 版本 `0.27.20`，天翼云盘 + 百度网盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块；v0.26.x 做架构拆分与稳定性修复；v0.27.0–v0.27.20 做游戏库视觉重构、详情页/搜索/筛选/更新按钮对齐、Steam Deck 手柄与触控板适配 |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -33,10 +33,10 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 - **作者已停止维护**：NewFreedeck v0.1 的发布说明原文是"目前我没有精力与时间继续维护，抱歉，所以可以根据我整理的 skill 自行修改，最后可以给我推 pr"。
 - **v0.25.0 库详情时长块按 managed 隔离**：`LibraryTimeBlock` 只在 `data.managed === true` 时渲染，未匹配/未加载直接 `return null`（不再对 Steam 原有游戏插入"已玩/主线/总时长"，也不先显示"加载中"）；后端 `get_library_game_time_stats()` **先按 AppID** `_resolve_installed_record_by_app_id`、再按标题匹配，未匹配返回 `managed=false` + 全 0 且**不调用 `resolve_hltb_stats`**；只影响插件安装的游戏（见 7.3）。
 - **v0.24.0 原生库返回/关闭修复**：`LibraryPage` 新增 `onClose?`——modal 模式 `showModal(<LibraryPage onClose={() => modal.Close()} />)`，route 模式无 `onClose` 时 `handleClose` 用 `Navigation.NavigateBack()`；顶部新增 **sticky 固定栏**（返回/Steam 库/刷新，滚动仍可见），标题栏也保留「返回」；「Steam 库」关闭 modal/返回后 `Router.NavigateToLibraryTab()` 回 Steam 库（失败再 `NavigateBack`）（见 5.16）。
-- **v0.23.0 原生库兜底 + 百度扫码超时/反馈**：QAM「游戏库」改为 **`showModal(<LibraryPage />)` 优先**、失败才 `Navigation.Navigate(LIBRARY_ROUTE)`（全屏路由保留）；主页显示 `QAM 原生 UI v0.23.0`、库页标题下显示 `原生 UI · v0.23.0` 便于确认前端是否更新；百度扫码点击立即 toast，前端 `withTimeout`（start 20s/poll 15s）、后端 `wait_for(request_qr, 12)`/图片 10s，超时给出明确文案并记 `Baidu QR ...` 日志（见 5.13 / 5.16）。
+- **v0.23.0 原生库兜底 + 百度扫码超时/反馈**（历史）：QAM「游戏库」改为 **`showModal(<LibraryPage />)` 优先**、失败才 `Navigation.Navigate(LIBRARY_ROUTE)`（全屏路由保留）；当时曾用主页/库页版本标识确认前端是否更新，v0.27.20 已移除；百度扫码点击立即 toast，前端 `withTimeout`、后端 `wait_for`，超时给出明确文案并记 `Baidu QR ...` 日志（见 5.13 / 5.16）。
 - **v0.22.0 诊断自检 + 一键诊断包**：QAM 设置新增「诊断」页（运行自检/导出诊断包）；`run_diagnostics()` 检查插件/目录/runtime/目录数据/Steam/存储/天翼网络/百度扫码/任务/日志，每项 `ok|warn|fail|skip` + detail/fix；`export_diagnostics()` 的 zip 新增 `self-check.json`，`export_diagnostics_to_downloads()` 写到下载目录（0600，`freedeckcy-diagnostics-<时间>.zip`）；百度 QR 自检只返回 sign 长度，不输出 sign/cookie（见 5.17）。
 - **v0.21.0 扫描已安装迁移 + 自动补 Steam 快捷方式**：「扫描已安装游戏」从原生库「已安装」页移到 **QAM 设置 → 安装**；`scan_installed_games()` 新增 `list_all_shortcuts_sync()` 同名/同 exe 查重，PC 用 `_find_scanned_executable()` 找 exe、模拟器用 `ensure_emulator(allow_download=False)` + wrapper **自动补建 Steam 快捷方式**（模拟器未安装只记 `shortcut_error`、不自动下载）；第二遍为已有记录 `steam_app_id=0` 的 PC 补建；返回 `steam_added`/`steam_recovered_count`/`shortcut_error`（见 5.14 / 5.16）。
-- **v0.20.0 Decky 原生游戏库**：QAM 新增 `LibraryPage`（路由 `/freedeckcy/library`，`routerHook.addRoute` 注册/卸载移除），主页「游戏库」按钮改为 `Navigation.Navigate(LIBRARY_ROUTE)`；原生库含「游戏库/已安装/刷新」Tab、搜索 + 平台/分类/排序下拉、20 条/页分页、安装 `ConfirmModal`（下载/安装大小、目录、模拟器/BIOS/setup 提示）与已安装启动/打开目录/卸载/扫描；全部走 Decky callable，不依赖本地 HTTP/CORS；网页库保留为备用（见 5.16）。
+- **v0.20.0 Decky 原生游戏库（历史）**：QAM 新增 `LibraryPage`（路由 `/freedeckcy/library`），主页「游戏库」改为原生入口；当时为列表 + 搜索/下拉筛选 + 20 条/页分页；全部走 Decky callable。v0.27.20 已升级为封面网格/Hero/分类货架/详情页、30 条/页+加载更多（见 5.16）。
 - **v0.19.0 下载/安装目录支持 SD 卡**：新增 `py_modules/storage_options.py`——解析 `/proc/mounts` 识别 `/run/media`（SteamOS SD）、`/media`、`/mnt`、`/storage`（DroidDeck）等可写挂载，过滤 proc/sysfs/tmpfs/overlay 等系统 fstype 与根挂载，`shutil.disk_usage` 返回 free/total；每个外置挂载给出 `freedeckCY/downloads`、`freedeckCY/installed` 建议目录；`GET /api/tianyi/storage/options` + QAM「路径」页一键切换（无外置时提示）（见 5.15）。
 - **v0.18.0 扫描已安装 + 百度扫码错误诊断**：`scan_installed_games()` 扫 `settings.install_dir` **一层子目录**，按目录名/标题与目录条目匹配，跳过已记录 path/game_id，回填 Steam appid，模拟器平台用 `find_rom_file()` 找 ROM；HTTP `POST /api/tianyi/installed/scan` + 网页库「扫描已安装」按钮；百度扫码补 **BAIDUID CookieJar**、HTTP 状态/响应片段错误、轮询网络错误 `stage=failed`（不再一直 waiting）（见 5.13 / 5.14）。
 - **v0.17.0 百度扫码登录（主链路）**：新增 `py_modules/baidu_qr.py`（Passport `getqrcode` → `unicast` 长轮询 → `qrbdusslogin` 换 `BDUSS/STOKEN/PTOKEN`）；QAM「百度网盘（扫码登录）」显示二维码，Cookie 持久化到 `state.json` 的 `baidu_login`；百度安装计划**优先 Cookie**，没有才用 OpenAPI（可选回退），都没有则提示扫码；任务 aria2 带百度 Cookie/Referer/UA；**仍不接 CDP/网页逆向**（见 5.13）。
@@ -112,7 +112,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 repo/
 ├── main.py                     # 插件入口：Plugin 类，24 个可调用 RPC，大部分薄转发给 TianyiService / server_manager
 ├── plugin.json                 # Decky 元信息（api_version=1, flags=[]，publish 描述已更新）
-├── package.json                # 版本 0.26.29；build=rollup；前端依赖
+├── package.json                # 版本 0.27.20；build=rollup；前端依赖
 ├── decky.pyi                   # Decky Python API 类型存根
 ├── Makefile                    # runtime / package / test / doctor / validate-catalog / validate-submissions / clean / help 目标（见 DEVELOPMENT.md）
 ├── requirements-dev.txt        # 开发与 CI 依赖（pytest 等，运行期依赖由 Decky 自带）
@@ -226,11 +226,11 @@ Steam Deck (Game Mode)
 
 | | QAM 面板（React） | 本地网页（Vue） |
 |---|---|---|
-| 路由 | 插件内容区 + `/freedeckcy/settings` | `/tianyi/library`、`/tianyi/library/login-bridge` |
-| 页面 | 登录状态/入口、下载队列（最多 20 条，自绘进度条）、已安装游戏预览+卸载；设置页 4 个 tab（路径/安装/下载/账号，账号页含云存档上传与恢复） | **两个**：游戏库橱窗（打开即浏览全部资源 + 搜索/平台/分类筛选 + 分页 + 排序 + 「已安装」页签 + 诊断/更新工具条 + 安装确认弹窗）、二维码登录桥 |
-| 能干什么 | 看任务、暂停/继续/移除任务、改设置、管云存档、卸载（除了卸载，**不能**自己发起下载） | **唯一能"下单"的地方**：浏览→确认→创建下载任务 |
-| 交互特点 | 900 ms / 6 s / 30 s 三档轮询 | 手柄/键盘双焦点模型（160 ms 轮询、方向键导航、A/B/X/Y/L1/R1 快捷键，为掌机设计；详见 5.8） |
-| 怎么打开 | 插件自带 | 调 RPC 拿 URL → `SteamClient.Browser.OpenUrl`（Steam 内置浏览器），不是 iframe/webview |
+| 路由 | 插件内容区 + `/freedeckcy/settings` + 原生库 `/freedeckcy/library`（modal 优先） | `/tianyi/library`、`/tianyi/library/login-bridge`（旧版本地网页，仅回退/调试） |
+| 页面 | 登录状态/入口、下载队列、已安装预览+卸载；设置页 4 个 tab（路径/安装/下载/账号）；游戏库为原生 React 封面网格/Hero/筛选/详情 | 旧版本地网页库，仅桌面调试/回退 |
+| 能干什么 | 看任务、暂停/继续/移除任务、改设置、管云存档、卸载；**原生游戏库负责浏览/筛选/详情/安装** | 旧版网页备用，不再作为主入口 |
+| 交互特点 | QAM 轮询 + 原生库手柄/触控板导航（A/B、方向键、L1/R1、L2/R2、触控滚动） | 旧版网页键盘/鼠标模型，详见 5.8（历史） |
+| 怎么打开 | 插件自带 | 本地 HTTP 服务，仅桌面/调试回退 |
 
 QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `PanelSection` 组成，代码在 [src/index.tsx:3137](../src/index.tsx) `Content()` 到文件末尾；设置页是 `Tabs` 四页（路径 / 安装 / 下载 / 账号），在 [src/index.tsx:1730](../src/index.tsx) `SettingsPage()`。
 
@@ -335,7 +335,9 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 - 产物命名后缀：`PACKAGE_ARCH=aarch64` → `-arm64`，`all` → `-universal`，`x86_64` 无后缀；
 - 部署到 DroidDeck：把 `-arm64.zip` 放进手机存储，用 Decky 的 **Import plugin zip** 安装（DroidDeck 按 `plugin.json` 的 name 覆盖安装）；首次使用与排障见 [DROIDDECK.md](DROIDDECK.md)。
 
-### 5.8 库页交互与焦点模型（v0.5.0）
+### 5.8 旧版网页库交互与焦点模型（历史，v0.5.0）
+
+> 本节描述 `defaults/tianyi_library_ui/` 旧版网页库；当前主入口是 5.16 的 Decky 原生库。
 
 **打开即浏览**：页面 `bootstrap()` 先 `GET /api/tianyi/state` 拿设置，再 `reloadList(1)` + `reloadInstalled()`；空查询不再隐藏结果，`hintText` 显示「共 N 条资源，第 x / y 页」。搜索/平台/分类/排序变化都会回到第 1 页。
 
@@ -648,32 +650,33 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 
 **边界**：只看已挂载且**可写**的挂载（未挂载/只读/权限不足不会出现）；`/mnt`、`/media`、`/storage` 的**挂载根本身**会被跳过（子挂载如 `/mnt/sdcard` 可显示）；容量是检测时的快照；不会自动 `mkdir`/格式化/挂载；**不做 Steam 库同盘检测**（切目录后 Steam 库是否同盘需用户自行判断）；建议子目录固定为 `freedeckCY/{downloads,installed}`（暂不支持自定义名字）。
 
-### 5.16 Decky 原生游戏库（v0.20.0）
+### 5.16 Decky 原生游戏库（v0.20.0 起，v0.27.20 视觉/输入重构）
 
-**背景**：之前 QAM「游戏库」按钮打开的是本地网页库（`defaults/tianyi_library_ui/`，依赖本地 HTTP 服务/浏览器）。v0.20.0 起改为 Decky 原生 React 页面，网页库保留为备用（桌面浏览器/调试/回退）。
+**入口**：QAM 主页「游戏库」→ `Router.CloseSideMenus()` → `showModal(<LibraryPage />)`；modal 失败才 `Navigation.Navigate("/freedeckcy/library")`。原生页面通过 Decky callable 直连 Python，不依赖本地 HTTP、CORS 或浏览器。QAM 不再显示版本标识；以 Decky 插件列表里的版本号和 `package.json` 为准。
 
-**路由与入口（v0.23.0：modal 优先、route 兜底）**：
+**页面结构**：
 
-- [src/index.tsx:32](../src/index.tsx) `LIBRARY_ROUTE = "/freedeckcy/library"`；[src/index.tsx:3703](../src/index.tsx) `LibraryPage()` 是页面组件；[src/index.tsx:4132](../src/index.tsx) `routerHook.addRoute(LIBRARY_ROUTE, LibraryPage)` 在插件挂载时注册，`onDismount()` 里 `removeRoute`；
-- QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)` 原生弹层**，失败才 `Navigation.Navigate(LIBRARY_ROUTE)`（全屏路由保留）；不再调用后端打开网页；网页库入口仍保留作备用；
-- **版本标识**：主页显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`，库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`，用于确认前端是否已更新；**前端未重载/旧 dist 仍会打开网页或看不到该标识**。
+- **顶部栏**：返回 / Steam 库 / 标题与总数 / 游戏库 / 已安装 / 刷新；横向 `Focusable flow-children="row"`。
+- **搜索与筛选**：搜索框使用 placeholder（无额外 label），搜索/筛选按钮同高同一行；筛选面板按平台 / 分类 / 排序渲染 chip，chip 可横向移动。
+- **Hero**：首个有封面资源的大图推荐位，含「查看详情 / 全部游戏」。
+- **分类货架**：最近更新、分类 section，横向滚动卡片；货架隐藏默认滚动条。
+- **卡片**：竖版封面、来源角标（天翼云盘 / 百度网盘）、已安装角标、标题与大小/来源；网格和货架两种布局。
+- **详情弹窗**：`GameDetailModal` 通过 `showModal` 打开；海报+标题+标签、下载源选择、固定底部「安装/退出」；顶部下移 40px 避开 Steam 状态栏，高度 `calc(100vh - 150px)`。
+- **已安装**：启用/目录/卸载卡片；扫描入口仍在 QAM 设置 → 安装。
+- **分页**：每页 30 条，底部「加载更多」；`catalog.items.length < catalog.total` 时显示。
 
-**返回 / 关闭链路（v0.24.0）**：
+**Steam Deck 输入模型（v0.27）**：
 
-- `LibraryPage({ onClose? })`：**modal 模式**由 `onOpenLibrary` 传 `onClose={() => modal.Close()}`；**route 模式**不传 `onClose`，`handleClose()` 走 `Navigation.NavigateBack()`（失败回退 `Router.CloseSideMenus`）；
-- 顶部 **sticky 固定栏**（`position: sticky; top: 0`）：「返回」「Steam 库」「刷新」，页面滚动时仍可点；页面标题栏也保留「返回」按钮；
-- `handleSteamLibrary()`：先关闭 modal（`onClose?.()`），再 `Router.NavigateToLibraryTab()` 直接回 Steam 库页；该 API 不可用时回退 `Navigation.NavigateBack()`；
-- **边界**：Steam 覆盖层里手柄 B/键盘 Esc 不一定能关掉 QAM modal（不同 Steam UI 版本行为不同），所以提供**显式返回/Steam 库按钮**兜底；如果 modal 打开失败会走全屏 route（无 `onClose`，返回用 `NavigateBack`）；若当前不在路由页/导航栈为空，返回按钮可能只关侧栏或无效。
+- 根节点 `Focusable flow-children="column"`；顶栏、搜索行、筛选行、Hero 操作、货架、网格、详情下载源/操作栏均为 `flow-children="row"`，因此左右键可在同一行内移动。
+- A：激活当前控件；B：关闭详情 → 退出游戏库；L1/R1：切换「游戏库 / 已安装」；L2/R2：整页滚动；方向键上下：滚动长列表。
+- 卡片获得焦点时自动做水平/垂直 `scrollIntoView({block:"nearest", inline:"nearest"})`，并额外按 14px 边距修正货架横向位置；卡片 `scroll-margin-top:84px`，顶部焦点环不被 60px Steam 遮罩裁切。
+- 货架/网格左右 16px 内边距、顶部 10px 内边距；取消 `scroll-snap` 和 `overflow-anchor`，避免最左卡片焦点环被裁。
+- 触控板/触摸：根列表纵向滚动、货架横向滚动，`touch-action: pan-y/pan-x`，按钮与卡片有 `cursor:pointer`。
+- 详情弹窗根节点同样绑定 `onCancel`，B 可退出；内容滚动区与操作栏分离。
 
-**页面能力**：
+**callable 链路**：`list_tianyi_catalog`、`prepare_tianyi_install`、`start_tianyi_install`、`list_tianyi_installed_games`、`launch_tianyi_installed_game`、`open_tianyi_installed_folder`、`scan_tianyi_installed_games` 等；安装进度仍在 QAM 主页任务区。
 
-- Tab：「游戏库 / 已安装 / 刷新」；游戏库页：搜索 `TextField`（Enter 触发）+「搜索/重置」、「平台/分类/排序」三个 `DropdownItem`、**20 条/页**分页（上一页/下一页）；
-- 游戏行：标题、平台（大写）、大小、分类 + 「安装」按钮；点击走 `prepare_tianyi_install` 生成计划，`ConfirmModal` 显示下载/安装大小、目标目录、模拟器名与 `emulator_info.setup_hint`（BIOS/setup 提示），确认后 `start_tianyi_install` 入队；
-- 已安装页：`list_tianyi_installed_games` 列表，显示安装路径/大小/时长；「启动」`launch_tianyi_installed_game`、「目录」`open_tianyi_installed_folder`、「卸载」`ConfirmModal`（`delete_files=true`）→ `uninstall_tianyi_installed_game`。**v0.21.0 起「扫描已安装」不在库页**，统一到 QAM 设置 → 安装（见 5.14）。
-
-**callable 链路**：`main.py` 暴露 `list_tianyi_catalog`（query/page/page_size/platform/category/sort）、`prepare_tianyi_install`、`start_tianyi_install`、`list_tianyi_installed_games`、`launch_tianyi_installed_game`、`open_tianyi_installed_folder`、`scan_tianyi_installed_games`（扫描实现仍是 `settings.install_dir` 一层 + 目录名/标题匹配，见 5.14）；前端通过 `callable("...")` 直连 Python，**不经过本地 HTTP，也没有 CORS/浏览器依赖**。
-
-**边界**：原生库只做浏览/安装/已安装动作，**任务进度仍在 QAM 主页任务区**（不在库页）；列表是行式（无封面卡片视图）；分页固定 20 条；扫描仍只认 `settings.install_dir` 一层；卸载固定 `delete_files=true`（不弹 compatdata 回收选项）；网页库作为备用保留，功能以原生库为准。
+**边界**：详情弹窗依赖 `showModal`；任务进度不在库页；卸载固定 `delete_files=true`；扫描仍只认 `settings.install_dir` 一层。旧本地网页库 `defaults/tianyi_library_ui/` 只作桌面调试/回退，不是主入口；独立 Web 提交/管理系统不在本仓库、不进插件包。
 
 ### 5.17 诊断自检（v0.22.0）
 
@@ -1120,10 +1123,10 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 42. **模拟器存档恢复/多碟的边界（v0.16.0）**：恢复目标受已知存档根白名单限制（`restore_roots`），跨设备 3DS 可能退化到根目录；PS1/PS2/Switch 共享卡/目录覆盖不能只挑单个游戏，冲突需确认后整文件覆盖（有 `*.freedeckcy-bak-<时间戳>` 备份）；PS1 多碟只在多张 `.cue/.chd` 时自动生成 `freedeckcy-multidisc.m3u`，单碟/已有 m3u 不生成；m3u 按文件名自然排序，碟号命名不规范时顺序可能不符合预期。（已知限制）
 43. **扫描已安装的边界（v0.18.0；v0.21.0 补快捷方式）**：只扫安装目录一层、最多 500 项；目录名需与目录标题归一化匹配（改名可能 `catalog_no_match`）；补已安装记录/回填 appid/找 ROM；v0.18 不创建 Steam 快捷方式，**v0.21.0 起自动补建**（见 46，模拟器未装不下载）；模拟器 ROM 找不到时记录仍建但 `rom_path` 为空；扫描不会删除/修正已有记录。（已知限制）
 44. **存储位置选择的边界（v0.19.0）**：只显示已挂载且可写的 `/run/media`、`/media`、`/mnt`、`/storage`、`/sdcard` 子挂载；挂载根（如 `/mnt` 本身）跳过；只读/权限不足/未挂载不会出现；容量为快照；不会自动创建/挂载/格式化，也不检测 Steam 库是否同盘；建议子目录固定 `freedeckCY/{downloads,installed}`。（已知限制）
-45. **Decky 原生游戏库的边界（v0.20.0）**：任务进度仍在 QAM 主页任务区，库页只有列表/分页/安装/已安装动作；没有封面卡片视图，固定 20 条/页；扫描仍只认 `settings.install_dir` 一层；卸载固定删文件（不含 compatdata 回收选项）；网页库仅作备用，两套 UI 可能短暂不同步（以原生库/接口为准）。（已知限制）
+45. **Decky 原生游戏库的边界（v0.20.0；v0.27.20 视觉/输入重构）**：任务进度仍在 QAM 主页任务区；原生库使用封面网格/Hero/分类货架/详情弹窗，每页 30 条+加载更多；扫描仍只认 `settings.install_dir` 一层；卸载固定删文件（不含 compatdata 回收选项）；旧网页库仅桌面调试/回退，不是主入口。（已知限制）
 46. **扫描补 Steam 快捷方式的边界（v0.21.0）**：只对扫描到/已存在但 `steam_app_id=0` 的 PC 记录补建；模拟器快捷方式要求模拟器已安装（`allow_download=False`，不会自动下载），否则记 `shortcut_error=emulator_not_ready`；PC 找不到 exe/ROM 时跳过并记 `exe_not_found`/`rom_not_found`；只写 `shortcuts.vdf`，**Steam 需重启/切用户/重开库页才可见**；不覆盖已有同名同 exe 快捷方式。（已知限制）
 47. **诊断自检的边界（v0.22.0）**：自检是一次性快照（版本/目录/运行时/Steam/存储/网络/百度 QR/任务/日志），网络项受连通性影响；「运行自检」不自动修复，只给 detail/fix；`baidu_qr` 只输出 sign 长度（不输出 sign/cookie）；导出诊断包会写 0600 zip 到下载目录并包含 300 行日志（已脱敏），仍建议提交前自行过目；不支持在线查看日志或上传诊断包。（已知限制）
-48. **原生库兜底/扫码超时的边界（v0.23.0）**：`showModal(<LibraryPage />)` 失败才走全屏路由，两者都失败才 toast；**前端未重载/旧 `dist` 仍可能打开旧网页或没有版本标识**（以 `QAM 原生 UI v0.23.0`/`原生 UI · v0.23.0` 为准）；百度扫码前后端超时（start 20s/12s、poll 15s）依赖网络/TLS，超时只提示不自动重试；`Baidu QR` 日志只记 sign 长度，不记 sign/cookie。（已知限制）
+48. **原生库入口/扫码超时的边界（v0.23.0 起；v0.27.20 已移除版本标识）**：`showModal(<LibraryPage />)` 失败才走全屏路由，两者都失败才 toast；前端是否更新以 Decky 插件列表版本/`package.json` 为准；百度扫码前后端超时依赖网络/TLS，超时只提示不自动重试；`Baidu QR` 日志只记 sign 长度，不记 sign/cookie。（已知限制）
 49. **原生库返回/关闭的边界（v0.24.0）**：modal 模式依赖 `onClose` 回调关闭，route 模式用 `Navigation.NavigateBack()`；Steam 覆盖层的 B/Esc 不一定能关闭 modal，需用显式「返回」/「Steam 库」按钮；`Router.NavigateToLibraryTab()` 不可用时只回退 `NavigateBack`；sticky 栏只覆盖库页内部滚动，不改变 Steam 全局导航行为。（已知限制）
 50. **库详情时长块的边界（v0.25.0）**：只有 `managed=true`（AppID 或标题匹配到 `installed_games`）才插入时长块；未匹配的 Steam 原有游戏直接 `return null` 且不查 HLTB；AppID 优先已降低同名误判，但标题匹配仍可能把同名 Steam 游戏认成插件游戏；HLTB 失败只影响块内数据；仍依赖 Steam 库页内部结构（patch 可能随 Steam 更新失效）。（已知限制）
 

@@ -1,6 +1,6 @@
 # freedeckCY 开发指南
 
-本文面向二次开发者，对应 freedeckCY **v0.26.29**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
+本文面向二次开发者，对应 freedeckCY **v0.27.20**：如何在本地跑起来、改代码、打补丁、排查故障。DroidDeck（Android/ARM64）的安装、构建与排障单独见 [DROIDDECK.md](DROIDDECK.md)。架构与协议细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，与作者 v0.6 的能力对照见 [ARCHITECTURE.md](ARCHITECTURE.md) §13，后续可做项见 [ROADMAP.md](ROADMAP.md)。
 
 > 前提：本项目只支持 **SteamOS / Linux**。开发机可以是 Steam Deck，也可以是装了 Decky Loader 的 Linux 桌面环境；Windows / macOS 只能改代码，不能完整运行。
 
@@ -93,12 +93,14 @@ pnpm watch      # 开发时可选：文件变化自动重打包
 - 改了 `src/index.tsx` 或 `src/types.d.ts` 后必须重新 `pnpm build`，然后重载插件才会生效。
 - 只提交 `dist/index.js` 与 `dist/index.js.map`，`node_modules/` 不提交。
 
-### 2.4 Vue 本地页面：免构建
+### 2.4 旧版 Vue 本地页面（仅桌面调试/回退）
+
+> 当前主入口是 Decky 原生 React 游戏库（见 §6.14）；`defaults/tianyi_library_ui/` 不再由 QAM「游戏库」打开。
 
 `defaults/tianyi_library_ui/` 下的 `index.html`、`app.js`、`app.css`、`login_bridge.*`、`vue.global.prod.js` 是**浏览器直出**的静态文件，没有构建步骤：
 
 - 直接编辑这些文件，刷新 Steam 内置浏览器里的页面即可（必要时重载插件让 Python 重新识别资源目录）；
-- 本地网页地址：QAM 里"打开游戏库"按钮会调 `get_tianyi_library_url`，形如 `http://127.0.0.1:59271/tianyi/library`；
+- 本地网页地址仍由 `get_tianyi_library_url` 返回，形如 `http://127.0.0.1:59271/tianyi/library`，仅用于桌面浏览器/调试；QAM「游戏库」已改为原生 React 页面。
 - 建议在桌面浏览器的无痕窗口里直接访问上述地址调试（只在回环地址监听，必须在本机访问）。
 
 ### 2.5 目录数据、封面索引与筛选
@@ -438,9 +440,9 @@ bash scripts/doctor.sh --help             # 查看参数
 
 说明：脚本**只读**，不改任何文件；支持 `FREEDECKCY_STATE_FILE` / `FREEDECKCY_STEAM_ROOT` / `FREEDECKCY_PORT` / `DECKY_PLUGIN_DIR` 覆盖默认路径。排障流程建议先让用户附上 `make doctor` 输出，再要日志。
 
-### 6.7 库页、已安装与诊断调试（v0.5.0）
+### 6.7 旧版网页库、已安装与诊断调试（历史，v0.5.0）
 
-库页是免构建 Vue 页面，所有数据都走本地 HTTP API；用 curl 可以脱离浏览器单独验证。
+> 当前主入口是 §6.14 的 Decky 原生库；本节保留给旧版 Vue 网页库/HTTP API 调试。
 
 **新接口调试示例**：
 
@@ -862,51 +864,71 @@ QAM「设置 → 路径」：下载目录/安装目录下会按外置挂载渲�
 | 切过去后路径不存在/不可写 | 插件不会自动 mkdir/挂载/格式化；先确认挂载点可写，必要时手动 `mkdir -p <mount>/freedeckCY/{downloads,installed}` |
 | 容量不对 | 容量是检测时快照；重新打开路径页/重载插件刷新 |
 
-### 6.14 Decky 原生游戏库（v0.20.0）
+### 6.14 Decky 原生游戏库与 Steam Deck 输入（v0.20.0；v0.27.20）
 
-**入口（v0.23.0）**：QAM 主页「游戏库」`onOpenLibrary()` **优先 `showModal(<LibraryPage />)`**，失败才 `Navigation.Navigate("/freedeckcy/library")`；`routerHook.addRoute` 仍注册全屏入口，卸载移除。旧的网页库（`defaults/tianyi_library_ui/`）保留为备用（桌面浏览器/回退），两者共用同一后端。
+**入口**：QAM 主页「游戏库」→ `Router.CloseSideMenus()` → `showModal(<LibraryPage />)`；modal 失败才 `Navigation.Navigate("/freedeckcy/library")`。`routerHook.addRoute` 仍注册全屏入口，卸载移除。旧版 Vue 网页库只作桌面调试/回退。
 
-**如何确认原生 UI 版本**：主页底部显示 `QAM 原生 UI v${PLUGIN_UI_BUILD}`、库页标题下显示 `原生 UI · v${PLUGIN_UI_BUILD}`。看不到标识说明 **前端 dist 未更新/插件未重载**；`pnpm build` + 重载 Decky 插件后再看。当前源码 `PLUGIN_UI_BUILD` 与 `package.json` 均为 `0.26.29`。
+**页面结构（v0.27.20）**：
 
-**返回/关闭测试（v0.24.0）**：
+- 顶部栏：返回 / Steam 库 / 标题 / 游戏库 / 已安装 / 刷新。
+- 搜索：placeholder「搜索游戏」+ 搜索 / 筛选按钮；筛选面板含平台/分类/排序 chip。
+- Hero + 最近更新 + 分类横向货架 + 封面网格；卡片含来源/已安装角标。
+- 详情：`GameDetailModal` + `showModal`；下载源选择、固定「安装/退出」操作栏。
+- 每页 30 条 + 「加载更多」；已安装页签卡片支持启动/目录/卸载。
+- QAM 不再显示 `QAM 原生 UI v...` 标识；版本以 Decky 插件列表和 `package.json` 为准。
 
-| 场景 | 操作 | 预期 |
-|---|---|---|
-| modal 模式 | 点「游戏库」→ 顶部或标题栏「返回」 | `onClose` 关闭 modal，回到 QAM |
-| modal 模式 → Steam 库 | 点「Steam 库」 | 关闭 modal 后 `Router.NavigateToLibraryTab()` 回 Steam 库 |
-| route 模式 | 直接访问 `/freedeckcy/library`（无 `onClose`）→「返回」 | `Navigation.NavigateBack()` 返回上一页 |
-| 滚动后返回 | 库页列表向下滚动 → 点 sticky 栏「返回」 | 固定栏仍可见、可点（`position: sticky`） |
+**手柄/触控板（v0.27）**：
 
-**"困在库页"排查**：先确认用的是 v0.24.0 前端（版本标识/dist）；modal 内点「返回」无反应时改用「Steam 库」（`NavigateToLibraryTab`）或键盘/手柄 B、Esc；route 模式返回依赖导航栈，栈空时只能关侧栏；仍不行重载插件/重启 Steam 再试。
+| 输入 | 行为 |
+|---|---|
+| 方向键 / 左摇杆 | 在 `flow-children` 分组内左右/上下移动；焦点卡片自动滚动到可视区 |
+| A | 激活当前按钮/卡片/筛选 chip |
+| B | 关闭详情；游戏库内退出（`onCancel`） |
+| L1/R1 | 切换「游戏库 / 已安装」 |
+| L2/R2 | 游戏库/详情内容整页滚动 |
+| 触控板 / 触摸 | 纵向列表、横向货架滚动；按钮/卡片可点击 |
+| 搜索框 | A 聚焦后输入，Enter 提交 |
 
-**调试 callable**（`main.py`，均返回 `{status,data,message}`）：
+**布局调试要点**：
+
+- 顶部固定 60px 遮罩 → 卡片 `scroll-margin-top:84px`，避免焦点卡顶部/蓝框被裁。
+- 货架 `overflow-x:auto` + 焦点 `outline:2px` → 顶部/左右 padding 10/16px，取消 scroll-snap/overflow-anchor，避免最左卡焦点环被裁。
+- 详情弹窗 `margin-top:40px` 避开状态栏，`max-height:calc(100vh - 150px)`，操作栏独立固定在底部。
+- 搜索框必须用 placeholder（不要 label），搜索/筛选按钮才会和输入框同高。
+- 更新按钮用 DialogButton + Focusable row，不要用两个独立 ButtonItem。
+
+**真机 CEF 验证**（Steam Deck，CEF 8081）：
 
 ```bash
-# 在插件 Python 侧（或看 QAM 报错）确认这些 callable 已注册
-list_tianyi_catalog(query=..., page=1, page_size=20, platform=..., category=..., sort=...)
-prepare_tianyi_install(game_id=...)
-start_tianyi_install(game_id=...)
-list_tianyi_installed_games()
-launch_tianyi_installed_game(game_id=...)
-open_tianyi_installed_folder(game_id=...)
-scan_tianyi_installed_games()
+# 列出 targets；选择「Steam 大屏幕模式」
+curl -s http://<deck-ip>:8081/json/list
+# 在目标页 Runtime.evaluate：
+# document.querySelector('.gpfocus') / '.fdc-root' / '.fdc-shelf'
+# 方向键用 Input.dispatchKeyEvent 发送 ArrowUp/Down/Left/Right 验证焦点环
 ```
+
+检查项：
+
+1. 最左卡焦点环左右完整；
+2. 焦点卡顶部蓝框/封面不被状态栏裁；
+3. A/B/左右/上下可用；
+4. 详情「安装/退出」完整可见；
+5. 搜索/筛选/更新按钮同排。
+
+**callable**：`list_tianyi_catalog`、`prepare_tianyi_install`、`start_tianyi_install`、`list_tianyi_installed_games`、`launch_tianyi_installed_game`、`open_tianyi_installed_folder`、`scan_tianyi_installed_games`。
 
 **常见问题**：
 
 | 现象 | 处理 |
 |---|---|
-| **Steam 原有游戏详情页出现插件时长块** | v0.25.0 起前端只在 `managed===true` 渲染、未匹配直接 `return null`；确认前端 dist/插件已重载、Steam 库页重开；后端未匹配会返回 `managed=false` 且不查 HLTB；同名游戏可能因标题匹配被误认，需 AppID 优先/手动核对 `installed_games` |
-| **游戏库无法返回/困在库页** | v0.24.0 起顶部 sticky 栏和标题栏都有「返回」；modal 用 `onClose`→`modal.Close()`，route 用 `Navigation.NavigateBack()`；「Steam 库」走 `Router.NavigateToLibraryTab()`；B/Esc 在 Steam 覆盖层不一定生效，优先点显式按钮；route 返回依赖导航栈 |
-| QAM 点「游戏库」仍打开网页/没页面 | v0.23.0 起优先 `showModal(<LibraryPage />)`、失败才走路由；先确认主页有 `QAM 原生 UI v0.23.0`、库页有 `原生 UI · v0.23.0`（没有即 dist 未更新/未重载）；再看 Decky 日志里 modal/route 报错 |
-| 列表空/搜索无结果 | 目录 CSV 是否加载；`list_tianyi_catalog` 的 query/platform/category/sort/page_size 参数；空查询应返回全部 |
-| 点安装报"磁盘空间不足" | `prepare_tianyi_install` 返回 `can_install=false`，看 `required_download/install`、目标目录与 SD 卡剩余（§6.13） |
-| 安装计划里没有模拟器/BIOS/setup 提示 | 看 `emulator_info.name/setup_hint/bios_required`；模拟器渠道/平台白名单（§6.8） |
-| 安装后库页没进度 | 进度在 QAM 主页任务区，不在库页；`start_tianyi_install` 只负责入队 |
-| 已安装页空/扫描无效 | v0.21.0 起扫描入口在 **QAM 设置 → 安装**；仍以 `settings.install_dir` 为根、只扫一层、目录名匹配标题（§6.12），路径/名称不符会进 `unresolved_dirs`；自动补 Steam 失败看 `shortcut_error`（`exe_not_found`/`emulator_not_ready`/`rom_not_found`） |
-| 卸载行为与主页不同 | 原生库卸载固定 `delete_files=true`（不弹 compatdata 回收）；需要回收前缀用主页/网页库卸载选项 |
-
-**Web 库保留**：`defaults/tianyi_library_ui/` 仍可用 `http://127.0.0.1:59271/` 打开（桌面/调试/回退）；原生库通过 callable 直连 Python，不依赖本地 HTTP 与 CORS。
+| 点「游戏库」仍打开网页/无页面 | 确认插件版本 ≥0.27.20、前端 dist 已更新、Decky 已重载；fallback 会走全屏 route |
+| 左右键不能移动 | 检查横向区域是否有 `DFL.Focusable flow-children="row"`；普通 div 不够 |
+| 最左卡焦点环被裁 | 货架需 `padding-left:16px`、`scroll-snap-type:none`、`overflow-anchor:none`；卡片聚焦用自定义最近可见滚动，不要 `inline:"center"` |
+| 顶部蓝框/封面被裁 | 货架顶部 padding 10px，卡片 `scroll-margin-top:84px` |
+| 详情按钮被裁/溢出 | 详情 `margin-top:40px`、`max-height:calc(100vh - 150px)`、内容滚动区与操作栏分离 |
+| B 无反应 | 详情根节点必须 `DFL.Focusable onCancel=...`；库根节点也有 onCancel |
+| 更新按钮错位/不能左右 | 两个按钮必须同一个 `Focusable flow-children="row"` + DialogButton，不能用两个 ButtonItem |
+| 搜索/筛选低一截 | 搜索框用 placeholder，不要 label；按钮 `align-items:center` |
 
 ### 6.15 诊断自检（v0.22.0）
 
@@ -1044,12 +1066,12 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 
 - **诊断自检（v0.22.0）**：一次性快照，网络项受连通性影响；不自动修复，只给 detail/fix；`baidu_qr` 只输出 sign 长度（不含 sign/cookie）；导出包写 0600 zip 到下载目录并含 300 行日志（已脱敏），提交前建议自行过目；不支持在线查看日志/上传诊断包。
 
-- **Decky 原生游戏库（v0.20.0）**：库页只有列表/分页/安装与已安装动作，任务进度仍在 QAM 主页任务区；无封面卡片视图，固定 20 条/页；**v0.21.0 起扫描入口在设置（不在库页）**，仍只认 `settings.install_dir` 一层；卸载固定 `delete_files=true`（不弹 compatdata 回收）；网页库保留为备用，两套 UI 可能短暂不同步。
+- **Decky 原生游戏库（v0.20.0 起；v0.27.20）**：封面网格/Hero/分类货架/详情页、30 条/页+加载更多、双网盘源选择；任务进度仍在 QAM 主页任务区；扫描入口在设置，仍只认 `settings.install_dir` 一层；卸载固定 `delete_files=true`（不弹 compatdata 回收）；旧网页库仅调试/回退。
 - **扫描补 Steam 快捷方式（v0.21.0）**：PC 需能找到 .exe（排除常见安装器/运行库），模拟器需已安装（不自动下载），否则记 `shortcut_error`；只写 `shortcuts.vdf`，Steam 需重启/切用户/重开库页才可见；不覆盖已有同名同 exe 快捷方式。
 
 - **存储位置选择（v0.19.0）**：只显示已挂载且可写的外置子挂载（挂载根跳过）；容量为快照；不会自动创建/挂载/格式化，也不检测 Steam 库是否同盘；建议子目录固定 `freedeckCY/{downloads,installed}`。
 
-- **资源源只有天翼云盘**：百度网盘、模拟器整合、用户资源池只存在于 GitHub Releases（v0.5 之后 / NewFreedeck），**本仓库没有实现**。
+- **资源源**：天翼云盘 + 百度网盘扫码/Cookie（OpenAPI 可选回退）均已实现；模拟器资源在首次安装时按需下载；独立 Web 提交/管理系统不在本仓库、不进插件包。
 - **仅支持 SteamOS / Linux（含 DroidDeck 的 proot 环境）**：依赖 `7zz`、Proton、Steam 的 Linux 目录结构；Windows / macOS 无法运行。Steam 根目录支持原生 / Flatpak / **DroidDeck 双客户端**，SD 卡/第二块盘通过 `libraryfolders.vdf` 扫描。
 - **作者已停止维护**：上游不再更新，接口失效只能自行修；release 与仓库版本存在代差（仓库落后）。
 - **仅早期版本**：`package.json` 版本 0.8.0（fork 自上游 0.2 基线），功能和上游 release 里的成品有差距。
@@ -1124,7 +1146,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 
 ## 10. 提交前检查清单
 
-- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 548 用例）；
+- [ ] `make test`（或 `.venv/bin/pytest -q`）全绿（当前 555 用例）；
 - [ ] 改动运行期/Steam/卸载相关代码后，跑一次 `make doctor` 确认环境自检正常；
 - [ ] 改了目录数据后跑 `make normalize-catalog` 与 `make validate-catalog`（CI 会跑 `--strict`）；
 - [ ] 改 Ludusavi 清单相关代码后确认 `defaults/ludusavi/manifest.json.gz` 存在且随包（发布包应内置），本地跑 `tests/test_cloud_auto.py`；
@@ -1134,9 +1156,10 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 - [ ] 改 3DS Flatpak/启动脚本后跑 `tests/test_emulator.py -q` 的 flatpak/wrapper 用例；确认 `emulators.3ds.source` 与 wrapper 的 XWayland env；已有 3DS 记录会由后台 repair 重写；
 - [ ] 改库页时长逻辑后验证：原版 Steam 游戏详情页无块、插件游戏有块；`get_library_game_time_stats` 对未托管返回 `managed=false` 且不查 HLTB；`pytest tests/test_diagnostics.py -q`；
 - [ ] 改原生库返回逻辑后验证三种路径：modal「返回」、modal「Steam 库」、route「返回」；滚动后 sticky 栏仍可点；必要时用 `Navigation.NavigateBack` 回退验证；
-- [ ] 改原生库入口/百度 QR 后跑 `pnpm build`、重载插件：确认 `QAM 原生 UI v0.23.0`/`原生 UI · v0.23.0`、点游戏库走 modal；QR 超时日志包含 `Baidu QR ...`；
+- [ ] 改原生库入口/百度 QR 后跑 `pnpm build`、重载插件：确认插件版本 0.27.20、点游戏库走 modal；QR 超时日志包含 `Baidu QR ...`；
+- [ ] 改原生库布局/输入后，用真机 CEF 验最左卡左右焦点环、顶部蓝框、A/B/方向键、触控板滚动、详情操作栏完整可见；
 - [ ] 改诊断后跑 `pytest tests/test_diagnostics.py -q`，确认 checks 结构/summary；导出包含 `self-check.json` 且权限 0600；
-- [ ] 改原生库后跑 `pnpm build`、重载插件；确认 `/freedeckcy/library` 路由、搜索/筛选/分页、安装确认与已安装动作；`make test` 仍 351；
+- [ ] 改原生库后跑 `pnpm build`、重载插件；确认 `/freedeckcy/library` 路由、搜索/筛选/分页、安装确认与已安装动作；`make test` 仍 555；
 - [ ] 改存储检测后跑 `pytest tests/test_storage_options.py -q`，确认系统挂载过滤、外置目录/容量字段；QAM 路径页按钮能切换且刷新；
 - [ ] 改扫描已安装后跑 `pytest tests/test_install_pipeline.py -q`（扫描回填/自动补快捷方式用例），确认只扫一层、path/game_id 去重、同名同 exe 不重复、PC exe 查找与模拟器 wrapper；Steam 重启后再核对 `shortcuts.vdf`；
 - [ ] 改百度相关代码后跑 `python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q`（mock HTTP/扫码，不联网）；确认扫码 Cookie 只存 state、不写日志/诊断；

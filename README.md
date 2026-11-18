@@ -29,12 +29,24 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 | 资源目录 | `defaults/tianyi_catalog/freedeckcy_catalog.csv`（7084 条） |
 | Web 系统 | 独立项目，不在本仓库、不进入插件包；插件只通过 `catalog_url` 拉取并验签服务器 CSV |
 
+### 文档索引
+
+| 文档 | 内容 |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 实现结构、原生游戏库/输入模型、协议、数据与边界 |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 本地开发、真机 CEF 调试、测试、故障排查、提交清单 |
+| [docs/DROIDDECK.md](docs/DROIDDECK.md) | Android/ARM64 安装、功能支持、输入与排障 |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 后续方向与已落地状态 |
+| [docs/UPSTREAM_SERVER.md](docs/UPSTREAM_SERVER.md) | 上游服务器依赖分析（freedeckCY 不依赖） |
+| [CHANGELOG.md](CHANGELOG.md) | 逐版本变更记录 |
+
 ## 核心功能
 
 ### 游戏库与下载
 
 - **Decky 原生游戏库**：插件内浏览、搜索、平台/分类筛选、排序、分页、加载更多、已安装页，不依赖网页。
 - **游戏库三阶段视觉改版**：响应式封面网格、Hero 推荐区、卡片来源/已安装角标、折叠筛选工具栏、分类货架、海报式详情页、已安装卡片、骨架屏与焦点动效。
+- **Steam Deck 原生输入**：D-pad/左摇杆焦点导航、A 选择、B 关闭详情/游戏库、L1/R1 切页、L2/R2 翻页；触控板/触摸纵向列表与横向货架滚动；焦点卡片自动滚入可视区，焦点环/顶部安全区完整可见。
 - **单/双网盘资源**：
   - 单天翼条目、单百度条目都可直接入目录。
   - 同一游戏同时有天翼和百度时自动合并，详情页让用户选择「天翼云盘 / 百度网盘」。

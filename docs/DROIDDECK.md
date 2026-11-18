@@ -1,6 +1,6 @@
 # 在 DroidDeck 上使用 freedeckCY
 
-[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）、v0.15.0 起模拟器存档纳入云存档上传、v0.16.0 起模拟器存档恢复 + PSP/PS3/3DS 按游戏拆分 + PS1 多碟 m3u、v0.17.0 起百度网盘扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退）、v0.18.0 起扫描已安装游戏 + 百度扫码错误诊断、v0.19.0 起下载/安装目录支持 SD 卡/外置存储选择、v0.20.0 起 Decky 原生游戏库（不再依赖网页）、v0.21.0 起扫描已安装移到设置并自动补 Steam 快捷方式、v0.22.0 起诊断自检 + 一键诊断包、v0.23.0 起原生库 modal 兜底/版本标识 + 百度扫码超时、v0.24.0 起原生库返回/关闭修复、v0.25.0 起 Steam 原有游戏不再显示插件时长块也可在 DroidDeck 上使用；本文是安装与排障说明。
+[DroidDeck](https://github.com/Droid-Deck/DroidDeck) 是在 Android 手机上运行 SteamOS 运行时的开源项目：它自带 Linux 桌面、Steam 游戏模式，并支持 **[Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件**。freedeckCY 从 v0.4.0 起适配 DroidDeck，v0.6.0 起 GBA 模拟器闭环、v0.7.0 起通用模拟器注册表（GBA/PSP/NDS）、v0.8.0 起 Ludusavi + gamewatch 自动云存档、v0.9.0 起 PS1/FC/MD、v0.10.0 起全部模拟器改为在线下载、v0.11.0 起 10 平台 + 架构能力矩阵（DroidDeck 自动隐藏 3DS/PS2/PS3）、v0.12.0 起安装后自动部署 BIOS/固件并写 portable 配置、v0.13.0 起网页库支持仓库游戏提交（Issue/PR）、v0.14.0 起百度网盘（官方 OpenAPI）、v0.14.1 起 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak，无 Flatpak 回退 AppImage）、v0.15.0 起模拟器存档纳入云存档上传、v0.16.0 起模拟器存档恢复 + PSP/PS3/3DS 按游戏拆分 + PS1 多碟 m3u、v0.17.0 起百度网盘扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退）、v0.18.0 起扫描已安装游戏 + 百度扫码错误诊断、v0.19.0 起下载/安装目录支持 SD 卡/外置存储选择、v0.20.0 起 Decky 原生游戏库（不再依赖网页）、v0.21.0 起扫描已安装移到设置并自动补 Steam 快捷方式、v0.22.0 起诊断自检 + 一键诊断包、v0.23.0 起原生库 modal 兜底/版本标识 + 百度扫码超时、v0.24.0 起原生库返回/关闭修复、v0.25.0 起 Steam 原有游戏不再显示插件时长块、v0.26.x 做架构/稳定性修复、v0.27.0–v0.27.20 做原生游戏库视觉重构与 Steam Deck 手柄/触控板适配（DroidDeck 同样使用 Decky 焦点系统，触控/手柄逻辑可复用）。本文对应 **v0.27.20**，是安装与排障说明。
 
 > 适配基于 DroidDeck 的源码与 ARM64 运行时结构，**尚未在真机上完整验证**。遇到问题请按文末“排障”收集日志。
 
@@ -25,12 +25,13 @@ freedeckCY 的处理方式：
 - 3DS（Azahar，v0.14.1）：SteamOS 3.9.5 上优先官方 Flathub Flatpak `org.azahar_emu.Azahar`（AppImage 有上游 #127/#953 兼容问题）；**DroidDeck/aarch64 没有 3DS 官方 arm64 包，目录里仍不显示 3DS**（架构白名单，见 §9.8）。如果设备能跑 x86_64 且装有 flatpak，则自动用 Flatpak、失败回退 AppImage；3DS 启动脚本会强制 XWayland（`QT_QPA_PLATFORM=xcb`/`SDL_VIDEODRIVER=x11`）；system files 放 `~/.local/share/freedeckCY/bios/3ds/sysdata/`，会部署到 azahar/citra 与 `~/.var/app/org.azahar_emu.Azahar/data/{azahar,azahar-emu}/sysdata`。已有 3DS 快捷方式由后台自动重写，无需重装。
 - 库页时长隔离（v0.25.0）：Steam 原有游戏详情页不再出现 freedeckCY 的「已玩/主线/总时长」块——前端只在 `managed===true` 时渲染，未匹配直接 `return null`；后端先按 AppID、再按标题匹配插件安装记录，未匹配返回 `managed=false` 且不查 HLTB。只影响插件安装/补录的游戏，DroidDeck 上同样生效。
 - 库页时长（v0.25.0）：仅 `managed=true` 显示；AppID 优先降低同名误判但非绝对；HLTB 失败只影响块内数值；依赖 Steam 库页结构。
-- 原生库返回（v0.24.0）：库页顶部有 **sticky 固定栏**「返回 / Steam 库 / 刷新」（滚动仍可见），标题栏也保留「返回」；modal 模式「返回」调 `onClose` 关闭弹层，全屏 route 模式用 `Navigation.NavigateBack()`；「Steam 库」关闭弹层后 `Router.NavigateToLibraryTab()` 回 Steam 库页（DroidDeck 上该 API 不可用时回退 `NavigateBack`）。Steam 覆盖层的 B/Esc 不一定能关 modal，优先点显式按钮。
-- 原生库入口（v0.23.0）：QAM 主页「游戏库」优先 `showModal(<LibraryPage />)` 原生弹层，失败才 `Navigation.Navigate("/freedeckcy/library")`；主页显示 `QAM 原生 UI v0.23.0`、库页标题下显示 `原生 UI · v0.23.0`——看不到标识说明前端 dist 未更新/插件未重载，可能仍打开旧网页。
+- 原生库返回（v0.24.0；v0.27.20）：库页顶部有「返回 / Steam 库 / 刷新」工具栏（v0.27.3 起因 QAM sticky 偏移改为普通流式）；modal 模式「返回」调 `onClose` 关闭弹层，全屏 route 模式用 `Navigation.NavigateBack()`；「Steam 库」关闭弹层后 `Router.NavigateToLibraryTab()` 回 Steam 库页（DroidDeck 上该 API 不可用时回退 `NavigateBack`）。B 键在详情/库根节点绑定 `onCancel`；仍可用显式按钮兜底。
+- 原生库入口（v0.20.0 起；v0.27.20 当前）：QAM 主页「游戏库」优先 `showModal(<LibraryPage />)` 原生弹层，失败才 `Navigation.Navigate("/freedeckcy/library")`；v0.27.20 起不再显示 UI 版本标识，版本以 Decky 插件列表/`package.json` 为准。
+- 手柄/触控板（v0.27）：D-pad/左摇杆在 `flow-children` 分组内移动；A 选择，B 关闭详情/游戏库，L1/R1 切换游戏库/已安装，L2/R2 翻页；触控板/触摸纵向列表与横向货架滚动。焦点卡自动滚入可视区，最左卡焦点环/顶部蓝框不被裁。
 - 百度扫码超时（v0.23.0）：点击立即 toast「正在获取百度二维码...」；前端 20s/15s、后端 12s/10s 超时，提示"获取百度二维码超时（网络/TLS 可能受阻...）"；DroidDeck/proot 网络/TLS 受限时按提示重试或运行诊断。
 - 诊断自检（v0.22.0）：QAM 设置 → 「诊断」→「运行自检」显示 summary（OK/警告/失败/跳过）和每项检查（插件/state/下载安装目录/runtime/目录数据/Steam/存储/天翼网络/百度 QR/任务/日志）与建议；「导出诊断包」把 `freedeckcy-diagnostics-<时间>.zip` 写到 proot 内下载目录（`settings.download_dir`，未设置则插件下载目录/`~/Downloads`），权限 0600，toast 显示路径。DroidDeck 上 runtime 检查会看 `defaults/runtime/aarch64/` 的 aria2c/7zz/node；Steam 检查看当前正在运行的客户端；网络/百度 QR 受 proot 网络限制。
 - 扫描已安装（v0.21.0 位置变更）：入口在 **QAM 设置 → 安装 → 「扫描已安装游戏」**（原生库已安装页不再有扫描按钮；网页库按钮保留备用）。扫描仍以 proot 内 `settings.install_dir` 为根、只扫一层、目录名匹配标题；对没有快捷方式的游戏会自动补建：PC 找 `.exe`，模拟器需已安装（不自动下载）并生成 wrapper；成功后 toast 显示"自动加入 Steam：N"。**Steam 需要重启/切用户/重开库页**才能在 DroidDeck 里看到新快捷方式。
-- Decky 原生游戏库（v0.20.0）：QAM 主页「游戏库」直接进原生页面（路由 `/freedeckcy/library`），不再打开本地网页；含「游戏库 / 已安装 / 刷新」Tab、搜索 + 平台/分类/排序下拉、20 条/页分页、安装确认（下载/安装大小、目标目录、模拟器/BIOS/setup 提示）与已安装启动/目录/卸载。扫描入口 v0.21.0 起移到设置；安装进度在 QAM 主页任务区。网页库保留为备用（桌面浏览器/回退）。
+- Decky 原生游戏库（v0.20.0；v0.27.20 视觉/输入重构）：QAM 主页「游戏库」进入原生封面网格/Hero/分类货架/详情页，不再打开本地网页；搜索 + 平台/分类/排序筛选、30 条/页 + 加载更多、双网盘下载源选择；已安装页签支持启动/目录/卸载。扫描入口在设置；安装进度在 QAM 主页任务区。旧本地网页库仅桌面调试/回退。
 - 存储位置选择（v0.19.0）：QAM「设置 → 路径」会在下载/安装目录下显示检测到的外置挂载按钮（如 `/storage/emulated/0`、`/sdcard`、`/mnt/...`；标签「SD 卡 / 外置：<目录名>（剩余 X）」），点一下就把目录切到 `<mount>/freedeckCY/downloads|installed`。**只显示已挂载且 proot/Android 下可写的子挂载**；/storage、/sdcard、/mnt 挂载根本身会被跳过；权限不足/只读/未挂载不显示；插件不会自动创建/挂载/格式化，也不检测 Steam 库是否同盘。原「选择下载目录/安装目录」仍保留。
 - 扫描已安装（v0.18.0 起，v0.21.0 迁移）：网页库「已安装」工具栏按钮仍作为备用（`POST /api/tianyi/installed/scan`）；主入口在 QAM 设置 → 安装。DroidDeck 上安装目录通常是 proot 内路径（如 `/root/Games`），插件只扫 `settings.install_dir` **一层子目录**；目录名需与目录标题匹配，v0.21.0 起会自动补建 Steam 快捷方式（见上一条）。
 - 百度网盘（v0.17.0，扫码/Cookie 主链路）：aarch64 与 x86_64 行为一致（纯 HTTPS API，无本地二进制）。QAM「百度网盘（扫码登录）」→「扫码登录百度网盘」→ 用手机百度 App/百度网盘 App 扫码确认；Cookie 写入 proot 内 `~/.local/share/freedeckCY/tianyi/state.json` 的 `baidu_login`，之后百度分享可直接安装，不需要开放平台 App Key。Cookie 会过期/被风控，失效后重新扫码；扫码 session 仅内存 180s。**OpenAPI（v0.14.0）保留为可选回退**（自建应用 + OAuth，无 Cookie 时才用）。**不接 CDP/网页逆向**。详见 [ARCHITECTURE.md](ARCHITECTURE.md) §5.13 / [DEVELOPMENT.md](DEVELOPMENT.md) §6.11。
@@ -101,10 +102,11 @@ make package-droiddeck           # 产出 dist-artifacts/freedeckCY-v<version>-a
 | 模拟器 BIOS/固件部署（v0.12.0） | ✅ 安装后自动部署 `bios/<platform>/`（支持压缩包，7zz 解压缓存）；aarch64 可用 PS1/NDS/Switch 的部署与 GBA/PSP 全屏配置；PS2/PS3/3DS 仅 x86_64 |
 | 仓库游戏提交（v0.13.0） | ✅ 网页库「提交游戏」按钮打开 GitHub Issue 表单；或直接 PR `submissions/*.json`。无设备特定逻辑，DroidDeck 与 Steam Deck 行为一致 |
 | 模拟器存档上传/恢复（v0.15.0 / v0.16.0） | ✅ aarch64 可用：按 proot 内 HOME 发现/恢复 GBA/PSP/NDS/PS1/FC/MD/Switch 存档；恢复走白名单目标 + `*.freedeckcy-bak-*` 备份，冲突需确认；PSP 按 PARAM.SFO 拆分；PS1 多碟 m3u 可用；3DS 拆分随平台隐藏（仅 x86_64） |
-| Decky 原生游戏库（v0.20.0） | ✅ aarch64 可用：QAM 原生路由 `/freedeckcy/library`，搜索/筛选/分页/安装确认/已安装动作齐全；不依赖网页与本地 HTTP |
+| Decky 原生游戏库（v0.20.0；v0.27.20） | ✅ aarch64 可用：QAM 原生封面网格/Hero/筛选/详情页/已安装动作；不依赖网页与本地 HTTP |
+| 手柄/触控板（v0.27） | ✅ DroidDeck 触控/手柄走 Decky 焦点系统：A/B、方向键、L1/R1、L2/R2、触控滚动；与 Steam Deck 共用同一实现 |
 | 库页时长隔离（v0.25.0） | ✅ aarch64 可用：仅插件安装/补录游戏显示时长块；Steam 原有游戏 `managed=false` 不插入、不查 HLTB |
 | 原生库返回/关闭（v0.24.0） | ✅ aarch64 可用：sticky「返回/Steam 库/刷新」+ 标题栏返回；modal 用 `onClose`，route 用 `NavigateBack`；「Steam 库」走 `NavigateToLibraryTab`（不可用则回退） |
-| 原生库 modal 兜底/QR 超时（v0.23.0） | ✅ aarch64 可用：游戏库优先 modal、全屏路由兜底；主页/库页版本标识；百度扫码前后端超时与明确提示 |
+| 原生库 modal 兜底/QR 超时（v0.23.0） | ✅ aarch64 可用：游戏库优先 modal、全屏路由兜底；v0.27.20 起不再显示 UI 版本标识；百度扫码前后端超时与明确提示 |
 | 诊断自检/诊断包（v0.22.0） | ✅ aarch64 可用：QAM 设置「诊断」运行自检、导出 0600 zip 到 proot 下载目录；runtime 检查 aarch64 组件，网络/百度 QR 受 proot 限制 |
 | 扫描已安装 + 自动补 Steam（v0.21.0） | ✅ 入口在设置 → 安装；扫描 proot 内 `install_dir` 一层，自动补建 PC/模拟器快捷方式（模拟器未安装不下载，记 `shortcut_error`）；Steam 需重启/切用户/重开库页才显示 |
 | 存储位置选择（v0.19.0） | ✅ aarch64 可用：QAM 路径页按 `/storage`、`/sdcard`、`/mnt` 等可写挂载渲染「下载/安装到 …（剩余 X）」按钮，一键切换；只读/未挂载不显示 |
@@ -269,7 +271,7 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 
 **点游戏库仍打开旧网页 / QR 点了没反应**
 
-- v0.23.0 起游戏库优先 `showModal(<LibraryPage />)`；看不到 `QAM 原生 UI v0.23.0`（主页）或 `原生 UI · v0.23.0`（库页）说明 dist 未更新/插件未重载，重装/重载后再试。
+- v0.20.0 起游戏库优先 `showModal(<LibraryPage />)`；v0.27.20 起不再显示 UI 版本标识，先确认插件版本为 0.27.20、dist 已更新、Decky 已重载。
 - 百度扫码点击后应立刻出现 toast；若超时，提示会带"网络/TLS 可能受阻"，看 `/tmp/freedeckcy.log` 的 `Baidu QR` 关键字，或运行诊断。
 
 **诊断自检失败 / 诊断包导出失败**
@@ -316,12 +318,12 @@ ls -l defaults/runtime/aria2/aarch64/aria2c \
 - 百度网盘（v0.17.0）主链路是扫码登录（BDUSS/Cookie）：需要手机百度 App 扫码，Cookie 会过期/被风控、失效需重扫；扫码 session 仅内存 180s；OpenAPI 是可选回退（自建应用/授权，转存 `/FreedeckTmp` 占网盘空间）；不接 CDP/网页逆向；扫码确认/换 Cookie 尚未真机验证；aarch64 与 x86_64 行为一致。
 - 仓库游戏提交（v0.13.0）只依赖网页/GitHub，无设备特定逻辑；DroidDeck 上没有额外限制（除了需要能打开 GitHub 的浏览器）。
 - DroidDeck 升级/重装 Decky 可能清空插件，需重新导入 zip。
-- 原生库返回（v0.24.0）：modal/route 返回逻辑不同，Steam 覆盖层 B/Esc 不保证生效；以 sticky 栏/标题栏显式按钮为准；route 返回依赖导航栈。
-- 原生库/扫码超时（v0.23.0）：modal 失败才走路由，旧 dist/未重载可能仍打开网页（以 `QAM 原生 UI v0.23.0` 标识为准）；扫码超时依赖 proot 网络/TLS，只提示不自动重试。
+- 原生库返回（v0.24.0；v0.27.20 起 B 键绑定 onCancel）：modal/route 返回逻辑不同；B 键在详情/游戏库根节点已绑定，仍建议用显式按钮兜底；route 返回依赖导航栈。
+- 原生库/扫码超时：modal 失败才走路由；版本以 Decky 插件列表/`package.json` 为准；扫码超时依赖 proot 网络/TLS，只提示不自动重试。
 - 诊断自检（v0.22.0）是一次性快照，网络项受 proot 连通性影响；`baidu_qr` 只输出 sign 长度（不含 sign/cookie）；导出包含 300 行日志（已脱敏），提交前自行过目；不支持在线查看日志/上传诊断包。
-- 原生游戏库（v0.20.0）只有列表/分页/安装与已安装动作，任务进度在主页任务区；无封面卡片视图；**v0.21.0 起扫描入口在设置**，仍只认 `settings.install_dir` 一层；卸载固定删文件（不弹 compatdata 回收）；网页库保留备用。
+- 原生游戏库（v0.20.0；v0.27.20）：封面网格/Hero/筛选/详情/已安装动作齐全；任务进度在主页任务区；扫描入口在设置，仍只认 `settings.install_dir` 一层；卸载固定删文件（不弹 compatdata 回收）；旧网页库仅调试/回退。
 - 扫描补 Steam（v0.21.0）只写 `shortcuts.vdf`，需重启 Steam/切用户/重开库页才可见；模拟器未安装不自动下载；PC 找不到 exe/ROM 会跳过并记 `shortcut_error`。
 - 存储位置选择依赖 `/proc/mounts` 与 proot 内可写权限；Android 的 `/storage/emulated/0` 等路径可见性/可写性因设备而异，插件不自动挂载/格式化；不会检测 Steam 库同盘。
 - 扫描已安装依赖 proot 内 `settings.install_dir` 可见、目录名与目录标题匹配；只扫一层；v0.21.0 起会自动补建 Steam 快捷方式（模拟器未安装不下载，记 `shortcut_error`；Steam 需重启/切用户/重开库页才显示）；百度扫码要求手机 App 与网络可达 `passport.baidu.com`。
-- 本版测试基线：`make test` → 555 passed（2026-11 v0.26.29）。
+- 本版测试基线：`make test` → 555 passed（2026-11 v0.27.20）。
 - 本插件不修改 DroidDeck 自身的启动参数或系统设置，只读写 Steam 用户配置与游戏目录。
