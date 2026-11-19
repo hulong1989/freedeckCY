@@ -704,6 +704,16 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def diagnose_tianyi_task(self, payload=None, task_id: str = "") -> dict:
+        """诊断失败任务并给出处理建议。"""
+        try:
+            if isinstance(payload, dict):
+                task_id = str(payload.get("task_id", task_id))
+            data = await self._get_tianyi_service().diagnose_task(task_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def pause_all_tianyi_tasks(self) -> dict:
         """全部暂停下载。"""
         try:

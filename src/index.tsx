@@ -153,6 +153,7 @@ const resumeTianyiTask = callable("resume_tianyi_task");
 const removeTianyiTask = callable("remove_tianyi_task");
 const retryTianyiTask = callable("retry_tianyi_task");
 const retryTianyiTaskWithFallback = callable("retry_tianyi_task_with_fallback");
+const diagnoseTianyiTask = callable("diagnose_tianyi_task");
 const previewTianyiUninstall = callable("preview_tianyi_uninstall");
 const uninstallTianyiInstalledGame = callable("uninstall_tianyi_installed_game");
 const PANEL_REQUEST_TIMEOUT_MS = 6000;
@@ -2856,6 +2857,41 @@ function Content() {
             setTaskActionKey("");
         }
     }, [syncState, taskActionKey]);
+    const onDiagnoseTask = SP_REACT.useCallback(async (task) => {
+        if (taskActionKey)
+            return;
+        const taskId = String(task.task_id || "").trim();
+        if (!taskId)
+            return;
+        setTaskActionKey(`diagnose:${taskId}`);
+        try {
+            const result = await withTimeout(diagnoseTianyiTask({ task_id: taskId }), 20000, "诊断超时");
+            if (result.status !== "success")
+                throw new Error(result.message || "诊断失败");
+            const data = result.data || {};
+            const stageLabels = { resolve: "解析链接", download: "下载", extract: "解压", install: "安装" };
+            const lines = [
+                `阶段：${stageLabels[data.stage] || data.stage || "-"}`,
+                `原因：${data.reason || "-"}`,
+                "",
+                ...(data.suggestions || []).map((item) => `• ${item}`),
+            ];
+            DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, {
+                strTitle: `任务诊断：${data.title || taskId}`,
+                strDescription: lines.join("\n"),
+                strOKButtonText: "完成",
+                strCancelButtonText: "关闭",
+                onOK: () => { },
+                onCancel: () => { },
+            }));
+        }
+        catch (error) {
+            toastError(error);
+        }
+        finally {
+            setTaskActionKey("");
+        }
+    }, [taskActionKey]);
     const onPauseAllTasks = SP_REACT.useCallback(async () => {
         if (batchBusy)
             return;
@@ -3018,7 +3054,7 @@ function Content() {
                         background: "rgba(255, 255, 255, 0.12)",
                         color: "#f2f2f2",
                     };
-                    return (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [TaskProgressRow(task), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%", marginTop: "4px" }, children: [canPause && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("pause", task), onOKButton: () => void performTaskAction("pause", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "暂停" }) })), canResume && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("resume", task), onOKButton: () => void performTaskAction("resume", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "继续" }) })), canRetry && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("retry", task), onOKButton: () => void performTaskAction("retry", task), disabled: Boolean(taskActionKey), style: {
+                    return (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [TaskProgressRow(task), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%", marginTop: "4px" }, children: [canRetry && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onDiagnoseTask(task), onOKButton: () => void onDiagnoseTask(task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "诊断" }) })), canPause && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("pause", task), onOKButton: () => void performTaskAction("pause", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "暂停" }) })), canResume && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("resume", task), onOKButton: () => void performTaskAction("resume", task), disabled: Boolean(taskActionKey), style: buttonStyle, children: busy ? "处理中..." : "继续" }) })), canRetry && (SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("retry", task), onOKButton: () => void performTaskAction("retry", task), disabled: Boolean(taskActionKey), style: {
                                                 minWidth: "76px",
                                                 borderRadius: "10px",
                                                 border: "1px solid rgba(120, 200, 255, 0.45)",

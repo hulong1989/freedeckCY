@@ -7519,6 +7519,70 @@ class TianyiService(UpdateFlowMixin):
         self._invalidate_panel_cache(tasks=True)
         return _task_to_view(task)
 
+    def _has_alternate_source(self, task: TianyiTaskRecord) -> bool:
+        """判断同一游戏是否有另一个可用网盘源。"""
+        current_entry = self.catalog.get_by_game_id(str(task.game_id or ""))
+        if current_entry is None:
+            return False
+        current_provider = self._catalog_provider_key(current_entry)
+        current_title = self._normalize_cover_text(str(current_entry.title or ""))
+        current_platform = str(current_entry.platform or "")
+        for entry in list(self.catalog.entries or []):
+            if str(entry.game_id or "") == str(current_entry.game_id or ""):
+                continue
+            if str(entry.platform or "") != current_platform:
+                continue
+            if self._normalize_cover_text(str(entry.title or "")) != current_title:
+                continue
+            provider = self._catalog_provider_key(entry)
+            if provider in {"other", current_provider}:
+                continue
+            if str(entry.down_url or "").strip():
+                return True
+        return False
+
+    async def diagnose_task(self, task_id: str) -> Dict[str, Any]:
+        """对失败任务给出阶段、原因和建议。"""
+        task = self._find_task(task_id)
+        if task is None:
+            raise ValueError("任务不存在")
+        reason = str(task.error_reason or task.install_message or "").strip()
+        status = str(task.status or "").strip()
+        install_status = str(task.install_status or "").strip()
+        stage = "download"
+        if any(word in reason for word in ("解压", "7z", "archive", "压缩包")):
+            stage = "extract"
+        elif any(word in reason for word in ("快捷方式", "Steam", "Proton", "安装目录")):
+            stage = "install"
+        elif any(word in reason for word in ("直链", "解析", "登录", "分享", "链接")):
+            stage = "resolve"
+        elif install_status in {"failed", "gave_up"}:
+            stage = "install"
+        elif status == "error":
+            stage = "download"
+        suggestions: List[str] = []
+        if stage == "resolve":
+            suggestions.extend(["重新登录对应网盘", "确认分享链接未过期", "换一个下载源重试"])
+        elif stage == "download":
+            suggestions.extend(["检查网络连接", "重试当前源", "换一个下载源重试"])
+        elif stage == "extract":
+            suggestions.extend(["确认压缩包完整", "检查磁盘剩余空间", "换源重新下载"])
+        else:
+            suggestions.extend(["检查安装目录和启动文件", "重新写入 Steam 快捷方式", "文件缺失时重新下载安装"])
+        can_fallback = self._has_alternate_source(task)
+        can_retry = status in {"error", "complete"} or install_status in {"failed", "gave_up"}
+        return {
+            "task_id": str(task.task_id or ""),
+            "title": str(task.game_title or task.file_name or ""),
+            "stage": stage,
+            "status": status,
+            "install_status": install_status,
+            "reason": reason or "未记录具体错误",
+            "suggestions": suggestions,
+            "can_retry": bool(can_retry),
+            "can_fallback": bool(can_fallback),
+        }
+
     @staticmethod
     def _catalog_provider_key(entry: Any) -> str:
         """把 catalog 条目归一成 tianyi/baidu/other，用于换源比较。"""
