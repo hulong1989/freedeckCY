@@ -54,6 +54,13 @@ export function useLanguage(): Language {
 function translatePatterns(value: string): string {
     let output = value;
     const rules: Array<[RegExp, string]> = [
+        [/共\s*(\d+)\s*个游戏，正常\s*(\d+)\s*个，异常\s*(\d+)\s*个。/g, "Total $1 games, $2 OK, $3 issues."],
+        [/…另有\s*(\d+)\s*个/g, "…and $1 more"],
+        [/任务诊断：/g, "Task Diagnostics: "],
+        [/阶段：/g, "Stage: "],
+        [/原因：/g, "Reason: "],
+        [/环境检查：/g, "Environment Check: "],
+        [/(\d+)\s*个游戏/g, "$1 games"],
         [/(\d[\d,]*)\s*款游戏/g, "$1 games"],
         [/(\d[\d,]*)\s*款已安装/g, "$1 installed"],
         [/(\d[\d,]*)\s*款/g, "$1 items"],
@@ -71,6 +78,9 @@ function translatePatterns(value: string): string {
         [/(\d+)\s*个文件/g, "$1 files"],
         [/(\d+)\s*个/g, "$1"],
         [/／/g, "/"],
+        [/：/g, ": "],
+        [/，/g, ", "],
+        [/。/g, ". "],
     ];
     for (const [pattern, replacement] of rules) {
         output = output.replace(pattern, replacement);

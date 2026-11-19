@@ -126,6 +126,8 @@ POST_PROCESS_MAX_ATTEMPTS = 5
 EXTRACT_FREE_SPACE_MARGIN = 1.05
 # 安装空间估算系数（压缩包 -> 解压后），仅用于给用户提示，不作为硬性拦截。
 INSTALL_SPACE_ESTIMATE_FACTOR = 1.5
+# 安装前环境自检的磁盘剩余空间下限（真正的空间校验在安装计划里按文件大小做）。
+PREFLIGHT_MIN_FREE_BYTES = 512 * 1024 * 1024
 LOCAL_WEB_READY_TIMEOUT_SECONDS = 3.0
 LOCAL_WEB_PROBE_TIMEOUT_SECONDS = 1.2
 CAPTURE_DEFAULT_TIMEOUT_SECONDS = 240
@@ -7924,24 +7926,74 @@ class TianyiService(UpdateFlowMixin):
             "checks": checks,
         }
 
+    @staticmethod
+    def _preflight_probe_path(target: str) -> str:
+        """返回 target 自身或最近的存在祖先，用于可写性与空间探测。"""
+        probe = str(target or "").strip()
+        while probe and not os.path.exists(probe):
+            parent = os.path.dirname(probe)
+            if not parent or parent == probe:
+                return ""
+            probe = parent
+        return probe if probe and os.path.exists(probe) else ""
+
     async def preflight_install(self) -> Dict[str, Any]:
-        """下载/安装前环境自检。"""
-        import shutil
+        """下载/安装前环境自检：目录可写性与剩余空间（不创建目录）。"""
         checks: List[Dict[str, Any]] = []
-        download_dir = str(self.store.settings.download_dir or os.path.expanduser("~/Downloads"))
-        install_dir = str(self.store.settings.install_dir or os.path.expanduser("~/Games/freedeckCY"))
-        for key, path in (("download_dir", download_dir), ("install_dir", install_dir)):
+        settings = self.store.settings
+        targets = {
+            "download_dir": str(settings.download_dir or os.path.expanduser("~/Downloads")),
+            "install_dir": str(settings.install_dir or os.path.expanduser("~/Games/freedeckCY")),
+        }
+        resolved: Dict[str, str] = {}
+        for key, path in targets.items():
             target = os.path.realpath(os.path.expanduser(path))
+            resolved[key] = target
+            path_exists = os.path.exists(target)
             exists = os.path.isdir(target)
-            writable = bool(exists and os.access(target, os.W_OK))
-            checks.append({"id": key, "ok": writable, "path": target, "message": "" if writable else ("目录不存在" if not exists else "目录不可写")})
-        try:
-            usage = shutil.disk_usage(os.path.realpath(os.path.expanduser(download_dir)))
-            free = int(usage.free)
-            checks.append({"id": "disk_free", "ok": free > 512 * 1024 * 1024, "free_bytes": free, "message": "" if free > 512 * 1024 * 1024 else "剩余空间不足 512MB"})
-        except Exception as exc:
-            checks.append({"id": "disk_free", "ok": False, "message": f"无法读取磁盘空间：{exc}"})
-        return {"ok": all(item.get("ok") for item in checks), "checks": checks}
+            probe = target if exists else self._preflight_probe_path(target)
+            if path_exists and not exists:
+                writable = False
+                message = "路径不是目录"
+            else:
+                writable = bool(probe and os.path.isdir(probe) and os.access(probe, os.W_OK))
+                message = ""
+                if not writable:
+                    message = "目录不可写" if exists else ("上级目录不存在" if not probe else "上级目录不可写")
+                elif not exists:
+                    message = "目录不存在，安装时会自动创建"
+            checks.append({
+                "id": key,
+                "ok": writable,
+                "path": target,
+                "exists": exists,
+                "message": message,
+            })
+
+        for key, check_id in (("download_dir", "disk_free"), ("install_dir", "disk_free_install")):
+            target = resolved[key]
+            probe = target if os.path.isdir(target) else self._preflight_probe_path(target)
+            if not probe:
+                checks.append({"id": check_id, "ok": False, "path": target, "free_bytes": 0, "message": "无法定位可用的上级目录"})
+                continue
+            try:
+                free = int(shutil.disk_usage(probe).free)
+            except Exception as exc:
+                checks.append({"id": check_id, "ok": False, "path": probe, "free_bytes": 0, "message": f"无法读取磁盘空间：{exc}"})
+                continue
+            ok = free >= PREFLIGHT_MIN_FREE_BYTES
+            checks.append({
+                "id": check_id,
+                "ok": ok,
+                "path": probe,
+                "free_bytes": free,
+                "message": "" if ok else f"剩余空间不足 {PREFLIGHT_MIN_FREE_BYTES // (1024 * 1024)}MB",
+            })
+        return {
+            "ok": all(item.get("ok") for item in checks),
+            "checks": checks,
+            "min_free_bytes": PREFLIGHT_MIN_FREE_BYTES,
+        }
 
     async def installed_health_report(self) -> Dict[str, Any]:
         """扫描全部已安装游戏，汇总健康状态。"""

@@ -113,6 +113,7 @@ const prepareTianyiInstall = callable("prepare_tianyi_install");
 const startTianyiInstall = callable("start_tianyi_install");
 const listTianyiInstalledGames = callable("list_tianyi_installed_games");
 const getTianyiInstalledHealth = callable("get_tianyi_installed_health");
+const preflightTianyiInstall = callable("preflight_tianyi_install");
 const launchTianyiInstalledGame = callable("launch_tianyi_installed_game");
 const openTianyiInstalledFolder = callable("open_tianyi_installed_folder");
 const repairTianyiInstalledGame = callable("repair_tianyi_installed_game");
@@ -1308,12 +1309,42 @@ function pollIntervalByMode(mode) {
         return PANEL_BACKGROUND_POLL_MS;
     return PANEL_IDLE_POLL_MS;
 }
+function InstallPreflightSection({ report, busy, onRun }) {
+    const checks = Array.isArray(report?.checks) ? report.checks : [];
+    const labels = {
+        download_dir: "下载目录",
+        install_dir: "安装目录",
+        disk_free: "下载盘剩余空间",
+        disk_free_install: "安装盘剩余空间",
+    };
+    return (SP_JSX.jsxs(DFL.PanelSection, { title: "安装环境检查", children: [
+            SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.86 }, children: "检查下载/安装目录是否可写、磁盘剩余空间是否充足；开始安装时也会自动检查，异常时仍可选择继续。" }) }),
+            SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onRun, disabled: busy, children: busy ? "检查中..." : "检查安装环境" }) }),
+            report ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "4px", width: "100%" }, children: [
+                        SP_JSX.jsx("div", { style: { fontWeight: 600, color: report.ok ? "#9fe6a8" : "#ffb4a8" }, children: report.ok ? "环境正常" : "环境异常" }),
+                        checks.map((check, index) => {
+                            const ok = Boolean(check.ok);
+                            const label = labels[check.id] || check.id || "检查项";
+                            return (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "1px", fontSize: "11px", lineHeight: 1.5 }, children: [
+                                    SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px" }, children: [
+                                            SP_JSX.jsx("span", { children: label }),
+                                            SP_JSX.jsx("span", { style: { color: ok ? "#9fe6a8" : "#ffb4a8" }, children: ok ? "正常" : "异常" }),
+                                        ] }),
+                                    check.path ? (SP_JSX.jsx("div", { style: { opacity: 0.72, wordBreak: "break-all" }, children: check.path })) : null,
+                                    check.message ? (SP_JSX.jsx("div", { style: { color: ok ? "#b9c9d8" : "#ffb4a8" }, children: check.message })) : null,
+                                ] }, `${check.id || "check"}-${index}`));
+                        }),
+                    ] }) })) : null,
+        ] }));
+}
 function SettingsPage() {
     const language = useLanguage();
     const [loading, setLoading] = SP_REACT.useState(true);
     const [saving, setSaving] = SP_REACT.useState(false);
     const [clearingLogin, setClearingLogin] = SP_REACT.useState(false);
     const [scanningInstalled, setScanningInstalled] = SP_REACT.useState(false);
+    const [preflightReport, setPreflightReport] = SP_REACT.useState(null);
+    const [preflightBusy, setPreflightBusy] = SP_REACT.useState(false);
     const [updatingCatalog, setUpdatingCatalog] = SP_REACT.useState(false);
     const [catalogUpdateMessage, setCatalogUpdateMessage] = SP_REACT.useState("");
     const [diagnosticsReport, setDiagnosticsReport] = SP_REACT.useState(null);
@@ -1912,6 +1943,25 @@ function SettingsPage() {
             setScanningInstalled(false);
         }
     }, [scanningInstalled]);
+    const onRunPreflight = SP_REACT.useCallback(async () => {
+        if (preflightBusy)
+            return;
+        setPreflightBusy(true);
+        try {
+            const result = await withTimeout(preflightTianyiInstall(), 20000, "安装环境检查超时");
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "安装环境检查失败");
+            }
+            setPreflightReport(result.data);
+            toaster.toast({ title: "freedeckCY", body: result.data.ok ? "安装环境正常" : "安装环境存在异常，请查看检查结果" });
+        }
+        catch (error) {
+            toastError(error);
+        }
+        finally {
+            setPreflightBusy(false);
+        }
+    }, [preflightBusy]);
     const onSaveBaiduApp = SP_REACT.useCallback(async () => {
         if (baiduBusy)
             return;
@@ -2242,6 +2292,11 @@ function SettingsPage() {
             content: (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u884C\u4E3A", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "\u5B89\u88C5\u540E\u81EA\u52A8\u5220\u9664\u538B\u7F29\u5305", description: "\u4EC5\u5728\u81EA\u52A8\u5B89\u88C5\u6210\u529F\u540E\u751F\u6548", checked: Boolean(settings.auto_delete_package), onChange: (value) => savePatch({ auto_delete_package: value }), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }, children: "\u4E0B\u8F7D\u5B8C\u6210\u540E\u81EA\u52A8\u5B89\u88C5\u5DF2\u56FA\u5B9A\u5F00\u542F\u3002" }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u626B\u63CF\u5DF2\u5B89\u88C5", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }, children: "\u626B\u63CF\u8BBE\u7F6E\u91CC\u7684\u5B89\u88C5\u76EE\u5F55\u4E00\u5C42\uFF0C\u628A\u76EE\u5F55\u540D\u5339\u914D\u6807\u9898\u7684\u6E38\u620F\u8865\u56DE\u5217\u8868\uFF1BSteam \u91CC\u6CA1\u6709\u7684\u4F1A\u81EA\u52A8\u521B\u5EFA\u5FEB\u6377\u65B9\u5F0F\u3002" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onScanInstalledSettings, disabled: scanningInstalled || saving, children: scanningInstalled ? "扫描中..." : "扫描已安装游戏" }) })] })] })),
         },
         {
+            id: "preflight",
+            title: "环境",
+            content: SP_JSX.jsx(InstallPreflightSection, { report: preflightReport, busy: preflightBusy, onRun: onRunPreflight }),
+        },
+        {
             id: "download",
             title: "下载",
             content: (SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E0B\u8F7D\u53C2\u6570", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.SliderField, { label: "aria2 \u5206\u7247\u6570", description: "\u5EFA\u8BAE 8~32\uFF0C\u8303\u56F4 1~64", value: Math.max(1, Math.min(64, Number(splitDraft || 16))), min: 1, max: 64, step: 1, showValue: true, editableValue: true, onChange: (value) => setSplitDraft(Math.max(1, Math.min(64, Number(value || 1)))), disabled: saving }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DropdownItem, { label: "\u5206\u9875\u6570\u91CF", description: "\u6E38\u620F\u5217\u8868\u6BCF\u9875\u663E\u793A\u6761\u6570", rgOptions: PAGE_SIZE_OPTIONS, selectedOption: Math.max(10, Math.min(200, Number(settings.page_size || 50))), disabled: saving, onChange: (option) => {
@@ -2373,6 +2428,9 @@ function SettingsPage() {
         onClearBaiduLogin,
         scanningInstalled,
         onScanInstalledSettings,
+        preflightReport,
+        preflightBusy,
+        onRunPreflight,
     ]);
     const focusSettingsTabRow = SP_REACT.useCallback((tabId) => {
         const classMap = getGamepadTabClassMap();
@@ -3304,6 +3362,7 @@ function LibraryPage({ onClose }) {
     const [reloadNonce, setReloadNonce] = SP_REACT.useState(0);
     const [loadingInstalled, setLoadingInstalled] = SP_REACT.useState(false);
     const [busyKey, setBusyKey] = SP_REACT.useState("");
+    const [healthBusy, setHealthBusy] = SP_REACT.useState(false);
     const [catalogUpdate, setCatalogUpdate] = SP_REACT.useState({ added_count: 0, items: [], updated_at: 0 });
     const [coverProxyBase, setCoverProxyBase] = SP_REACT.useState("");
     const catalogRequestRef = SP_REACT.useRef(0);
@@ -3557,11 +3616,24 @@ function LibraryPage({ onClose }) {
             if (!plan.can_install) {
                 throw new Error(plan.message || "磁盘空间不足，无法安装");
             }
+            let preflightWarning = "";
+            try {
+                const preflight = await withTimeout(preflightTianyiInstall(), 15000, "安装环境检查超时");
+                const failedChecks = preflight.status === "success" && preflight.data
+                    ? (preflight.data.checks || []).filter((check) => !check.ok)
+                    : [];
+                if (failedChecks.length > 0) {
+                    preflightWarning = "\n\n环境检查：\n" + failedChecks.map((check) => `⚠ ${check.message || check.id}`).join("\n");
+                }
+            }
+            catch {
+                // 环境检查失败不阻断安装，继续展示安装计划。
+            }
             const emulatorText = plan.emulator_info?.name ? `模拟器：${plan.emulator_info.name}` : "PC / Proton";
             const setupText = plan.emulator_info?.setup_hint ? `\n提示：${plan.emulator_info.setup_hint}` : "";
             DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `安装 ${plan.game_title || item.title}`, strDescription: `下载：${plan.required_download_human || "未知"} → ${plan.download_dir || "-"}\n` +
                     `安装：${plan.required_install_human || "未知"} → ${plan.install_dir || "-"}\n` +
-                    `${emulatorText}${setupText}`, strOKButtonText: "\u5F00\u59CB\u4E0B\u8F7D", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
+                    `${emulatorText}${setupText}${preflightWarning}`, strOKButtonText: preflightWarning ? "仍然下载" : "开始下载", strCancelButtonText: "\u53D6\u6D88", onOK: () => {
                     void (async () => {
                         try {
                             const started = await withTimeout(startTianyiInstall({ game_id: item.game_id }), 30000, "启动安装超时");
@@ -3600,19 +3672,56 @@ function LibraryPage({ onClose }) {
         }
     }, [beginBusy, endBusy]);
     const onHealthCheck = SP_REACT.useCallback(async () => {
+        if (healthBusy)
+            return;
+        setHealthBusy(true);
         try {
             const result = await withTimeout(getTianyiInstalledHealth(), 120000, "健康检查超时");
             if (result.status !== "success")
                 throw new Error(result.message || "健康检查失败");
             const data = result.data || {};
             const bad = (data.items || []).filter((item) => !item.ok);
+            const repairable = bad.filter((item) => Boolean(item.game_id) && !item.needs_reinstall);
             const lines = [`共 ${data.total || 0} 个游戏，正常 ${data.ok || 0} 个，异常 ${bad.length} 个。`];
             bad.slice(0, 12).forEach((item) => lines.push(`❌ ${item.title || item.game_id}${item.needs_reinstall ? " · 需重下" : ""}`));
             if (bad.length > 12) lines.push(`…另有 ${bad.length - 12} 个`);
-            DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "游戏健康中心", strDescription: lines.join("\n"), strOKButtonText: "完成", strCancelButtonText: "关闭", onOK: () => { }, onCancel: () => { } }));
+            if (repairable.length > 0)
+                lines.push("", `可修复 ${repairable.length} 个（需重下的无法自动修复）`);
+            DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "游戏健康中心", strDescription: lines.join("\n"), strOKButtonText: repairable.length > 0 ? "修复可修复项" : "完成", strCancelButtonText: "关闭", onOK: () => {
+                    if (repairable.length === 0)
+                        return;
+                    void (async () => {
+                        setHealthBusy(true);
+                        let repaired = 0;
+                        const failed = [];
+                        for (const item of repairable) {
+                            try {
+                                const repairedResult = await withTimeout(repairTianyiInstalledGame(item.game_id), 120000, "修复超时");
+                                if (repairedResult.status === "success" && repairedResult.data?.ok)
+                                    repaired += 1;
+                                else
+                                    failed.push(item.title || item.game_id);
+                            }
+                            catch {
+                                failed.push(item.title || item.game_id);
+                            }
+                        }
+                        toaster.toast({ title: "freedeckCY", body: failed.length > 0 ? `修复完成：成功 ${repaired} 个，失败 ${failed.length} 个` : `已修复 ${repaired} 个游戏` });
+                        try {
+                            await loadInstalled();
+                        }
+                        catch {
+                            // 刷新失败不影响修复结果。
+                        }
+                        finally {
+                            setHealthBusy(false);
+                        }
+                    })();
+                }, onCancel: () => { } }));
         }
         catch (error) { toastError(error); }
-    }, []);
+        finally { setHealthBusy(false); }
+    }, [healthBusy, loadInstalled]);
     const onOpenFolder = SP_REACT.useCallback(async (item) => {
         if (!beginBusy(item.game_id))
             return;
@@ -3802,7 +3911,7 @@ function LibraryPage({ onClose }) {
             touchAction: "pan-y",
             WebkitOverflowScrolling: "touch",
             overscrollBehavior: "contain",
-        }, children: [SP_JSX.jsx("style", { children: LIBRARY_CSS }), SP_JSX.jsx("div", { "aria-hidden": "true", style: { position: "fixed", top: 0, left: 0, right: 0, height: "40px", background: "#0b0f14", zIndex: 50, pointerEvents: "none" } }), SP_JSX.jsx("div", { "aria-hidden": "true", style: { position: "fixed", bottom: 0, left: 0, right: 0, height: "72px", background: "#0b0f14", zIndex: 50, pointerEvents: "none" } }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-topbar", "flow-children": "row", children: [SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "6px", flex: "0 1 auto", minWidth: 0 }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { width: "auto", padding: "8px 14px" }, children: "返回" }), SP_JSX.jsx(DFL.DialogButton, { onClick: handleSteamLibrary, style: { width: "auto", padding: "8px 14px" }, children: "Steam 库" })] }), SP_JSX.jsxs("div", { className: "fdc-heading", children: [SP_JSX.jsx("div", { className: "fdc-title", children: "freedeckCY 游戏库" }), SP_JSX.jsx("div", { className: "fdc-subtitle", children: tab === "catalog" ? `${catalog.total} 款游戏${hasActiveFilters ? " · 已筛选" : ""}` : `${installed.total} 款已安装` })] }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-tabs", "flow-children": "row", children: [SP_JSX.jsx(DFL.DialogButton, { className: "fdc-tab" + (tab === "catalog" ? " fdc-tab-active" : ""), onClick: () => setTab("catalog"), children: "游戏库" }), SP_JSX.jsxs(DFL.DialogButton, { className: "fdc-tab" + (tab === "installed" ? " fdc-tab-active" : ""), onClick: () => setTab("installed"), children: ["已安装", installed.total ? ` (${installed.total})` : ""] })] }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-button", onClick: () => void refreshCatalog(), disabled: loadingCatalog || loadingInstalled, children: loadingCatalog || loadingInstalled ? "刷新中..." : "刷新" }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-button", onClick: () => void onHealthCheck(), children: "体检" })] }), tab === "catalog" ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.Focusable, { className: "fdc-search-row", "flow-children": "row", children: [SP_JSX.jsx("div", { className: "fdc-search", children: SP_JSX.jsx(DFL.TextField, { "aria-label": "搜索游戏", placeholder: "搜索游戏", value: query, onChange: (event) => setQuery(getTextFieldValue(event)), onKeyDown: (event) => { if (event.key === "Enter") submitSearch(); } }) }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-button", onClick: submitSearch, children: "搜索" }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-button", onClick: () => setFiltersOpen((value) => !value), children: filtersOpen ? "收起筛选" : "筛选" })] }), filtersOpen ? (SP_JSX.jsxs("div", { className: "fdc-filter-panel", children: [SP_JSX.jsxs(DFL.Focusable, { className: "fdc-filter-row", "flow-children": "row", children: [SP_JSX.jsx("span", { className: "fdc-label", children: "平台" }), renderChips(platformChips, platform, setPlatform)] }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-filter-row", "flow-children": "row", children: [SP_JSX.jsx("span", { className: "fdc-label", children: "分类" }), renderChips(categoryChips, category, setCategory)] }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-filter-row", "flow-children": "row", children: [SP_JSX.jsx("span", { className: "fdc-label", children: "排序" }), renderChips(sortOptions, sort, setSort), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-chip", onClick: resetSearch, children: "清空筛选" })] })] })) : null, showShelves && heroItem ? (SP_JSX.jsxs("div", { className: "fdc-hero", children: [SP_JSX.jsx("div", { className: "fdc-hero-bg", style: heroCover ? { backgroundImage: `url("${heroCover.replace(/"/g, "%22")}")` } : {} }), SP_JSX.jsx("div", { className: "fdc-hero-shade" }), SP_JSX.jsxs("div", { className: "fdc-hero-content", children: [SP_JSX.jsx("div", { className: "fdc-hero-eyebrow", children: "推荐 · 最近更新" }), SP_JSX.jsx("div", { "data-fdc-i18n-skip": "1", className: "fdc-hero-title", children: String(heroItem.title || "未命名游戏").split("/")[0] }), SP_JSX.jsx("div", { className: "fdc-hero-meta", children: [String(heroItem.platform || "pc").toUpperCase(), heroItem.size_text, heroItem.provider_label].filter(Boolean).join(" · ") }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-hero-actions", "flow-children": "row", children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => onOpenDetail(heroItem), style: { width: "auto", padding: "9px 18px", background: "rgba(101,214,192,0.20)", border: "1px solid rgba(101,214,192,0.55)" }, children: "查看详情" }), catalog.items.length > 1 ? (SP_JSX.jsx(DFL.DialogButton, { onClick: () => setFiltersOpen(true), style: { width: "auto", padding: "9px 18px" }, children: "全部游戏" })) : null] })] })] })) : null, showShelves && catalogUpdate.items.length ? (SP_JSX.jsxs("section", { className: "fdc-shelf-block", children: [SP_JSX.jsxs("div", { className: "fdc-section-head", children: [SP_JSX.jsx("div", { className: "fdc-section-title", children: `最近更新（${catalogUpdate.added_count || catalogUpdate.items.length}）` }), SP_JSX.jsx("div", { className: "fdc-section-count", children: "新加入目录" })] }), SP_JSX.jsx(DFL.Focusable, { className: "fdc-shelf", "flow-children": "row", children: catalogUpdate.items.map((item) => (SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: [item.size_text, item.provider_label].filter(Boolean).join(" · ") || "-", providerLabel: item.provider_label || "", coverUrl: item.cover_portrait_url || item.cover_url, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), coverProxyBase: coverProxyBase, onPress: () => onOpenDetail(item), width: 158 }, `recent:${item.game_id}`))) })] })) : null, loadingCatalog && catalog.items.length === 0 ? renderSkeletonGrid(12) : catalog.items.length === 0 ? (SP_JSX.jsx("div", { className: "fdc-empty", children: "没有匹配游戏，试试清空筛选或更换关键词" })) : showShelves ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [categorySections.map(([sectionTitle, items]) => (SP_JSX.jsxs("section", { className: "fdc-shelf-block", children: [SP_JSX.jsxs("div", { className: "fdc-section-head", children: [SP_JSX.jsx("div", { className: "fdc-section-title", children: sectionTitle }), SP_JSX.jsx("div", { className: "fdc-section-count", children: `${items.length} 款` })] }), SP_JSX.jsx(DFL.Focusable, { className: "fdc-shelf", "flow-children": "row", children: items.map((item) => (SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: [item.size_text, item.provider_label].filter(Boolean).join(" · ") || "-", providerLabel: item.provider_label || "", coverUrl: item.cover_portrait_url || item.cover_url, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), coverProxyBase: coverProxyBase, onPress: () => onOpenDetail(item), width: 158 }, item.game_id))) })] }, `shelf:${sectionTitle}`)))] })) : (SP_JSX.jsx(DFL.Focusable, { className: "fdc-grid", "flow-children": "row", children: catalog.items.map((item) => renderCatalogCard(item)) })), catalog.items.length < catalog.total ? (SP_JSX.jsxs("div", { className: "fdc-footer", children: [SP_JSX.jsx(DFL.DialogButton, { onClick: loadMore, disabled: loadingCatalog, style: { width: "auto", padding: "8px 20px" }, children: loadingCatalog ? "加载中..." : "加载更多" }), SP_JSX.jsx("span", { children: `已显示 ${catalog.items.length} / ${catalog.total}` })] })) : null] })) : (SP_JSX.jsxs(SP_JSX.Fragment, { children: [loadingInstalled && installed.items.length === 0 ? renderSkeletonGrid(8) : installed.items.length === 0 ? (SP_JSX.jsx("div", { className: "fdc-empty", children: "还没有已安装游戏" })) : (SP_JSX.jsx(DFL.Focusable, { className: "fdc-grid", "flow-children": "row", children: installed.items.map((item) => renderInstalledCard(item)) }))] }))] }));
+        }, children: [SP_JSX.jsx("style", { children: LIBRARY_CSS }), SP_JSX.jsx("div", { "aria-hidden": "true", style: { position: "fixed", top: 0, left: 0, right: 0, height: "40px", background: "#0b0f14", zIndex: 50, pointerEvents: "none" } }), SP_JSX.jsx("div", { "aria-hidden": "true", style: { position: "fixed", bottom: 0, left: 0, right: 0, height: "72px", background: "#0b0f14", zIndex: 50, pointerEvents: "none" } }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-topbar", "flow-children": "row", children: [SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "6px", flex: "0 1 auto", minWidth: 0 }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: handleClose, style: { width: "auto", padding: "8px 14px" }, children: "返回" }), SP_JSX.jsx(DFL.DialogButton, { onClick: handleSteamLibrary, style: { width: "auto", padding: "8px 14px" }, children: "Steam 库" })] }), SP_JSX.jsxs("div", { className: "fdc-heading", children: [SP_JSX.jsx("div", { className: "fdc-title", children: "freedeckCY 游戏库" }), SP_JSX.jsx("div", { className: "fdc-subtitle", children: tab === "catalog" ? `${catalog.total} 款游戏${hasActiveFilters ? " · 已筛选" : ""}` : `${installed.total} 款已安装` })] }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-tabs", "flow-children": "row", children: [SP_JSX.jsx(DFL.DialogButton, { className: "fdc-tab" + (tab === "catalog" ? " fdc-tab-active" : ""), onClick: () => setTab("catalog"), children: "游戏库" }), SP_JSX.jsxs(DFL.DialogButton, { className: "fdc-tab" + (tab === "installed" ? " fdc-tab-active" : ""), onClick: () => setTab("installed"), children: ["已安装", installed.total ? ` (${installed.total})` : ""] })] }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-button", onClick: () => void refreshCatalog(), disabled: loadingCatalog || loadingInstalled, children: loadingCatalog || loadingInstalled ? "刷新中..." : "刷新" }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-button", onClick: () => void onHealthCheck(), disabled: healthBusy, children: healthBusy ? "体检中..." : "体检" })] }), tab === "catalog" ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.Focusable, { className: "fdc-search-row", "flow-children": "row", children: [SP_JSX.jsx("div", { className: "fdc-search", children: SP_JSX.jsx(DFL.TextField, { "aria-label": "搜索游戏", placeholder: "搜索游戏", value: query, onChange: (event) => setQuery(getTextFieldValue(event)), onKeyDown: (event) => { if (event.key === "Enter") submitSearch(); } }) }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-button", onClick: submitSearch, children: "搜索" }), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-button", onClick: () => setFiltersOpen((value) => !value), children: filtersOpen ? "收起筛选" : "筛选" })] }), filtersOpen ? (SP_JSX.jsxs("div", { className: "fdc-filter-panel", children: [SP_JSX.jsxs(DFL.Focusable, { className: "fdc-filter-row", "flow-children": "row", children: [SP_JSX.jsx("span", { className: "fdc-label", children: "平台" }), renderChips(platformChips, platform, setPlatform)] }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-filter-row", "flow-children": "row", children: [SP_JSX.jsx("span", { className: "fdc-label", children: "分类" }), renderChips(categoryChips, category, setCategory)] }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-filter-row", "flow-children": "row", children: [SP_JSX.jsx("span", { className: "fdc-label", children: "排序" }), renderChips(sortOptions, sort, setSort), SP_JSX.jsx(DFL.DialogButton, { className: "fdc-chip", onClick: resetSearch, children: "清空筛选" })] })] })) : null, showShelves && heroItem ? (SP_JSX.jsxs("div", { className: "fdc-hero", children: [SP_JSX.jsx("div", { className: "fdc-hero-bg", style: heroCover ? { backgroundImage: `url("${heroCover.replace(/"/g, "%22")}")` } : {} }), SP_JSX.jsx("div", { className: "fdc-hero-shade" }), SP_JSX.jsxs("div", { className: "fdc-hero-content", children: [SP_JSX.jsx("div", { className: "fdc-hero-eyebrow", children: "推荐 · 最近更新" }), SP_JSX.jsx("div", { "data-fdc-i18n-skip": "1", className: "fdc-hero-title", children: String(heroItem.title || "未命名游戏").split("/")[0] }), SP_JSX.jsx("div", { className: "fdc-hero-meta", children: [String(heroItem.platform || "pc").toUpperCase(), heroItem.size_text, heroItem.provider_label].filter(Boolean).join(" · ") }), SP_JSX.jsxs(DFL.Focusable, { className: "fdc-hero-actions", "flow-children": "row", children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => onOpenDetail(heroItem), style: { width: "auto", padding: "9px 18px", background: "rgba(101,214,192,0.20)", border: "1px solid rgba(101,214,192,0.55)" }, children: "查看详情" }), catalog.items.length > 1 ? (SP_JSX.jsx(DFL.DialogButton, { onClick: () => setFiltersOpen(true), style: { width: "auto", padding: "9px 18px" }, children: "全部游戏" })) : null] })] })] })) : null, showShelves && catalogUpdate.items.length ? (SP_JSX.jsxs("section", { className: "fdc-shelf-block", children: [SP_JSX.jsxs("div", { className: "fdc-section-head", children: [SP_JSX.jsx("div", { className: "fdc-section-title", children: `最近更新（${catalogUpdate.added_count || catalogUpdate.items.length}）` }), SP_JSX.jsx("div", { className: "fdc-section-count", children: "新加入目录" })] }), SP_JSX.jsx(DFL.Focusable, { className: "fdc-shelf", "flow-children": "row", children: catalogUpdate.items.map((item) => (SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: [item.size_text, item.provider_label].filter(Boolean).join(" · ") || "-", providerLabel: item.provider_label || "", coverUrl: item.cover_portrait_url || item.cover_url, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), coverProxyBase: coverProxyBase, onPress: () => onOpenDetail(item), width: 158 }, `recent:${item.game_id}`))) })] })) : null, loadingCatalog && catalog.items.length === 0 ? renderSkeletonGrid(12) : catalog.items.length === 0 ? (SP_JSX.jsx("div", { className: "fdc-empty", children: "没有匹配游戏，试试清空筛选或更换关键词" })) : showShelves ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [categorySections.map(([sectionTitle, items]) => (SP_JSX.jsxs("section", { className: "fdc-shelf-block", children: [SP_JSX.jsxs("div", { className: "fdc-section-head", children: [SP_JSX.jsx("div", { className: "fdc-section-title", children: sectionTitle }), SP_JSX.jsx("div", { className: "fdc-section-count", children: `${items.length} 款` })] }), SP_JSX.jsx(DFL.Focusable, { className: "fdc-shelf", "flow-children": "row", children: items.map((item) => (SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: [item.size_text, item.provider_label].filter(Boolean).join(" · ") || "-", providerLabel: item.provider_label || "", coverUrl: item.cover_portrait_url || item.cover_url, installed: Boolean(item.game_id && installedGameIds.has(item.game_id)), busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), coverProxyBase: coverProxyBase, onPress: () => onOpenDetail(item), width: 158 }, item.game_id))) })] }, `shelf:${sectionTitle}`)))] })) : (SP_JSX.jsx(DFL.Focusable, { className: "fdc-grid", "flow-children": "row", children: catalog.items.map((item) => renderCatalogCard(item)) })), catalog.items.length < catalog.total ? (SP_JSX.jsxs("div", { className: "fdc-footer", children: [SP_JSX.jsx(DFL.DialogButton, { onClick: loadMore, disabled: loadingCatalog, style: { width: "auto", padding: "8px 20px" }, children: loadingCatalog ? "加载中..." : "加载更多" }), SP_JSX.jsx("span", { children: `已显示 ${catalog.items.length} / ${catalog.total}` })] })) : null] })) : (SP_JSX.jsxs(SP_JSX.Fragment, { children: [loadingInstalled && installed.items.length === 0 ? renderSkeletonGrid(8) : installed.items.length === 0 ? (SP_JSX.jsx("div", { className: "fdc-empty", children: "还没有已安装游戏" })) : (SP_JSX.jsx(DFL.Focusable, { className: "fdc-grid", "flow-children": "row", children: installed.items.map((item) => renderInstalledCard(item)) }))] }))] }));
 }
 
 var index = definePlugin(() => {
