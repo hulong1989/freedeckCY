@@ -7508,12 +7508,19 @@ class TianyiService(UpdateFlowMixin):
             return _task_to_view(task)
 
         if not await self._readd_task_download(task):
+            # 当前源无法恢复直链时，自动尝试同游戏的其他网盘源（只切一次）。
+            try:
+                fallback = await self.retry_task_with_fallback(task.task_id)
+                fallback["auto_fallback"] = True
+                return fallback
+            except Exception:
+                pass
             task.install_status = "failed"
-            task.install_message = "重试失败：无法重新获取下载直链"
+            task.install_message = "重试失败：无法重新获取下载直链（也无备用源）"
             task.updated_at = _now_wall_ts()
             self.store.save()
             self._invalidate_panel_cache(tasks=True)
-            raise RuntimeError("重试失败：无法重新获取下载直链（登录可能已失效）")
+            raise RuntimeError("重试失败：无法重新获取下载直链（登录可能已失效，且无可用备用源）")
 
         self.store.save()
         self._invalidate_panel_cache(tasks=True)
