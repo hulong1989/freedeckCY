@@ -714,6 +714,14 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def preflight_tianyi_install(self) -> dict:
+        """安装前环境自检。"""
+        try:
+            data = await self._get_tianyi_service().preflight_install()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def get_tianyi_installed_health(self) -> dict:
         """全量扫描已安装游戏健康状态。"""
         try:

@@ -7924,6 +7924,25 @@ class TianyiService(UpdateFlowMixin):
             "checks": checks,
         }
 
+    async def preflight_install(self) -> Dict[str, Any]:
+        """下载/安装前环境自检。"""
+        import shutil
+        checks: List[Dict[str, Any]] = []
+        download_dir = str(self.store.settings.download_dir or os.path.expanduser("~/Downloads"))
+        install_dir = str(self.store.settings.install_dir or os.path.expanduser("~/Games/freedeckCY"))
+        for key, path in (("download_dir", download_dir), ("install_dir", install_dir)):
+            target = os.path.realpath(os.path.expanduser(path))
+            exists = os.path.isdir(target)
+            writable = bool(exists and os.access(target, os.W_OK))
+            checks.append({"id": key, "ok": writable, "path": target, "message": "" if writable else ("目录不存在" if not exists else "目录不可写")})
+        try:
+            usage = shutil.disk_usage(os.path.realpath(os.path.expanduser(download_dir)))
+            free = int(usage.free)
+            checks.append({"id": "disk_free", "ok": free > 512 * 1024 * 1024, "free_bytes": free, "message": "" if free > 512 * 1024 * 1024 else "剩余空间不足 512MB"})
+        except Exception as exc:
+            checks.append({"id": "disk_free", "ok": False, "message": f"无法读取磁盘空间：{exc}"})
+        return {"ok": all(item.get("ok") for item in checks), "checks": checks}
+
     async def installed_health_report(self) -> Dict[str, Any]:
         """扫描全部已安装游戏，汇总健康状态。"""
         items: List[Dict[str, Any]] = []
