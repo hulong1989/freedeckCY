@@ -7924,6 +7924,19 @@ class TianyiService(UpdateFlowMixin):
             "checks": checks,
         }
 
+    async def installed_health_report(self) -> Dict[str, Any]:
+        """扫描全部已安装游戏，汇总健康状态。"""
+        items: List[Dict[str, Any]] = []
+        for record in list(self.store.installed_games or []):
+            try:
+                report = await self.verify_installed_game(str(record.game_id or ""))
+            except Exception as exc:
+                report = {"game_id": str(record.game_id or ""), "title": str(record.game_title or ""), "ok": False, "needs_reinstall": True, "checks": [], "error": str(exc)}
+            items.append(report)
+        ok_count = sum(1 for item in items if item.get("ok"))
+        reinstall_count = sum(1 for item in items if item.get("needs_reinstall"))
+        return {"total": len(items), "ok": ok_count, "needs_repair": len(items) - ok_count, "needs_reinstall": reinstall_count, "items": items}
+
     async def repair_installed_game(self, game_id: str) -> Dict[str, Any]:
         """校验并修复已安装游戏：重建快捷方式、Proton 映射与 Steam 四件套美术。"""
         record = self._find_installed_record(game_id=str(game_id or "").strip())
