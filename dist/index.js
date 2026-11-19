@@ -243,6 +243,14 @@ const EN_MISSING = {
     "最新": "Latest",
     "当前版本": "Current version",
     "最新版本": "Latest version",
+    "校验": "Verify",
+    "换源": "Switch Source",
+    "校验失败": "Verification failed",
+    "校验/修复超时": "Verify/repair timed out",
+    "安装完整，无需修复。": "Install is complete; no repair needed.",
+    "已修复 Steam 快捷方式与封面。": "Repaired Steam shortcut and artwork.",
+    "校验发现文件缺失，需要重新下载安装。": "Missing files detected; reinstall required.",
+    "已切换下载源": "Switched download source",
 };
 
 // @ts-nocheck
@@ -865,6 +873,8 @@ const startTianyiInstall = callable("start_tianyi_install");
 const listTianyiInstalledGames = callable("list_tianyi_installed_games");
 const launchTianyiInstalledGame = callable("launch_tianyi_installed_game");
 const openTianyiInstalledFolder = callable("open_tianyi_installed_folder");
+const repairTianyiInstalledGame = callable("repair_tianyi_installed_game");
+callable("verify_tianyi_installed_game");
 const scanTianyiInstalledGames = callable("scan_tianyi_installed_games");
 const runTianyiDiagnostics = callable("run_tianyi_diagnostics");
 const checkTianyiUpdate = callable("check_tianyi_update");
@@ -901,6 +911,7 @@ const pauseTianyiTask = callable("pause_tianyi_task");
 const resumeTianyiTask = callable("resume_tianyi_task");
 const removeTianyiTask = callable("remove_tianyi_task");
 const retryTianyiTask = callable("retry_tianyi_task");
+const retryTianyiTaskWithFallback = callable("retry_tianyi_task_with_fallback");
 const previewTianyiUninstall = callable("preview_tianyi_uninstall");
 const uninstallTianyiInstalledGame = callable("uninstall_tianyi_installed_game");
 const PANEL_REQUEST_TIMEOUT_MS = 6000;
@@ -3568,9 +3579,11 @@ function Content() {
                     ? resumeTianyiTask
                     : action === "retry"
                         ? retryTianyiTask
-                        : removeTianyiTask;
-            // 重试要重新取直链/重新进入安装，给更长的超时；暂停/继续/移除通常很快。
-            const actionTimeoutMs = action === "retry" ? 60000 : 20000;
+                        : action === "fallback"
+                            ? retryTianyiTaskWithFallback
+                            : removeTianyiTask;
+            // 重试/换源要重新取直链/重新进入安装，给更长的超时；暂停/继续/移除通常很快。
+            const actionTimeoutMs = action === "retry" || action === "fallback" ? 90000 : 20000;
             const result = await withTimeout(runner({ task_id: taskId }), actionTimeoutMs, "任务操作超时，请稍后重试");
             if (result.status !== "success") {
                 throw new Error(result.message || "任务操作失败");
@@ -3581,7 +3594,9 @@ function Content() {
                     ? "已继续"
                     : action === "retry"
                         ? "已重新开始"
-                        : "已移除";
+                        : action === "fallback"
+                            ? "已切换下载源"
+                            : "已移除";
             toaster.toast({
                 title: "freedeckCY",
                 body: `${label}：${task.game_title || task.file_name || taskId}`,
@@ -3768,7 +3783,13 @@ function Content() {
                                                     border: "1px solid rgba(120, 200, 255, 0.45)",
                                                     background: "rgba(120, 200, 255, 0.16)",
                                                     color: "#dff4ff",
-                                                }, children: busy ? "重试中..." : "重试" }) })), _local_SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => onRemoveTask(task), onOKButton: () => onRemoveTask(task), disabled: Boolean(taskActionKey), style: {
+                                                }, children: busy ? "重试中..." : "重试" }) })), canRetry && (_local_SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void performTaskAction("fallback", task), onOKButton: () => void performTaskAction("fallback", task), disabled: Boolean(taskActionKey), style: {
+                                                    minWidth: "76px",
+                                                    borderRadius: "10px",
+                                                    border: "1px solid rgba(255, 196, 120, 0.45)",
+                                                    background: "rgba(255, 196, 120, 0.14)",
+                                                    color: "#ffe8c8",
+                                                }, children: busy ? "处理中..." : "换源" }) })), _local_SP_JSX.jsx(DFL.Focusable, { style: { flex: 1 }, children: _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => onRemoveTask(task), onOKButton: () => onRemoveTask(task), disabled: Boolean(taskActionKey), style: {
                                                     minWidth: "76px",
                                                     borderRadius: "10px",
                                                     border: "1px solid rgba(255, 106, 106, 0.4)",
@@ -4318,6 +4339,33 @@ function LibraryPage({ onClose }) {
             endBusy();
         }
     }, [beginBusy, endBusy]);
+    const onCheckInstalled = SP_REACT.useCallback(async (item) => {
+        if (!beginBusy(item.game_id))
+            return;
+        try {
+            const result = await withTimeout(repairTianyiInstalledGame(item.game_id), 120000, "校验/修复超时");
+            if (result.status !== "success")
+                throw new Error(result.message || "校验失败");
+            const data = result.data || {};
+            const after = data.after || {};
+            if (after.needs_reinstall) {
+                toaster.toast({ title: "freedeckCY", body: "校验发现文件缺失，需要重新下载安装。" });
+            }
+            else if (after.ok) {
+                toaster.toast({ title: "freedeckCY", body: (data.actions || []).length ? "已修复 Steam 快捷方式与封面。" : "安装完整，无需修复。" });
+            }
+            else {
+                toaster.toast({ title: "freedeckCY", body: "校验发现问题，请打开目录检查安装文件。" });
+            }
+            await loadInstalled();
+        }
+        catch (error) {
+            toastError(error);
+        }
+        finally {
+            endBusy();
+        }
+    }, [beginBusy, endBusy, loadInstalled]);
     const onUninstall = SP_REACT.useCallback((item) => {
         if (busyRef.current)
             return;
@@ -4435,7 +4483,7 @@ function LibraryPage({ onClose }) {
         const meta = [item.size_text, item.provider_label].filter(Boolean).join(" · ") || "-";
         return (_local_SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: meta, providerLabel: item.provider_label || "", coverUrl: item.cover_portrait_url || item.cover_url, installed: isInstalled, busyLabel: busyKey === item.game_id ? "处理中..." : "", disabled: Boolean(busyKey), coverProxyBase: coverProxyBase, onPress: () => onOpenDetail(item), width: width }, item.game_id));
     };
-    const renderInstalledCard = (item) => (_local_SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.playtime_text ? `${item.size_text || "-"} · ${item.playtime_text}` : (item.size_text || "-"), providerLabel: item.provider_label || "", coverUrl: item.cover_portrait_url || item.cover_url, installed: true, disabled: Boolean(busyKey), coverProxyBase: coverProxyBase, onPress: () => void onLaunchInstalled(item), actions: _local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onOpenFolder(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "5px 2px", fontSize: "11px" }, children: "目录" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstall(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "5px 2px", fontSize: "11px", background: "rgba(255,106,106,0.22)" }, children: "卸载" })] }) }, item.game_id));
+    const renderInstalledCard = (item) => (_local_SP_JSX.jsx(LibraryCoverCard, { title: item.title || "未命名游戏", platform: item.platform, meta: item.playtime_text ? `${item.size_text || "-"} · ${item.playtime_text}` : (item.size_text || "-"), providerLabel: item.provider_label || "", coverUrl: item.cover_portrait_url || item.cover_url, installed: true, disabled: Boolean(busyKey), coverProxyBase: coverProxyBase, onPress: () => void onLaunchInstalled(item), actions: _local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onCheckInstalled(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "5px 2px", fontSize: "11px" }, children: "校验" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onOpenFolder(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "5px 2px", fontSize: "11px" }, children: "目录" }), _local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => onUninstall(item), disabled: Boolean(busyKey), style: { flex: 1, minWidth: 0, padding: "5px 2px", fontSize: "11px", background: "rgba(255,106,106,0.22)" }, children: "卸载" })] }) }, item.game_id));
     const renderSkeletonGrid = (count) => (_local_SP_JSX.jsx(DFL.Focusable, { className: "fdc-grid", "flow-children": "row", children: Array.from({ length: count || 12 }).map((_, index) => (_local_SP_JSX.jsx(LibrarySkeletonCard, {}, `skeleton-${index}`))) }));
     const renderChips = (items, active, onPick) => items.map((item) => {
         const value = String(item.value !== undefined ? item.value : (item.data || ""));

@@ -621,6 +621,22 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def verify_tianyi_installed_game(self, game_id: str = "") -> dict:
+        """校验已安装游戏目录、启动文件与 Steam 快捷方式。"""
+        try:
+            data = await self._get_tianyi_service().verify_installed_game(game_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def repair_tianyi_installed_game(self, game_id: str = "") -> dict:
+        """修复已安装游戏快捷方式、Proton 映射和 Steam 美术。"""
+        try:
+            data = await self._get_tianyi_service().repair_installed_game(game_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def uninstall_tianyi_installed_game(
         self,
         payload=None,
@@ -674,6 +690,16 @@ class Plugin:
             if isinstance(payload, dict):
                 task_id = str(payload.get("task_id", task_id))
             data = await self._get_tianyi_service().retry_task(task_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def retry_tianyi_task_with_fallback(self, payload=None, task_id: str = "") -> dict:
+        """失败任务换另一个网盘源重试。"""
+        try:
+            if isinstance(payload, dict):
+                task_id = str(payload.get("task_id", task_id))
+            data = await self._get_tianyi_service().retry_task_with_fallback(task_id)
             return {"status": "success", "data": data}
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}

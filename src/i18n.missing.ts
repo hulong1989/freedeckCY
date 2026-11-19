@@ -243,4 +243,12 @@ export const EN_MISSING: Record<string, string> = {
   "最新": "Latest",
   "当前版本": "Current version",
   "最新版本": "Latest version",
+  "校验": "Verify",
+  "换源": "Switch Source",
+  "校验失败": "Verification failed",
+  "校验/修复超时": "Verify/repair timed out",
+  "安装完整，无需修复。": "Install is complete; no repair needed.",
+  "已修复 Steam 快捷方式与封面。": "Repaired Steam shortcut and artwork.",
+  "校验发现文件缺失，需要重新下载安装。": "Missing files detected; reinstall required.",
+  "已切换下载源": "Switched download source",
 };

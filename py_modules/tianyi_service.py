@@ -7519,6 +7519,59 @@ class TianyiService(UpdateFlowMixin):
         self._invalidate_panel_cache(tasks=True)
         return _task_to_view(task)
 
+    @staticmethod
+    def _catalog_provider_key(entry: Any) -> str:
+        """把 catalog 条目归一成 tianyi/baidu/other，用于换源比较。"""
+        server = str(getattr(entry, "server", "") or "").strip().lower()
+        url = str(getattr(entry, "down_url", "") or "").lower()
+        if server in {"t", "tianyi", "189", "cloud189"} or "189.cn" in url:
+            return "tianyi"
+        if server in {"b", "baidu", "pan", "yun"} or "baidu.com" in url:
+            return "baidu"
+        return "other"
+
+    async def retry_task_with_fallback(self, task_id: str) -> Dict[str, Any]:
+        """失败任务换一个网盘源重新创建安装任务。"""
+        task = self._find_task(task_id)
+        if task is None:
+            raise ValueError("任务不存在")
+        if str(task.status or "") in {"active", "waiting", "paused"}:
+            raise ValueError("任务尚未结束，无需换源")
+        current_entry = self.catalog.get_by_game_id(str(task.game_id or ""))
+        if current_entry is None:
+            raise ValueError("当前任务没有可用的目录记录，无法换源")
+        current_provider = self._catalog_provider_key(current_entry)
+        current_key = (self._normalize_cover_text(str(current_entry.title or "")), str(current_entry.platform or ""))
+        candidates: List[Any] = []
+        for entry in list(self.catalog.entries or []):
+            if str(entry.game_id or "") == str(current_entry.game_id or ""):
+                continue
+            if str(entry.platform or "") != str(current_entry.platform or ""):
+                continue
+            if self._normalize_cover_text(str(entry.title or "")) != current_key[0]:
+                continue
+            provider = self._catalog_provider_key(entry)
+            if provider == "other" or provider == current_provider:
+                continue
+            if not str(entry.down_url or "").strip():
+                continue
+            candidates.append(entry)
+        if not candidates:
+            raise ValueError("没有其他网盘源可用")
+        # 优先百度/天翼交替，且优先已有明确来源的条目。
+        candidate = candidates[0]
+        result = await self.start_install(game_id=str(candidate.game_id or ""))
+        tasks = result.get("tasks") if isinstance(result, dict) else []
+        return {
+            "from_game_id": str(task.game_id or ""),
+            "from_provider": current_provider,
+            "to_game_id": str(candidate.game_id or ""),
+            "to_provider": self._catalog_provider_key(candidate),
+            "title": str(candidate.title or task.game_title or ""),
+            "tasks": tasks if isinstance(tasks, list) else [],
+            "reused": bool(result.get("reused")) if isinstance(result, dict) else False,
+        }
+
     def _find_task(self, task_id: str) -> Optional[TianyiTaskRecord]:
         """查找任务对象。"""
         target = (task_id or "").strip()
@@ -7746,6 +7799,121 @@ class TianyiService(UpdateFlowMixin):
             "steam_app_id": app_id,
             "launched": True,
         }
+
+    async def verify_installed_game(self, game_id: str) -> Dict[str, Any]:
+        """检查已安装记录、安装目录、启动文件与 Steam 快捷方式。"""
+        record = self._find_installed_record(game_id=str(game_id or "").strip())
+        if record is None:
+            raise ValueError("未找到已安装游戏记录")
+        entry = self.catalog.get_by_game_id(record.game_id)
+        install_path = os.path.realpath(os.path.expanduser(str(record.install_path or "").strip()))
+        checks: List[Dict[str, Any]] = []
+
+        path_ok = bool(install_path and os.path.isdir(install_path))
+        checks.append({"id": "install_path", "ok": path_ok, "message": "" if path_ok else "安装目录不存在"})
+
+        platform = str(record.platform or "pc").lower()
+        executable = ""
+        if platform == "pc":
+            if path_ok:
+                executable = await asyncio.to_thread(self._find_scanned_executable, install_path, entry)
+            exe_ok = bool(executable)
+            checks.append({"id": "executable", "ok": exe_ok, "message": "" if exe_ok else "未找到可执行文件", "path": executable})
+        else:
+            rom_path = os.path.realpath(os.path.expanduser(str(record.rom_path or "").strip()))
+            rom_ok = bool(rom_path and os.path.isfile(rom_path))
+            checks.append({"id": "rom", "ok": rom_ok, "message": "" if rom_ok else "ROM 文件不存在", "path": rom_path})
+            launcher_ok = bool(str(record.launcher_path or "").strip() and os.path.isfile(str(record.launcher_path)))
+            checks.append({"id": "launcher", "ok": launcher_ok, "message": "" if launcher_ok else "启动脚本不存在"})
+
+        shortcut: Dict[str, Any] = {}
+        try:
+            shortcut = await asyncio.to_thread(resolve_tianyi_shortcut_sync, game_id=str(record.game_id or ""))
+        except Exception:
+            shortcut = {}
+        shortcut_ok = bool(shortcut.get("ok"))
+        checks.append({
+            "id": "steam_shortcut",
+            "ok": shortcut_ok,
+            "message": "" if shortcut_ok else str(shortcut.get("message", "") or "Steam 快捷方式缺失"),
+            "appid": _safe_int(shortcut.get("appid_unsigned"), 0),
+        })
+
+        critical = {"install_path", "executable", "rom", "launcher"}
+        ok = all(item.get("ok") for item in checks if item.get("id") in critical)
+        needs_reinstall = not path_ok or (platform == "pc" and not executable) or (platform != "pc" and not any(item.get("ok") for item in checks if item.get("id") == "rom"))
+        return {
+            "game_id": str(record.game_id or ""),
+            "title": str(record.game_title or ""),
+            "platform": platform,
+            "install_path": install_path,
+            "executable": executable,
+            "ok": bool(ok),
+            "needs_reinstall": bool(needs_reinstall),
+            "checks": checks,
+        }
+
+    async def repair_installed_game(self, game_id: str) -> Dict[str, Any]:
+        """校验并修复已安装游戏：重建快捷方式、Proton 映射与 Steam 四件套美术。"""
+        record = self._find_installed_record(game_id=str(game_id or "").strip())
+        if record is None:
+            raise ValueError("未找到已安装游戏记录")
+        before = await self.verify_installed_game(record.game_id)
+        if before.get("needs_reinstall"):
+            return {"before": before, "after": before, "ok": False, "needs_reinstall": True, "actions": []}
+
+        entry = self.catalog.get_by_game_id(record.game_id)
+        install_path = os.path.realpath(os.path.expanduser(str(record.install_path or "").strip()))
+        platform = str(record.platform or "pc").lower()
+        actions: List[Dict[str, Any]] = []
+
+        cover_info: Dict[str, Any] = {}
+        try:
+            cover_info = await self.resolve_catalog_cover(
+                game_id=str(record.game_id or ""),
+                title=str(record.game_title or ""),
+                categories=str(getattr(entry, "categories", "") or ""),
+            )
+        except Exception:
+            cover_info = {}
+
+        launch_token = re.sub(r"[^a-zA-Z0-9._-]+", "_", str(record.game_id or "")).strip("_") or "game"
+        launch_options = f"freedeckcy:tianyi:{launch_token}"
+        display_title = self._derive_display_title_for_steam(str(record.game_title or getattr(entry, "title", "") or "freedeckCY Game"))
+
+        if platform == "pc":
+            exe_path = await asyncio.to_thread(self._find_scanned_executable, install_path, entry)
+            shortcut = await add_or_update_tianyi_shortcut(
+                game_id=str(record.game_id or ""),
+                display_name=display_title,
+                exe_path=exe_path,
+                launch_options=launch_options,
+                proton_tool=str(self.store.settings.proton_tool or "auto"),
+                cover_landscape_url=str(cover_info.get("cover_url", "") or ""),
+                cover_portrait_url=str(cover_info.get("square_cover_url", "") or ""),
+                steam_app_id=_safe_int(cover_info.get("app_id"), 0),
+            )
+        else:
+            launcher_path = str(record.launcher_path or "").strip()
+            shortcut = await add_or_update_tianyi_shortcut(
+                game_id=str(record.game_id or ""),
+                display_name=display_title,
+                exe_path=launcher_path,
+                launch_options=launch_options,
+                proton_tool="none",
+                cover_landscape_url=str(cover_info.get("cover_url", "") or ""),
+                cover_portrait_url=str(cover_info.get("square_cover_url", "") or ""),
+                steam_app_id=_safe_int(cover_info.get("app_id"), 0),
+            )
+        actions.append({"action": "shortcut_and_artwork", "ok": bool(shortcut.get("ok")), "message": str(shortcut.get("message", "") or "")})
+        if shortcut.get("ok"):
+            appid = _safe_int(shortcut.get("appid_unsigned"), 0)
+            if appid > 0 and _safe_int(record.steam_app_id, 0) != appid:
+                record.steam_app_id = appid
+                record.updated_at = _now_wall_ts()
+                await asyncio.to_thread(self.store.save)
+        after = await self.verify_installed_game(record.game_id)
+        return {"before": before, "after": after, "ok": bool(after.get("ok")), "needs_reinstall": bool(after.get("needs_reinstall")), "actions": actions}
 
     @staticmethod
     def _normalize_scan_title(value: str) -> str:
