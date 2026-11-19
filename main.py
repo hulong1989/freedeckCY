@@ -746,6 +746,14 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def retry_all_tianyi_tasks(self) -> dict:
+        """重试全部失败下载任务。"""
+        try:
+            data = await self._get_tianyi_service().retry_all_failed_tasks()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def set_tianyi_speed_limit(self, payload=None, limit_kb: int = 0) -> dict:
         """设置下载限速（KB/s，0 不限）。"""
         try:

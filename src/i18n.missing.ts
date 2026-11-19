@@ -306,4 +306,10 @@ export const EN_MISSING: Record<string, string> = {
   "已修复": "Repaired",
   "修复超时": "Repair timed out",
   "共": "Total",
+  "全部重试": "Retry All",
+  "没有失败任务": "No Failed Tasks",
+  "重试完成": "Retry Completed",
+  "全部重试失败": "Retry All Failed",
+  "全部重试超时": "Retry All Timed Out",
+  "成功": "Succeeded",
 };

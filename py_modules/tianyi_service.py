@@ -7479,6 +7479,42 @@ class TianyiService(UpdateFlowMixin):
         self._invalidate_panel_cache(tasks=True)
         return {"resumed": changed}
 
+    async def retry_all_failed_tasks(self) -> Dict[str, Any]:
+        """按列表顺序重试全部失败任务；单个失败不中断后续任务。"""
+        candidates = [
+            task
+            for task in list(self.store.tasks)
+            if str(task.status or "") == "error"
+            or str(task.install_status or "") in {"failed", "gave_up"}
+        ][:50]
+        results: List[Dict[str, Any]] = []
+        errors: List[Dict[str, Any]] = []
+        succeeded = 0
+        for task in candidates:
+            task_id = str(task.task_id or "").strip()
+            title = str(task.game_title or task.file_name or task_id)
+            try:
+                view = await self.retry_task(task_id)
+                succeeded += 1
+                results.append({
+                    "task_id": task_id,
+                    "title": title,
+                    "auto_fallback": bool(view.get("auto_fallback")) if isinstance(view, dict) else False,
+                })
+            except Exception as exc:
+                errors.append({
+                    "task_id": task_id,
+                    "title": title,
+                    "message": _redact_text(_describe_exception(exc))[:300],
+                })
+        return {
+            "attempted": len(candidates),
+            "succeeded": succeeded,
+            "failed": len(errors),
+            "results": results,
+            "errors": errors,
+        }
+
     async def apply_saved_download_speed_limit(self) -> None:
         """把持久化的限速应用到当前 aria2 实例。"""
         limit = max(0, int(getattr(self.store.settings, "download_speed_limit", 0) or 0))

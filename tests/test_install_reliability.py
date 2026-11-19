@@ -75,9 +75,9 @@ def _record(tmp_path, game_id="g1", *, platform="pc", install_path=None) -> Tian
     return record
 
 
-def _task(game_id="g1", *, status="error", install_status="failed", error_reason="") -> TianyiTaskRecord:
+def _task(game_id="g1", *, task_id="t1", status="error", install_status="failed", error_reason="") -> TianyiTaskRecord:
     return TianyiTaskRecord(
-        task_id="t1",
+        task_id=task_id,
         gid="gid1",
         game_id=game_id,
         game_title="Demo Game",
@@ -421,3 +421,35 @@ def test_retry_with_fallback_rejects_active_task(tmp_path):
     service.store.tasks = [_task(status="active", install_status="pending")]
     with pytest.raises(ValueError, match="尚未结束"):
         asyncio.run(service.retry_task_with_fallback("t1"))
+
+def test_retry_all_failed_tasks_continues_after_error(tmp_path, monkeypatch):
+    service = _service(tmp_path)
+    service.store.tasks = [
+        _task("g1", task_id="t1"),
+        _task("g2", task_id="t2"),
+        _task("g3", task_id="t3", install_status="gave_up"),
+        _task("g4", task_id="t4", status="active", install_status="pending"),
+        _task("g5", task_id="t5", status="complete", install_status="installed"),
+    ]
+
+    async def fake_retry(task_id):
+        if task_id == "t2":
+            raise RuntimeError("直链获取失败")
+        return {"task_id": task_id, "auto_fallback": task_id == "t3"}
+
+    monkeypatch.setattr(service, "retry_task", fake_retry)
+    result = asyncio.run(service.retry_all_failed_tasks())
+    assert result["attempted"] == 3
+    assert result["succeeded"] == 2
+    assert result["failed"] == 1
+    assert [item["task_id"] for item in result["results"]] == ["t1", "t3"]
+    assert result["results"][1]["auto_fallback"] is True
+    assert result["errors"][0]["task_id"] == "t2"
+    assert "直链获取失败" in result["errors"][0]["message"]
+
+
+def test_retry_all_failed_tasks_noop_without_failures(tmp_path):
+    service = _service(tmp_path)
+    service.store.tasks = [_task("g1", task_id="t1", status="active", install_status="pending")]
+    result = asyncio.run(service.retry_all_failed_tasks())
+    assert result == {"attempted": 0, "succeeded": 0, "failed": 0, "results": [], "errors": []}
