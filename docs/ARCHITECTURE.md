@@ -24,7 +24,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.28.14`，天翼云盘 + 百度网盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块；v0.26.x 做架构拆分与稳定性修复；v0.27.0–v0.27.20 做游戏库视觉重构、详情页/搜索/筛选/更新按钮对齐、Steam Deck 手柄与触控板适配；v0.28.14 增加中英双语/首次语言选择 |
+| 本仓库 `main` | `package.json` 版本 `0.28.14`，天翼云盘 + 百度网盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块；v0.26.x 做架构拆分与稳定性修复；v0.27.0–v0.27.20 做游戏库视觉重构、详情页/搜索/筛选/更新按钮对齐、Steam Deck 手柄与触控板适配；v0.28.14 增加中英双语/首次语言选择与安装可靠性增强（已安装校验/修复、体检、失败诊断/换源、安装前环境自检） |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -171,7 +171,7 @@ repo/
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（555 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
+├── tests/                      # pytest 单测（575 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -691,6 +691,34 @@ QAM 主面板由登录/操作入口、下载列表、已安装游戏预览等 `P
 - 翻译 observer 不在模块加载时启动：Decky 组件运行在共享 JS context，QAM/BigPicture 属于不同 document/realm。`useI18nRoot(ref)` 在 Content/Settings/Library/Detail 挂载后从真实根节点 `ownerDocument` 启动，TreeWalker/MutationObserver/timer 都用 `defaultView`，并用 `nodeType` 代替跨 realm 不可靠的 `instanceof`。
 - 词表实际 434 条（235 条直出中文 + 199 条 `\uXXXX` 转义解码），语言选择只影响插件 UI；Steam 自身界面/后端动态错误消息可能仍为中文。
 
+### 5.16.2 安装可靠性：校验 / 修复 / 体检 / 诊断 / 换源 / 环境自检（v0.28.14）
+
+**已安装校验**：callable `verify_tianyi_installed_game` → [tianyi_service.py:7876](../py_modules/tianyi_service.py) `verify_installed_game(game_id)`。按平台检查：
+
+- PC：安装目录存在、能用 `openpath`/`executable_name` 找到 `.exe`；
+- 模拟器：`rom_path` 文件存在、`launcher_path` 启动脚本存在；
+- 公共：`resolve_tianyi_shortcut_sync()` 能查到 Steam 快捷方式（返回 `appid`）。
+
+返回 `{ok, needs_reinstall, checks[{id,ok,message,path,appid}]}`。`ok` 只看关键项（目录/主程序/ROM/启动脚本），快捷方式缺失算可修复、不算重下；目录或主程序/ROM 缺失时 `needs_reinstall=true`，UI 明确提示重新下载。
+
+**一键修复**：callable `repair_tianyi_installed_game` → `repair_installed_game()`。先跑一次校验，`needs_reinstall=true` 时直接返回、不假装成功；否则重建 Steam 快捷方式、Proton 映射与四件套美术（`add_or_update_tianyi_shortcut`，缺 logo 时依次用竖版/横版封面兜底），写回新 `steam_app_id`，再跑一次校验返回 `before/after/actions`。库页已安装卡片的「校验」按钮会展示逐项结果与修复动作。
+
+**全量体检**：callable `get_tianyi_installed_health` → `installed_health_report()`。遍历 `store.installed_games` 逐个调用校验（单个异常不中断），返回 `{total, ok, needs_repair, needs_reinstall, items[]}`；库页顶栏「体检」汇总正常/异常/需重下，列出异常游戏（最多 12 条）；有可修复项时按钮变为「修复可修复项」，逐个调用 `repair_installed_game()` 后刷新已安装列表并汇总成功/失败数，`needs_reinstall` 的条目只提示重下。
+
+**失败任务诊断**：callable `diagnose_tianyi_task` → `diagnose_task(task_id)`。从 `error_reason`/`install_message`/状态推断阶段（`resolve`/`download`/`extract`/`install`），给出固定建议，并计算 `can_retry`、`can_fallback`（`_has_alternate_source()` 按同标题/同平台/不同网盘源判断）。QAM 失败任务的「诊断」按钮展示阶段、原因、建议。
+
+**换源**：callable `retry_tianyi_task_with_fallback` → `retry_task_with_fallback(task_id)`：在同标题/同平台的目录条目里找另一个有 `down_url` 的网盘源，调 `start_install()` 新开任务；旧任务保留便于对照。`retry_task()` 在当前源无法恢复直链时会自动调一次换源，返回结果带 `auto_fallback=true`；无备用源时按原逻辑标记失败并报“无可用备用源”。
+
+**安装前环境自检**：callable `preflight_tianyi_install` → `preflight_install()`：
+
+- 下载目录/安装目录：存在则 `os.access(W_OK)`；不存在则向上找最近的存在祖先判断可写，返回 `message="目录不存在，安装时会自动创建"`，**自检本身不创建目录**；
+- 磁盘空间：分别用下载/安装目录（或最近祖先）的 `shutil.disk_usage().free`，低于 `PREFLIGHT_MIN_FREE_BYTES=512MB` 记异常；
+- 返回 `{ok, checks[{id,ok,path,exists,free_bytes,message}], min_free_bytes}`。
+
+UI 有两处入口：设置页新增「环境」Tab（`InstallPreflightSection`，手动检查并逐项显示路径/状态/建议）；安装确认弹窗前自动调用一次（15s 超时），有异常时把失败项追加到安装计划描述、把按钮改成「仍然下载」，不阻断用户继续。真正的按文件大小空间校验仍在 `_build_install_plan()` 的 `can_install` 里。
+
+**测试**：`tests/test_install_reliability.py` 覆盖自检（可写/缺失可创建/不可写/低空间/读盘失败）、PC 与模拟器校验、修复跳过与重建、体检聚合与单项异常、诊断阶段/换源判断、重试自动换源/无备用源/活动任务拒绝。
+
 ### 5.17 诊断自检（v0.22.0）
 
 **QAM 入口**：设置页新增「诊断」Tab（`src/index.tsx`，`onRunDiagnostics`/`onExportDiagnostics`）：
@@ -926,8 +954,8 @@ QAM 任务行在 `status=error` 或 `install_status=failed` 时显示「重试�
 
 1. 重置状态：`post_processed=false`、`install_status=pending`、清空 `_readd_attempts` / `_task_sync_misses`，让"每任务每进程一次"的限制不再挡住人工重试；
 2. **文件已完整**（`_file_matches_expected_size()` 通过）→ 直接判 `complete` 并重新调度安装，**不重新下载**；
-3. **文件不完整/缺失** → 重新获取直链（`changeUri`/`addUri`）回到下载队列；取直链失败（如登录态失效）→ 任务改 `install_status=failed` 并提示"重试失败：无法重新获取下载直链"；
-4. 重试是显式人工动作，后台维护不会自动触发。
+3. **文件不完整/缺失** → 重新获取直链（`changeUri`/`addUri`）回到下载队列；取直链失败（如登录态失效）→ 自动尝试一次同游戏备用网盘源（`retry_task_with_fallback`，结果带 `auto_fallback=true`）；仍无备用源才把任务改 `install_status=failed` 并提示"重试失败：无法重新获取下载直链（也无备用源）"；
+4. 重试是显式人工动作，后台维护不会自动触发；`diagnose_task()` 只读诊断，不修改任务。
 
 ### 6.8 卸载与 Proton 前缀回收（v0.1.1）
 
@@ -1112,7 +1140,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### P2：工程性
 
-21. `tianyi_service.py` 约 10700 行、单类 100+ 方法；`src/index.tsx` 约 3705 行单文件。已补 `tests/`（555 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+21. `tianyi_service.py` 约 10700 行、单类 100+ 方法；`src/index.tsx` 约 3705 行单文件。已补 `tests/`（575 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
 22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
 23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
 24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）

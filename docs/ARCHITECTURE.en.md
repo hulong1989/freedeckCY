@@ -24,7 +24,7 @@ This is the easiest trap when reading this repository: **the finished releases o
 
 | Location | Content | Notes |
 |---|---|---|
-| This repo, `main` | `package.json` version `0.28.14`, Tianyi Cloud Drive + Baidu Netdisk + multi-platform catalog, adapted to Steam Deck / DroidDeck | Forked from the early 2026-02 upstream Freedeck version (0.2), with version numbers restarting from 0.1.0; v0.1.1 completed the "four-piece set"; v0.2.0 completed catalog platformization / cover index / category filtering; v0.3.0 completed the full catalog and platform filtering UI; v0.3.1 did category cleanup and catalog data health checks; v0.4.0 did DroidDeck (Android/ARM64) adaptation; v0.5.0 completed first-tier browsing/paging/sorting/installed tab plus diagnostics export/update check; v0.6.0~v0.6.2 did the GBA emulator closed loop and remote JSON catalog; v0.7.0 built the generic emulator registry and integrated PSP/NDS; v0.8.0 did Ludusavi + gamewatch automatic cloud saves; v0.9.0 expanded the emulator registry to PS1/FC/MD (6 platforms); v0.10.0 switched all emulators to online download (no emulator bundled in the plugin); v0.11.0 completed 10 platforms + architecture capability matrix; v0.12.0 did emulator BIOS/firmware deployment + portable config; v0.13.0 did repository game submission (Issue/PR → catalog); v0.14.0 integrated the Baidu Netdisk official OpenAPI; v0.14.1 fixed 3DS (Azahar) compatibility on SteamOS 3.9.5 (prefer official Flatpak); v0.15.0 brought emulator saves into cloud save upload; v0.16.0 did emulator save restore + per-game splitting + PS1 multi-disc m3u; v0.17.0 changed Baidu Netdisk to QR-code login (BDUSS/Cookie main path, OpenAPI optional fallback); v0.18.0 did installed game scanning + Baidu QR error diagnostics; v0.19.0 made download/install directories support SD card selection; v0.20.0 did the Decky native game library (no longer depending on the web page); v0.21.0 moved "scan installed" to settings and auto-added Steam shortcuts; v0.22.0 did diagnostics self-check + one-click diagnostics bundle; v0.23.0 did native library fallback + Baidu QR timeout/click feedback; v0.24.0 fixed native library back/close; v0.25.0 stopped showing the plugin playtime block for existing Steam games; v0.26.x did architecture splitting and stability fixes; v0.27.0–v0.27.20 did the game library visual refactor, detail page/search/filter/update button alignment, and Steam Deck controller/trackpad adaptation; v0.28.14 added Chinese/English bilingual UI and first-run language selection |
+| This repo, `main` | `package.json` version `0.28.14`, Tianyi Cloud Drive + Baidu Netdisk + multi-platform catalog, adapted to Steam Deck / DroidDeck | Forked from the early 2026-02 upstream Freedeck version (0.2), with version numbers restarting from 0.1.0; v0.1.1 completed the "four-piece set"; v0.2.0 completed catalog platformization / cover index / category filtering; v0.3.0 completed the full catalog and platform filtering UI; v0.3.1 did category cleanup and catalog data health checks; v0.4.0 did DroidDeck (Android/ARM64) adaptation; v0.5.0 completed first-tier browsing/paging/sorting/installed tab plus diagnostics export/update check; v0.6.0~v0.6.2 did the GBA emulator closed loop and remote JSON catalog; v0.7.0 built the generic emulator registry and integrated PSP/NDS; v0.8.0 did Ludusavi + gamewatch automatic cloud saves; v0.9.0 expanded the emulator registry to PS1/FC/MD (6 platforms); v0.10.0 switched all emulators to online download (no emulator bundled in the plugin); v0.11.0 completed 10 platforms + architecture capability matrix; v0.12.0 did emulator BIOS/firmware deployment + portable config; v0.13.0 did repository game submission (Issue/PR → catalog); v0.14.0 integrated the Baidu Netdisk official OpenAPI; v0.14.1 fixed 3DS (Azahar) compatibility on SteamOS 3.9.5 (prefer official Flatpak); v0.15.0 brought emulator saves into cloud save upload; v0.16.0 did emulator save restore + per-game splitting + PS1 multi-disc m3u; v0.17.0 changed Baidu Netdisk to QR-code login (BDUSS/Cookie main path, OpenAPI optional fallback); v0.18.0 did installed game scanning + Baidu QR error diagnostics; v0.19.0 made download/install directories support SD card selection; v0.20.0 did the Decky native game library (no longer depending on the web page); v0.21.0 moved "scan installed" to settings and auto-added Steam shortcuts; v0.22.0 did diagnostics self-check + one-click diagnostics bundle; v0.23.0 did native library fallback + Baidu QR timeout/click feedback; v0.24.0 fixed native library back/close; v0.25.0 stopped showing the plugin playtime block for existing Steam games; v0.26.x did architecture splitting and stability fixes; v0.27.0–v0.27.20 did the game library visual refactor, detail page/search/filter/update button alignment, and Steam Deck controller/trackpad adaptation; v0.28.14 added Chinese/English bilingual UI, first-run language selection, and install-reliability improvements (installed-game check/repair, health check, failure diagnostics/source fallback, pre-install environment preflight) |
 | Releases v0.2.3 → v0.6 | Release packages about 50 MB | Add **Baidu Netdisk** support, **emulator integration**, **resource pool (user uploads)**, CRT filter, likes, and more |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 refactored versions | Emulators playable, "play later" tab, multi-volume download fix |
 
@@ -171,7 +171,7 @@ repo/
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（555 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
+├── tests/                      # pytest 单测（575 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -691,6 +691,34 @@ Cards show the cover, install size, and playtime (showing `-` when missing); cli
 - The translation observer is not started at module load: Decky components run in a shared JS context, and QAM/BigPicture belong to different documents/realms. `useI18nRoot(ref)` starts from the real root node's `ownerDocument` after Content/Settings/Library/Detail mount; the TreeWalker/MutationObserver/timer all use `defaultView`, and `nodeType` is used instead of the cross-realm-unreliable `instanceof`.
 - The dictionary actually has 434 entries (235 directly authored Chinese + 199 decoded from `\uXXXX` escapes); the language choice only affects the plugin UI; Steam's own UI and backend dynamic error messages may still be in Chinese.
 
+### 5.16.2 Install reliability: verify / repair / health / diagnostics / source fallback / preflight (v0.28.14)
+
+**Installed-game verify**: callable `verify_tianyi_installed_game` → [tianyi_service.py:7876](../py_modules/tianyi_service.py) `verify_installed_game(game_id)`.
+
+- PC: install folder exists and an `.exe` can be located from `openpath`/`executable_name`;
+- Emulator: `rom_path` exists and `launcher_path` launcher script exists;
+- Common: `resolve_tianyi_shortcut_sync()` finds the Steam shortcut (returns `appid`).
+
+It returns `{ok, needs_reinstall, checks[{id,ok,message,path,appid}]}`. `ok` only covers critical items (folder/main executable/ROM/launcher); a missing shortcut is repairable and does not force a reinstall. A missing folder or main executable/ROM sets `needs_reinstall=true`, and the UI clearly says a re-download is required.
+
+**One-click repair**: callable `repair_tianyi_installed_game` → `repair_installed_game()`. It verifies first and returns immediately (without pretending success) when `needs_reinstall=true`; otherwise it rebuilds the Steam shortcut, Proton mapping and four-piece artwork (`add_or_update_tianyi_shortcut`, falling back from logo to portrait/landscape), writes back the new `steam_app_id`, verifies again and returns `before/after/actions`. The "Verify" button on installed cards shows per-item results and repair actions.
+
+**Full health check**: callable `get_tianyi_installed_health` → `installed_health_report()`. It walks `store.installed_games` and verifies each game (one failure does not abort the run), returning `{total, ok, needs_repair, needs_reinstall, items[]}`; the library top-bar "Health Check" button summarizes OK/issues/reinstall-required and lists abnormal games (up to 12); when repairable items exist the button becomes "Repair Repairable Items", calling `repair_installed_game()` for each and refreshing the installed list with a success/failure summary, while `needs_reinstall` items only prompt a re-download.
+
+**Failed-task diagnostics**: callable `diagnose_tianyi_task` → `diagnose_task(task_id)`. It infers the stage (`resolve`/`download`/`extract`/`install`) from `error_reason`/`install_message`/status, returns fixed suggestions, and computes `can_retry` and `can_fallback` (`_has_alternate_source()` matches same title/platform but a different provider). The QAM "Diagnostics" button on failed tasks shows stage, reason and suggestions.
+
+**Source fallback**: callable `retry_tianyi_task_with_fallback` → `retry_task_with_fallback(task_id)`: finds another catalog entry with the same title/platform and a non-empty `down_url` on a different provider, then calls `start_install()` to create a new task; the old task is kept for comparison. When `retry_task()` cannot re-fetch the direct link it calls fallback once automatically and marks the result `auto_fallback=true`; without an alternate source it keeps the old failure path and reports "no alternate source".
+
+**Pre-install environment preflight**: callable `preflight_tianyi_install` → `preflight_install()`:
+
+- Download/install folders: if they exist, check `os.access(W_OK)`; if missing, walk up to the nearest existing ancestor and check writability, returning `message="folder does not exist; it will be created automatically"`. **Preflight itself never creates folders**;
+- Disk space: read `shutil.disk_usage().free` for the download/install folder (or nearest ancestor) separately; below `PREFLIGHT_MIN_FREE_BYTES=512MB` is an issue;
+- Returns `{ok, checks[{id,ok,path,exists,free_bytes,message}], min_free_bytes}`.
+
+There are two UI entry points: a new "Environment" Tab in settings (`InstallPreflightSection`, manual check with per-item path/status/advice), and an automatic call before the install confirmation modal (15s timeout). On issues the failed items are appended to the plan description and the button becomes "Download Anyway", without blocking a deliberate install. The real size-based check remains in `_build_install_plan()`'s `can_install`.
+
+**Tests**: `tests/test_install_reliability.py` covers preflight (writable/creatable/not-writable/low-space/read failure), PC and emulator verification, repair skip and rebuild, health aggregation and per-item errors, diagnostics stage/fallback detection, and retry auto-fallback/no-fallback/active-task rejection.
+
 ### 5.17 Diagnostics self-check (v0.22.0)
 
 **QAM entry**: the settings page adds a "Diagnostics" Tab (`src/index.tsx`, `onRunDiagnostics`/`onExportDiagnostics`):
@@ -926,7 +954,7 @@ The QAM task row shows "Retry" when `status=error` or `install_status=failed`, g
 
 1. Reset state: `post_processed=false`, `install_status=pending`, clear `_readd_attempts` / `_task_sync_misses`, so that the "once per task per process" limit no longer blocks manual retries;
 2. **The file is already complete** (`_file_matches_expected_size()` passes) → mark `complete` directly and reschedule installation, **without re-downloading**;
-3. **The file is incomplete/missing** → re-fetch the direct link (`changeUri`/`addUri`) and return to the download queue; if fetching the direct link fails (e.g. login state expired) → the task changes to `install_status=failed` with the prompt "Retry failed: unable to re-fetch the download direct link";
+3. **The file is incomplete/missing** → re-fetch the direct link (`changeUri`/`addUri`) and return to the download queue; if fetching the direct link fails (e.g. login state expired) → automatically try an alternate provider for the same game once (`retry_task_with_fallback`, result marked `auto_fallback=true`); only when there is no alternate source does the task change to `install_status=failed` with the prompt "Retry failed: unable to re-fetch the download direct link (and no alternate source)";
 4. Retry is an explicit manual action; background maintenance never triggers it automatically.
 
 ### 6.8 Uninstall and Proton prefix reclamation (v0.1.1)
@@ -1112,7 +1140,7 @@ Note: **the cookie is never sent back through the browser** — the login bridge
 
 ### P2: Engineering quality
 
-21. `tianyi_service.py` is about 10700 lines with a single class of 100+ methods; `src/index.tsx` is an about 3705-line single file. `tests/` (555 test cases) and GitHub Actions CI have been added, but there is **still no Python type checking** (mypy/ruff not wired in, see ROADMAP).
+21. `tianyi_service.py` is about 10700 lines with a single class of 100+ methods; `src/index.tsx` is an about 3705-line single file. `tests/` (575 test cases) and GitHub Actions CI have been added, but there is **still no Python type checking** (mypy/ruff not wired in, see ROADMAP).
 22. Everything is hardcoded Chinese, **no i18n**; many `unknown` / `as` assertions bypass TS types. (Known issue)
 23. ~~`clear_freedeckcy_tasks.sh` hardcodes `/home/deck`~~: **fixed in this completion** — uses `$HOME` and supports `FREEDECKCY_STATE_FILE` overrides.
 24. The log path still hardcodes `/tmp/freedeckcy.log` and is not configurable (rotation is in place, so it no longer grows without bound). (Known issue)

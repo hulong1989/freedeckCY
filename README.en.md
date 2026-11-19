@@ -32,7 +32,7 @@ A **Decky Loader plugin** for the Steam Deck: using resource catalogs from Tiany
 |---|---|
 | Current version | **0.28.14** (see [CHANGELOG.md](CHANGELOG.md) / [English summary](CHANGELOG.en.md)) |
 | Code baseline | Forked from upstream Freedeck's early version (0.2) dated 2026-02; upstream is no longer maintained |
-| Tests | **555 passed**, covering offline logic for catalog, installation, cloud saves, Baidu, emulators, storage, updates and more |
+| Tests | **575 passed**, covering offline logic for catalog, installation, cloud saves, Baidu, emulators, storage, updates and more |
 | CI | Python tests / UI build / frontend hooks scope check / x86_64 and aarch64 runtime smoke tests |
 | Data directory | `~/.local/share/freedeckCY/` (`state.json` permissions 0600, directory 0700) |
 | Resource catalog | `defaults/tianyi_catalog/freedeckcy_catalog.csv` (7084 entries) |
@@ -68,6 +68,11 @@ A **Decky Loader plugin** for the Steam Deck: using resource catalogs from Tiany
 - **Extraction protection**: waits for `.aria2` files to be released and sizes to stabilize before extracting; empty files/HTML error pages are intercepted early.
 - **Steam config safety**: timestamped backups (12 kept) are made before writing `shortcuts.vdf` / `config.vdf`; files are not rewritten when unchanged.
 - **Download management**: pause/resume all, global speed limit, retry failed tasks; task progress is shown on the plugin home page.
+- **Install reliability**:
+  - **Pre-install environment preflight**: checks that the download/install folders are writable and have free space; a manual check lives on the Settings "Environment" tab, and the install confirmation warns with "Download Anyway" when issues are found.
+  - **Installed-game verify/repair**: checks the install folder, main executable/ROM and Steam shortcut item by item; one click rebuilds the shortcut, Proton mapping and four-piece artwork, and clearly reports when files are missing and a reinstall is required.
+  - **Full health check**: the library top bar summarizes OK/issues/reinstall-required and lists abnormal games, with one-click repair for all repairable items.
+  - **Failure diagnostics/source fallback**: failed tasks expose stage, reason and suggestions; retry on the other Tianyi/Baidu source for the same game, and a failed retry on the current source falls back automatically once.
 - **Storage locations**:
   - The download directory supports one-tap switching between "internal drive / SD card / external storage".
   - The internal drive is fixed to `~/Downloads`; external storage uses `<SD>/freedeckCY/downloads` and shows the free space.
@@ -195,7 +200,7 @@ pnpm check:ui       # hooks dependency scope check
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # or make test; currently 555 cases
+.venv/bin/pytest -q          # or make test; currently 575 cases
 make check-ui                # frontend hooks scope check
 make doctor                  # environment diagnostics (read-only)
 make package-droiddeck       # ARM64 package
@@ -289,7 +294,7 @@ submissions/                Repository game submission JSON / schema
 backend/*.js                Node helper scripts (share-parsing fallback, cloud-save upload)
 scripts/                    Runtime fetching/packaging/diagnostics/catalog validation/submission merging
 docs/                       Architecture/development/roadmap/DroidDeck
-tests/                      pytest cases (555)
+tests/                      pytest cases (575)
 CHANGELOG.md                Version changes
 Makefile                    runtime / package / package-droiddeck / test / check-ui / doctor / ...
 ```

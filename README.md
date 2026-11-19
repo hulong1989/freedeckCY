@@ -32,7 +32,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 |---|---|
 | 当前版本 | **0.28.14**（见 [CHANGELOG.md](CHANGELOG.md) / [English](CHANGELOG.en.md)） |
 | 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork；上游已停止维护 |
-| 测试 | **555 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
+| 测试 | **575 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
 | CI | Python 测试 / UI 构建 / 前端 hooks 作用域检查 / x86_64 与 aarch64 运行时冒烟 |
 | 数据目录 | `~/.local/share/freedeckCY/`（`state.json` 权限 0600，目录 0700） |
 | 资源目录 | `defaults/tianyi_catalog/freedeckcy_catalog.csv`（7084 条） |
@@ -68,6 +68,11 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 - **解压保护**：等待 `.aria2` 释放、大小稳定后再解压；空文件/HTML 错误页提前拦截。
 - **Steam 配置安全**：`shortcuts.vdf` / `config.vdf` 写前留时间戳备份（保留 12 份），无变化不重写。
 - **下载管理**：全部暂停/继续、全局限速、失败任务重试；任务进度在插件主页展示。
+- **安装可靠性**：
+  - **安装前环境自检**：检查下载/安装目录可写性与剩余空间，设置页「环境」页可手动检查；安装确认弹窗发现异常时提示「仍然下载」。
+  - **已安装校验/修复**：逐项检查安装目录、主程序/ROM、Steam 快捷方式；可一键重建快捷方式、Proton 映射与四件套封面，文件缺失时明确提示需重下。
+  - **全量体检**：库页顶栏汇总正常/异常/需重下，列出异常游戏；可一键修复所有可修复项。
+  - **失败诊断/换源**：失败任务可查看阶段、原因与建议；在同一游戏的天翼/百度源间换源重试，当前源重试失败时也会自动换源一次。
 - **存储位置**：
   - 下载目录支持「内置硬盘 / SD 卡 / 外置存储」一键切换。
   - 内置硬盘固定 `~/Downloads`；外置使用 `<SD>/freedeckCY/downloads`，并显示剩余空间。
@@ -195,7 +200,7 @@ pnpm check:ui       # hooks 依赖作用域检查
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test，当前 555 个用例
+.venv/bin/pytest -q          # 或 make test，当前 575 个用例
 make check-ui                # 前端 hooks 作用域检查
 make doctor                  # 环境诊断（只读）
 make package-droiddeck       # ARM64 包
@@ -289,7 +294,7 @@ submissions/                仓库游戏提交 JSON / schema
 backend/*.js                Node 辅助脚本（分享解析兜底、云存档上传）
 scripts/                    运行时获取/打包/诊断/目录校验/提交合并
 docs/                       架构/开发/路线图/DroidDeck
-tests/                      pytest 用例（555 个）
+tests/                      pytest 用例（575 个）
 CHANGELOG.md                版本变更
 Makefile                    runtime / package / package-droiddeck / test / check-ui / doctor / ...
 ```

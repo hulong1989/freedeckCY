@@ -5,7 +5,19 @@
 
 ## v0.28.14
 
-- Language selector buttons now flex to the panel width and align with the Game Library button.
+### Install reliability
+
+- **Installed-game verify/repair**: checks the install folder, main executable/ROM and Steam shortcut item by item; one click rebuilds the shortcut, Proton mapping and four-piece artwork; missing files are reported as requiring a reinstall instead of a fake success.
+- **Full health check**: scans every installed game and summarizes OK / needs repair / needs reinstall in the library top bar, with one click to repair every repairable item (reinstall-required ones excluded).
+- **Failure diagnostics**: failed tasks expose stage (resolve/download/extract/install), reason, suggestions, and whether retry/fallback is possible.
+- **Source fallback**: retry a failed task on the other Tianyi/Baidu source for the same game; retrying on the current source falls back automatically once when the direct link cannot be re-fetched.
+- **Pre-install environment preflight**: checks download/install folder writability and free space (512MB floor), available on the new Settings "Environment" tab; the install confirmation shows failed checks and changes the button to "Download Anyway".
+- Non-Steam games without a logo fall back to portrait/landscape artwork.
+- 20 new reliability tests; 574 tests passed.
+
+### UI
+
+- Language selector buttons flex to the panel width and align with the Game Library button.
 - Removed temporary i18n diagnostic DOM attributes.
 
 ## v0.28.6
