@@ -2,9 +2,9 @@
 
 > [English](ROADMAP.en.md) | 中文
 
-> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配 + v0.5.0 第一梯队 + v0.6.0 GBA 闭环 + v0.7.0 模拟器注册表 + v0.8.0 自动云存档 + v0.9.0 模拟器六平台 + v0.10.0 模拟器全部在线下载 + v0.11.0 十平台 + 架构能力矩阵 + v0.12.0 模拟器 BIOS/固件部署 + v0.13.0 仓库游戏提交 + v0.14.0 百度网盘官方 OpenAPI + v0.14.1 3DS SteamOS 兼容修复 + v0.15.0 模拟器存档纳入云存档 + v0.16.0 模拟器存档恢复/按游戏拆分/PS1 多碟 + v0.17.0 百度扫码/Cookie 主链路 + v0.18.0 扫描已安装/扫码诊断 + v0.19.0 SD 卡选择 + v0.20.0 原生游戏库 + v0.21.0 扫描迁移/自动补 Steam + v0.22.0 诊断自检 + v0.23.0 原生库兜底/QR 超时 + v0.24.0 返回修复 + v0.25.0 时长隔离 + v0.26.x 架构拆分/稳定性 + v0.27.0–v0.27.20 游戏库视觉重构/手柄触控/详情与筛选对齐之后**（v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 平台字段/封面缓存/分类筛选；v0.3.0 全量目录与平台筛选 UI；v0.3.1 分类清洗 + 数据体检 CI；v0.4.0 Android/ARM64 的 DroidDeck 适配；v0.5.0 目录浏览/分页/排序/已安装页签/诊断导出/更新检查；v0.6.0 GBA 模拟器闭环；v0.6.1/v0.6.2 远程 JSON 目录；v0.7.0 通用模拟器注册表 + PSP/NDS；v0.8.0 Ludusavi + gamewatch 自动云存档；v0.9.0 模拟器扩到 PS1/FC/MD；v0.10.0 模拟器全部在线下载、插件包不集成；v0.11.0 补齐 3DS/PS2/PS3/Switch、10 平台 + 架构白名单；v0.12.0 模拟器 BIOS/固件部署 + portable 配置；v0.13.0 仓库游戏提交（Issue/PR → 目录）；v0.14.0 百度网盘官方 OpenAPI；v0.14.1 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak）；v0.15.0 模拟器存档纳入云存档上传；v0.16.0 模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u；v0.17.0 百度网盘改为扫码/Cookie 主链路（OpenAPI 可选回退）；v0.18.0 扫描已安装游戏 + 百度扫码错误诊断；v0.19.0 下载/安装目录支持 SD 卡选择；v0.20.0 Decky 原生游戏库（不再依赖网页）；v0.21.0 扫描已安装移到设置 + 自动补 Steam 快捷方式；v0.22.0 诊断自检 + 一键诊断包；v0.23.0 原生库兜底 + 百度扫码点击反馈/超时；v0.26.51 移除 UI 版本标识；v0.24.0 原生库返回/关闭修复；v0.25.0 Steam 原有游戏不再显示插件时长块）值得继续做、以及明确不建议做的方向。当前版本 **v0.28.14**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
+> 本文件列出本仓库在 **2026-11 三轮工程补全 + v0.1.1 四件套 + v0.2.0 目录/封面 + v0.3.0 全量数据/平台筛选 + v0.3.1 分类清洗/数据体检 + v0.4.0 DroidDeck 适配 + v0.5.0 第一梯队 + v0.6.0 GBA 闭环 + v0.7.0 模拟器注册表 + v0.8.0 自动云存档 + v0.9.0 模拟器六平台 + v0.10.0 模拟器全部在线下载 + v0.11.0 十平台 + 架构能力矩阵 + v0.12.0 模拟器 BIOS/固件部署 + v0.13.0 仓库游戏提交 + v0.14.0 百度网盘官方 OpenAPI + v0.14.1 3DS SteamOS 兼容修复 + v0.15.0 模拟器存档纳入云存档 + v0.16.0 模拟器存档恢复/按游戏拆分/PS1 多碟 + v0.17.0 百度扫码/Cookie 主链路 + v0.18.0 扫描已安装/扫码诊断 + v0.19.0 SD 卡选择 + v0.20.0 原生游戏库 + v0.21.0 扫描迁移/自动补 Steam + v0.22.0 诊断自检 + v0.23.0 原生库兜底/QR 超时 + v0.24.0 返回修复 + v0.25.0 时长隔离 + v0.26.x 架构拆分/稳定性 + v0.27.0–v0.27.20 游戏库视觉重构/手柄触控/详情与筛选对齐之后**（v0.1.1 落地 compatdata 清理与 `7z t` 校验；v0.2.0 平台字段/封面缓存/分类筛选；v0.3.0 全量目录与平台筛选 UI；v0.3.1 分类清洗 + 数据体检 CI；v0.4.0 Android/ARM64 的 DroidDeck 适配；v0.5.0 目录浏览/分页/排序/已安装页签/诊断导出/更新检查；v0.6.0 GBA 模拟器闭环；v0.6.1/v0.6.2 远程 JSON 目录；v0.7.0 通用模拟器注册表 + PSP/NDS；v0.8.0 Ludusavi + gamewatch 自动云存档；v0.9.0 模拟器扩到 PS1/FC/MD；v0.10.0 模拟器全部在线下载、插件包不集成；v0.11.0 补齐 3DS/PS2/PS3/Switch、10 平台 + 架构白名单；v0.12.0 模拟器 BIOS/固件部署 + portable 配置；v0.13.0 仓库游戏提交（Issue/PR → 目录）；v0.14.0 百度网盘官方 OpenAPI；v0.14.1 3DS（Azahar）SteamOS 兼容修复（优先官方 Flatpak）；v0.15.0 模拟器存档纳入云存档上传；v0.16.0 模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u；v0.17.0 百度网盘改为扫码/Cookie 主链路（OpenAPI 可选回退）；v0.18.0 扫描已安装游戏 + 百度扫码错误诊断；v0.19.0 下载/安装目录支持 SD 卡选择；v0.20.0 Decky 原生游戏库（不再依赖网页）；v0.21.0 扫描已安装移到设置 + 自动补 Steam 快捷方式；v0.22.0 诊断自检 + 一键诊断包；v0.23.0 原生库兜底 + 百度扫码点击反馈/超时；v0.26.51 移除 UI 版本标识；v0.24.0 原生库返回/关闭修复；v0.25.0 Steam 原有游戏不再显示插件时长块）值得继续做、以及明确不建议做的方向。当前版本 **v0.28.15**。它不是承诺，也不绑定版本；各项给出现状、动机、代价与验收标准，方便二次开发者按需领取。
 
-> **当前状态（v0.28.14）**：Decky 原生游戏库已完成封面网格/Hero/分类货架/详情页/骨架屏改版；搜索、筛选、更新按钮、详情操作栏均已对齐；顶部工具栏单行；分类货架白条隐藏；最左/最右卡片焦点环与顶部安全区完整；D-pad/左摇杆、A/B、L1/R1、L2/R2、触控板/触摸滚动已接入。安装可靠性补齐：已安装校验/修复、全量体检、失败任务诊断与自动/手动换源、安装前环境自检（设置「环境」页 + 安装确认弹窗）。任务进度仍在 QAM 主页；旧本地网页库仅桌面调试/回退；独立 Web 提交/管理系统不在本仓库。
+> **当前状态（v0.28.15）**：Decky 原生游戏库已完成封面网格/Hero/分类货架/详情页/骨架屏改版；搜索、筛选、更新按钮、详情操作栏均已对齐；顶部工具栏单行；分类货架白条隐藏；最左/最右卡片焦点环与顶部安全区完整；D-pad/左摇杆、A/B、L1/R1、L2/R2、触控板/触摸滚动已接入。安装可靠性补齐：已安装校验/修复、全量体检、失败任务诊断与自动/手动换源、安装前环境自检（设置「环境」页 + 安装确认弹窗）、Range 续传探测（恢复时先探测，不支持则隔离半成品重下）。任务进度仍在 QAM 主页；旧本地网页库仅桌面调试/回退；独立 Web 提交/管理系统不在本仓库。
 >
 > 背景：上游作者已停止维护，`main` 只是早期版本，**上游 Freedeck** Releases 的百度网盘 / 模拟器 / 资源池实现不在本仓库；本仓库已有独立的百度/模拟器实现，仅“资源池”未移植（见 [ARCHITECTURE.md](ARCHITECTURE.md) §2）。
 >
@@ -44,7 +44,7 @@
 
 - 拆出至少 4 个模块（建议：`install_flow.py`、`cloud_save_flow.py`、`login_flow.py`、`playtime.py`），`TianyiService` 只做编排与状态持有；
 - `main.py` / `tianyi_http.py` 的调用面不变（RPC 与 HTTP 契约不动）；
-- `make test`（当前 575 个用例）保持全绿，新增用例覆盖搬迁后的模块（原生库为前端构建验证）；
+- `make test`（当前 585 个用例）保持全绿，新增用例覆盖搬迁后的模块（原生库为前端构建验证）；
 - 单个 Python 文件 < 1500 行；`docs/ARCHITECTURE.md` 的引用与模块图同步更新。
 
 **涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_http.py`、`docs/ARCHITECTURE.md`。
@@ -191,7 +191,7 @@
 
 | # | 候选 | 优先级 | 工作量 | v0.6 出处 | 一句话收益 |
 |---|---|---|---|---|---|
-| 9.1 | Range 续传探测 | P1 | 小 | `_remote_supports_resume()` | 避免对不支持续传的直链做无效重试 |
+| 9.1 | ~~Range 续传探测~~ ✅ | ~~P1~~ | ~~小~~ | `_remote_supports_resume()` | **v0.28.15 已落地**：恢复/换链前探测 Range；不支持则隔离半成品重下 |
 | 9.2 | ~~compatdata 卸载清理~~ ✅ | ~~P1~~ | ~~小~~ | `uninstall_installed_game(delete_compatdata=)` | **已在 v0.1.1 落地**：卸载可选回收 Proton 前缀 |
 | 9.3 | 自动重启 Steam | P1 | 小 | `main.py::restart_steam` | 写完快捷方式即可生效，不用手动重启 |
 | 9.4 | ~~`7z t` 全量归档校验~~ ✅ | ~~P1~~ | ~~中~~ | `archive_validator.test_archive` | **已在 v0.1.1 落地（best-effort）**：解压前发现坏包并自动重下 |
@@ -201,22 +201,16 @@
 | 9.8 | ~~单平台模拟器闭环~~ ✅（10 平台，全部在线下载 + BIOS/固件部署） | ~~P2~~ | ~~大~~ | `emulator_adapters.py` | **v0.6.0 GBA、v0.7.0 PSP/NDS、v0.9.0 PS1/FC/MD、v0.10.0 全部在线下载、v0.11.0 3DS（Azahar）/PS2（PCSX2）/PS3（RPCS3）/Switch（Eden）、v0.12.0 BIOS/固件部署 + portable 配置（含压缩包、RPCS3 `--installfw`）**；3DS/PS2/PS3 官方包仅 x86_64（aarch64 自动隐藏）；PS1/PS2 BIOS、3DS/PS3/Switch 系统文件由用户自备 |
 | 9.9 | ~~百度网盘~~ ✅（v0.17.0 扫码/Cookie 主链路；v0.14.0 OpenAPI 可选回退） | ~~P3~~ | ~~大~~ | `baidu_qr.py` / `baidu_openapi_client.py` | **v0.17.0**：Passport 二维码 → Cookie，QAM 扫码/退出，安装优先 Cookie，任务带百度 Cookie/Referer/UA；**v0.14.0**：OpenAPI（自建应用 OAuth/转存/dlink）作为无 Cookie 回退；**不接 CDP/网页逆向**；仓库提交/目录支持百度（`server=b`） |
 
-### 9.1 Range 续传探测（P1，工作量：小）
+### 9.1 ~~Range 续传探测~~（✅ v0.28.15 已落地）
 
-**v0.6 参考**：`_remote_supports_resume()` 对直链发 `Range: bytes=0-0`，只有返回 206 / `Content-Range` / `Accept-Ranges: bytes` 才认为可续传。
+**落地实现（v0.28.15）**：
 
-**为什么**：当前"直链过期 → 重新 addUri"默认服务端支持断点续传；不支持的线路会一直重试同一段，浪费时间与请求。
+- `tianyi_client.probe_resume_support(direct_url, headers)` 对直链发 `Range: bytes=0-0`，只看响应头：206 / `Content-Range` / `Accept-Ranges: bytes` 为支持；200 且无 Range 头为不支持；网络异常、非法 URL、其它状态一律保守按支持处理，避免误判导致重下；
+- `_readd_task_download()` 仅在存在半成品文件或 `progress > 0` 时探测一次：支持 → 继续 `changeUri` 保留进度（失败再回退 addUri）；不支持 → 日志 `resume unsupported`、`_quarantine_download_file(..., "noresume")` 隔离半成品并从 0 重新下载；
+- 正常下载路径不增加探测请求；`tests/test_resume_probe.py` 覆盖 206 / 200+Accept-Ranges / 200+Content-Range / 200 无头 / 异常 5 种探测结果、header 合并，以及换链/重下两条恢复路径；
+- DEVELOPMENT 故障排查已补：日志 `resume unsupported` 表示该线路不支持续传。
 
-**代价**：每个需要恢复的任务多一次探测请求；探测失败要保守按"支持"处理，避免误判导致重下。
-
-**验收标准**：
-
-- 新增 `probe_resume_support(direct_url, headers)`：解析 206 / `Content-Range` / `Accept-Ranges`，异常时返回 True（保守续传）；
-- 仅**恢复/换链路径**调用一次，正常下载不额外探测；结果写日志；
-- 离线单测覆盖 206 / 200+Accept-Ranges / 200 无头 / 异常四种情况；
-- DEVELOPMENT 故障排查补一句"日志里 `resume unsupported` 表示该线路不支持续传"。
-
-**涉及文件**：`py_modules/tianyi_service.py`、`py_modules/tianyi_client.py`、`tests/`、`docs/DEVELOPMENT.md`。
+**仍未做**：探测结果不持久化（每条恢复路径重新探测一次）；aria2 内部的 Range 重试行为不做改写。
 
 ### 9.2 ~~compatdata 卸载清理~~（✅ 已在 v0.1.1 落地）
 
@@ -407,4 +401,4 @@
 - 架构与问题清单：[ARCHITECTURE.md](ARCHITECTURE.md)
 - 与作者 v0.6 的能力对照：[ARCHITECTURE.md](ARCHITECTURE.md) §13
 - 本地开发、调试、故障排查：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 当前测试基线：`make test` → 575 passed（2026-11 v0.28.14）
+- 当前测试基线：`make test` → 585 passed（2026-11 v0.28.15）

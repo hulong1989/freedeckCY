@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.28.14**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.28.15**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -30,9 +30,9 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 | | 说明 |
 |---|---|
-| 当前版本 | **0.28.14**（见 [CHANGELOG.md](CHANGELOG.md) / [English](CHANGELOG.en.md)） |
+| 当前版本 | **0.28.15**（见 [CHANGELOG.md](CHANGELOG.md) / [English](CHANGELOG.en.md)） |
 | 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork；上游已停止维护 |
-| 测试 | **575 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
+| 测试 | **585 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
 | CI | Python 测试 / UI 构建 / 前端 hooks 作用域检查 / x86_64 与 aarch64 运行时冒烟 |
 | 数据目录 | `~/.local/share/freedeckCY/`（`state.json` 权限 0600，目录 0700） |
 | 资源目录 | `defaults/tianyi_catalog/freedeckcy_catalog.csv`（7084 条） |
@@ -63,7 +63,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
   - 卡片显示来源：`大小 · 天翼云盘 / 百度网盘`。
 - **下载安装链路**：aria2 多连接下载（默认 16 分片）→ 7zz 解压 → 自动写 Steam 快捷方式、Proton 兼容映射与封面。
 - **分卷/多包**：识别 `.7z.001` / `.part1.rar` / `.z01+zip` 等常见分卷，全部下完才安装，只解主卷、只注册一次 Steam。
-- **断点与恢复**：aria2 运行时元数据落盘；插件重载附着老进程，会话丢失时按文件路径认领 + 原直链换链续传。
+- **断点与恢复**：aria2 运行时元数据落盘；插件重载附着老进程，会话丢失时按文件路径认领 + 原直链换链续传；恢复前探测 Range，不支持续传的线路会隔离半成品并从 0 重下。
 - **完整性保护**：按资源清单大小比对落盘结果；异常先隔离并自愈重下。解压前 `7z t` 校验（best-effort），损坏包自动重下一次。
 - **解压保护**：等待 `.aria2` 释放、大小稳定后再解压；空文件/HTML 错误页提前拦截。
 - **Steam 配置安全**：`shortcuts.vdf` / `config.vdf` 写前留时间戳备份（保留 12 份），无变化不重写。
@@ -147,8 +147,8 @@ Releases 提供带运行时二进制的安装包：
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.28.14.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.28.14-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.28.15.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.28.15-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后使用 **Decky → 开发者 → 从文件安装插件**，选择对应 zip，重启 Decky Loader。
 校验值见 Release 中的 `.sha256` 文件。
@@ -158,7 +158,7 @@ Releases 提供带运行时二进制的安装包：
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime              # 下载 aria2c / 7zz / node 到 defaults/runtime/
-make package              # 产出 dist-artifacts/freedeckCY-v0.28.14.zip
+make package              # 产出 dist-artifacts/freedeckCY-v0.28.15.zip
 ```
 
 ### 方式 C：DroidDeck / ARM64
@@ -200,7 +200,7 @@ pnpm check:ui       # hooks 依赖作用域检查
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test，当前 575 个用例
+.venv/bin/pytest -q          # 或 make test，当前 585 个用例
 make check-ui                # 前端 hooks 作用域检查
 make doctor                  # 环境诊断（只读）
 make package-droiddeck       # ARM64 包
@@ -294,7 +294,7 @@ submissions/                仓库游戏提交 JSON / schema
 backend/*.js                Node 辅助脚本（分享解析兜底、云存档上传）
 scripts/                    运行时获取/打包/诊断/目录校验/提交合并
 docs/                       架构/开发/路线图/DroidDeck
-tests/                      pytest 用例（575 个）
+tests/                      pytest 用例（585 个）
 CHANGELOG.md                版本变更
 Makefile                    runtime / package / package-droiddeck / test / check-ui / doctor / ...
 ```

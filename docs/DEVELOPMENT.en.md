@@ -2,7 +2,7 @@
 
 # freedeckCY Development Guide
 
-This document is for secondary developers and corresponds to freedeckCY **v0.28.14**: how to run it locally, change code, apply patches, and troubleshoot. For installing, building, and troubleshooting DroidDeck (Android/ARM64), see [DROIDDECK.en.md](DROIDDECK.en.md) separately. For architecture and protocol details see [ARCHITECTURE.en.md](ARCHITECTURE.en.md); for a capability comparison with the author's v0.6 see [ARCHITECTURE.en.md](ARCHITECTURE.en.md) §13; for follow-up work see [ROADMAP.en.md](ROADMAP.en.md).
+This document is for secondary developers and corresponds to freedeckCY **v0.28.15**: how to run it locally, change code, apply patches, and troubleshoot. For installing, building, and troubleshooting DroidDeck (Android/ARM64), see [DROIDDECK.en.md](DROIDDECK.en.md) separately. For architecture and protocol details see [ARCHITECTURE.en.md](ARCHITECTURE.en.md); for a capability comparison with the author's v0.6 see [ARCHITECTURE.en.md](ARCHITECTURE.en.md) §13; for follow-up work see [ROADMAP.en.md](ROADMAP.en.md).
 
 > Prerequisite: this project supports **SteamOS / Linux** only. The development machine can be a Steam Deck, or a Linux desktop with Decky Loader installed; on Windows / macOS you can only edit code, not run it fully.
 
@@ -49,7 +49,7 @@ This document is for secondary developers and corresponds to freedeckCY **v0.28.
 | `scripts/doctor.sh` | Environment diagnostics (read-only, invoked by `make doctor`): system/Python/runtime/Steam/state/logs/ports/network |
 | `scripts/normalize_catalog_categories.py` | Cleans catalog `categories` in place (strip platform names / dedupe / emulator fallback; `--check` only reports differences) |
 | `scripts/validate_catalog.py` | Catalog data health check (duplicates/invalid links/empty titles/platform names mixed into categories/cover coverage/platform distribution/total size; `--strict` used by CI) |
-| `tests/` | pytest unit tests (575 cases; native-library paths are verified by the frontend build): **gamewatch state machine / Ludusavi matching and parsing / auto-upload triggers and fingerprints / emulator save discovery (per-game vs shared, toggles) / restore plans / PSP-PS3-3DS splitting / PS1 multi-disc m3u**, catalog parsing/platform filters/sorting, installed list/diagnostics export/update check, **10-platform plans/ROM lookup/wrappers/registry/BIOS/architecture allowlist/BIOS deployment and portable config, submission validation/merging, Baidu QR login/Cookie + OpenAPI fallback (source detection/QR/plans/headers/auth-code exchange)**, category cleanup, DroidDeck detection/Proton parsing/dual Steam roots, VDF, state store, cloud-save versions, install pipeline, grouping semantics, restart recovery, multi-volume detection, aria2 runtime, multi-library detection, uninstall/compatdata, **install reliability (environment preflight/verify/repair/health/diagnostics/source fallback)**, security boundary, and other offline logic |
+| `tests/` | pytest unit tests (585 cases; native-library paths are verified by the frontend build): **gamewatch state machine / Ludusavi matching and parsing / auto-upload triggers and fingerprints / emulator save discovery (per-game vs shared, toggles) / restore plans / PSP-PS3-3DS splitting / PS1 multi-disc m3u**, catalog parsing/platform filters/sorting, installed list/diagnostics export/update check, **10-platform plans/ROM lookup/wrappers/registry/BIOS/architecture allowlist/BIOS deployment and portable config, submission validation/merging, Baidu QR login/Cookie + OpenAPI fallback (source detection/QR/plans/headers/auth-code exchange)**, category cleanup, DroidDeck detection/Proton parsing/dual Steam roots, VDF, state store, cloud-save versions, install pipeline, grouping semantics, restart recovery, multi-volume detection, aria2 runtime, multi-library detection, uninstall/compatdata, **install reliability (environment preflight/verify/repair/health/diagnostics/source fallback)**, security boundary, and other offline logic |
 | `clear_freedeckcy_tasks.sh` | Ops script: clears the `tasks` in `state.json` (uses `$HOME`; the path can be overridden with `FREEDECKCY_STATE_FILE`) |
 | `docs/DROIDDECK.md` | DroidDeck (Android/ARM64) install, build, feature support, and troubleshooting guide (v0.4.0) |
 | `gl/` | Data hand-collected by the author (historical CSV, emulator share links); **not read by the code**, can be ignored |
@@ -290,7 +290,7 @@ make package PACKAGE_ARGS="--out-dir /tmp/freedeckcy-build"
 bash scripts/package.sh --help          # view all options
 ```
 
-- The version comes from the `version` field in `package.json` (currently `0.28.14`);
+- The version comes from the `version` field in `package.json` (currently `0.28.15`);
 - The zip's **top-level directory must be the plugin directory `freedeckCY/`** (Decky local install looks for `top-level-dir/plugin.json`; files placed directly at the root are silently ignored); underneath are `main.py`, `plugin.json`, `package.json`, `LICENSE`, `README.md`, plus `dist/`, `py_modules/`, `backend/`, `defaults/`;
 - The packaging script excludes `__pycache__`, `*.pyc`, `.DS_Store`, `node_modules`, `.git`, `tests`, `scripts`, `.github`, `docs`, `gl`, `dist-artifacts` (anything outside the whitelist is not packaged);
 - By default it reuses the committed `dist/index.js` and does not force a `pnpm build`; use `bash scripts/package.sh --build-ui` when the frontend needs rebuilding (requires pnpm on PATH);
@@ -340,7 +340,7 @@ Notes:
 
 - `requirements-dev.txt` lives at the repository root and only needs dev dependencies such as `pytest` / `pytest-asyncio` / `aiohttp`; **runtime dependencies follow the Python shipped with Decky**, so do not install them into the plugin environment.
 - If the system Python is too old (e.g. 3.9), use `python3.12 -m venv .venv` (CI uses 3.12). The `test` script in `package.json` is also `python3 -m pytest -q`.
-- There are currently **575 cases** (`make test` measured `575 passed`). `tests/test_droiddeck.py` covers DroidDeck detection, ARM Proton resolution, dual Steam root ordering, and settings read/write; `tests/test_install_reliability.py` covers the pre-install preflight, installed-game verify/repair, health report, failure diagnostics and source fallback; the port-related cases in `tests/test_utils.py` rely on real sockets and timing and may occasionally time out under heavy machine load — just rerun.
+- There are currently **585 cases** (`make test` measured `585 passed`). `tests/test_droiddeck.py` covers DroidDeck detection, ARM Proton resolution, dual Steam root ordering, and settings read/write; `tests/test_install_reliability.py` covers the pre-install preflight, installed-game verify/repair, health report, failure diagnostics and source fallback; `tests/test_resume_probe.py` covers Range resume probing and the recovery/restart branches; the port-related cases in `tests/test_utils.py` rely on real sockets and timing and may occasionally time out under heavy machine load — just rerun.
 - CI runs two jobs in `.github/workflows/ci.yml`: `python` (3.12, pytest) and `ui` (Node 20 + pnpm, `pnpm build` plus verifying that `dist/index.js` exists), triggered on push / pull_request.
 - Advice for new changes: when changing the recovery/grouping logic in `tianyi_service.py`, prefer reusing the existing fake-aria2 scaffolding in `tests/test_install_pipeline.py`.
 
@@ -396,6 +396,7 @@ grep -nE "ERROR|Traceback|失败" /tmp/freedeckcy.log | tail -50
 - The plugin spawns `aria2c` (random RPC port + random secret) and `7zz` (exists briefly during extraction); cloud saves briefly spawn `node`.
 - aria2 runtime state lives under `~/.local/share/freedeckCY/tianyi/aria2/`: `aria2-runtime.json` (RPC address/secret/pid), `aria2-runtime.lock` (flock, ensuring only one instance is started), `aria2.session`, `aria2.log`. On plugin reload it reads the metadata and attaches to a still-live aria2, so the gid/progress is usually not lost; to check "whether the current instance can be attached to", look at these two runtime files plus whether the pid is alive in `ps`.
 - RPC/download errors are visible in `aria2.log` (the startup arguments include `--log`); errors of the download tasks themselves are also recorded in `state.json` under `tasks[].error_reason`.
+- Since v0.28.15, recovery/rechain probes Range first: `resume unsupported` in the log means the route does not support resumable downloads, so the plugin quarantines the partial file (`*.freedeckcy-noresume-*`) and restarts from zero; `resume supported` means progress is kept while switching links.
 - If `ps aux | grep aria2c` shows leftovers after the plugin has reloaded, simply reload the plugin again; `_unload()` in `main.py` stops aria2 and the local service.
 - The local web service listens on a fixed `127.0.0.1:59271`; runtime state and port are persisted to Decky settings, but there is no UI to change the port, and it usually needs no change.
 
@@ -1160,7 +1161,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 
 ## 10. Pre-Submit Checklist
 
-- [ ] `make test` (or `.venv/bin/pytest -q`) is all green (currently 575 cases);
+- [ ] `make test` (or `.venv/bin/pytest -q`) is all green (currently 585 cases);
 - [ ] After changing runtime/Steam/uninstall-related code, run `make doctor` once to confirm the environment self-check is normal;
 - [ ] After changing catalog data, run `make normalize-catalog` and `make validate-catalog` (CI runs `--strict`);
 - [ ] After changing Ludusavi-manifest-related code, confirm `defaults/ludusavi/manifest.json.gz` exists and ships with the package (release packages should bundle it), and run `tests/test_cloud_auto.py` locally;
@@ -1173,7 +1174,7 @@ curl -s -X POST http://127.0.0.1:59271/api/tianyi/diagnostics/run | python3 -m j
 - [ ] After changing the native-library entry / Baidu QR, run `pnpm build` and reload the plugin: confirm the plugin version is 0.27.20 and that clicking the game library opens the modal; QR timeout logs contain `Baidu QR ...`;
 - [ ] After changing native-library layout/input, use on-device CEF to verify the left/right focus ring of the leftmost card, the top blue frame, A/B/directional keys, trackpad scrolling, and that the details action bar is fully visible;
 - [ ] After changing diagnostics, run `pytest tests/test_diagnostics.py -q` and confirm the checks structure/summary; the export contains `self-check.json` with 0600 permissions;
-- [ ] After changing the native library, run `pnpm build` and reload the plugin; confirm the `/freedeckcy/library` route, search/filter/pagination, install confirmation, and installed actions; `make test` is still 575;
+- [ ] After changing the native library, run `pnpm build` and reload the plugin; confirm the `/freedeckcy/library` route, search/filter/pagination, install confirmation, and installed actions; `make test` is still 585;
 - [ ] After changing storage detection, run `pytest tests/test_storage_options.py -q` and confirm system-mount filtering and the external directory/capacity fields; the QAM paths-page buttons switch and refresh;
 - [ ] After changing scan-installed, run `pytest tests/test_install_pipeline.py -q` (scan backfill/auto-shortcut cases), confirming single-level scanning, path/game_id dedupe, no duplicates for same-name same-exe, PC exe lookup, and emulator wrappers; re-check `shortcuts.vdf` after restarting Steam;
 - [ ] After changing Baidu-related code, run `python -m pytest tests/test_baidu_integration.py tests/test_baidu_openapi_client.py tests/test_baidu_client.py -q` (HTTP/QR mocked, no network); confirm the QR Cookie is stored only in state and is not written to logs/diagnostics;

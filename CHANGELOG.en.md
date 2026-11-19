@@ -3,6 +3,15 @@
 > English summary of recent releases. The full historical changelog is in [CHANGELOG.md](CHANGELOG.md).
 > [中文](CHANGELOG.md) | English
 
+## v0.28.15
+
+### Range resume probe
+
+- New `probe_resume_support()`: sends `Range: bytes=0-0` to the direct URL and decides resume support from headers only (206 / `Content-Range` / `Accept-Ranges: bytes` supported; 200 without range headers unsupported; errors, other statuses and invalid URLs conservatively assume supported).
+- Recovery/rechain paths probe once when partial data exists: supported keeps progress via `changeUri`; unsupported logs `resume unsupported`, quarantines the partial file and restarts from zero instead of stalling on invalid retries.
+- Normal downloads issue no extra request; results are logged for line troubleshooting.
+- 10 new tests cover the four probe outcomes, error fallback, header merging, and both recovery branches; 585 tests passed.
+
 ## v0.28.14
 
 ### Install reliability
