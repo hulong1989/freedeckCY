@@ -1762,6 +1762,52 @@ async def fetch_download_url(
     return direct_url
 
 
+async def probe_resume_support(
+    direct_url: str,
+    headers: Optional[Dict[str, str]] = None,
+    *,
+    timeout_seconds: float = 10.0,
+) -> Tuple[bool, str]:
+    """探测下载直链是否支持 Range 续传。
+
+    发送 `Range: bytes=0-0`，只看响应头，不读取响应体：
+    - 206 / Content-Range / Accept-Ranges: bytes → 支持；
+    - 200 且没有任何 Range 头 → 不支持；
+    - 其它状态或网络异常 → 保守认为支持，避免误判导致重下。
+    """
+    url = str(direct_url or "").strip()
+    if not url.lower().startswith(("http://", "https://")):
+        return True, "invalid url (assume resumable)"
+    request_headers: Dict[str, str] = {
+        "User-Agent": _DEFAULT_BROWSER_UA,
+        "Range": "bytes=0-0",
+    }
+    if isinstance(headers, dict):
+        for key, value in headers.items():
+            text_key = str(key or "").strip()
+            text_value = str(value or "").strip()
+            if text_key and text_value:
+                request_headers[text_key] = text_value
+    timeout = aiohttp.ClientTimeout(total=max(3.0, float(timeout_seconds)))
+    try:
+        async with _create_session(timeout=timeout) as session:
+            async with session.get(url, headers=request_headers, allow_redirects=True) as resp:
+                status = int(resp.status)
+                content_range = str(resp.headers.get("Content-Range", "") or "").strip()
+                accept_ranges = str(resp.headers.get("Accept-Ranges", "") or "").strip().lower()
+                if status == 206:
+                    return True, "http 206"
+                if content_range:
+                    return True, f"content-range {content_range[:80]}"
+                if "bytes" in accept_ranges:
+                    return True, "accept-ranges: bytes"
+                if status == 200:
+                    return False, "http 200 without range headers"
+                return True, f"http {status} (assume resumable)"
+    except Exception as exc:
+        return True, f"probe error: {type(exc).__name__}: {exc}"
+
+
 def _get_js_cloud_upload_path() -> str:
     """定位 JS 云上传脚本路径。"""
     candidates: List[Path] = []

@@ -98,6 +98,7 @@ from tianyi_client import (
     fetch_download_url,
     get_user_account,
     list_cloud_archives,
+    probe_resume_support,
     resolve_share,
     upload_archive_to_cloud,
 )
@@ -7163,8 +7164,41 @@ class TianyiService(UpdateFlowMixin):
             config.logger.warning("重新获取直链失败 task=%s: %s", task.task_id, exc)
             return False
 
+        # 恢复/换链前先探测 Range 支持：不支持时不做无效续传，直接清掉半成品重下。
+        resume_ok = True
+        resume_detail = "no partial data"
+        partial_bytes = 0
+        local_path = self._task_local_path(task)
+        if local_path and os.path.isfile(local_path):
+            try:
+                partial_bytes = max(0, int(os.path.getsize(local_path)))
+            except OSError:
+                partial_bytes = 0
+        if partial_bytes > 0 or float(task.progress or 0.0) > 0:
+            probe_headers: Dict[str, str] = {}
+            if provider == "baidu":
+                probe_headers = {
+                    "Cookie": str(self.store.baidu_login.cookie or "").strip(),
+                    "Referer": "https://pan.baidu.com/disk/home",
+                    "User-Agent": "pan.baidu.com",
+                }
+            elif provider == "baidu_openapi":
+                probe_headers = {"Referer": "https://pan.baidu.com/disk/home"}
+            else:
+                probe_headers = {"Cookie": cookie}
+            resume_ok, resume_detail = await probe_resume_support(direct_url, probe_headers)
+            if resume_ok:
+                config.logger.info("resume supported task=%s: %s", task.task_id, resume_detail)
+            else:
+                config.logger.warning(
+                    "resume unsupported task=%s (%s, partial=%s bytes); restart from scratch",
+                    task.task_id,
+                    resume_detail,
+                    partial_bytes,
+                )
+
         # 1) 原地换链：gid 与已下载进度都不丢
-        if str(task.gid or "").strip():
+        if resume_ok and str(task.gid or "").strip():
             try:
                 await self.aria2.replace_uri(task.gid, direct_url)
                 config.logger.info("Refreshed direct url in place for task %s (gid=%s)", task.task_id, task.gid)
@@ -7193,6 +7227,11 @@ class TianyiService(UpdateFlowMixin):
         if provider in {"baidu", "baidu_openapi"}:
             add_kwargs["referer"] = "https://pan.baidu.com/disk/home"
             add_kwargs["user_agent"] = "pan.baidu.com"
+        if not resume_ok:
+            # 线路不支持 Range：隔离半成品，让 aria2 从 0 开始，避免续传卡死。
+            quarantined = self._quarantine_download_file(task, "noresume")
+            if quarantined:
+                task.progress = 0.0
         try:
             gid = await self.aria2.add_uri(**add_kwargs)
         except Exception as exc:
