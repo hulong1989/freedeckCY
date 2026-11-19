@@ -860,6 +860,15 @@ async def _apply_grid_assets(
             reused = await asyncio.to_thread(_copy_file_sync, landscape_path, icon_path)
         status["icon"] = bool(reused)
 
+    # Fallback: no logo -> reuse portrait (best effort for non-Steam games).
+    if not status.get("logo"):
+        reused = False
+        if status.get("portrait"):
+            reused = await asyncio.to_thread(_copy_file_sync, portrait_path, logo_path)
+        elif status.get("landscape"):
+            reused = await asyncio.to_thread(_copy_file_sync, landscape_path, logo_path)
+        status["logo"] = bool(reused)
+
     # Fallback: no hero -> reuse landscape.
     if not status.get("hero") and status.get("landscape"):
         reused = await asyncio.to_thread(_copy_file_sync, landscape_path, hero_path)

@@ -3585,16 +3585,31 @@ function LibraryPage({ onClose }) {
             if (result.status !== "success")
                 throw new Error(result.message || "校验失败");
             const data = result.data || {};
-            const after = data.after || {};
-            if (after.needs_reinstall) {
-                toaster.toast({ title: "freedeckCY", body: "校验发现文件缺失，需要重新下载安装。" });
-            }
-            else if (after.ok) {
-                toaster.toast({ title: "freedeckCY", body: (data.actions || []).length ? "已修复 Steam 快捷方式与封面。" : "安装完整，无需修复。" });
-            }
-            else {
-                toaster.toast({ title: "freedeckCY", body: "校验发现问题，请打开目录检查安装文件。" });
-            }
+            const after = data.after || data.before || {};
+            const labels = {
+                install_path: "安装目录",
+                executable: "可执行文件",
+                rom: "ROM 文件",
+                launcher: "启动脚本",
+                steam_shortcut: "Steam 快捷方式",
+            };
+            const lines = (after.checks || []).map((check) => `${check.ok ? "✅" : "❌"} ${labels[check.id] || check.id}${check.message ? `：${check.message}` : ""}`);
+            if (after.needs_reinstall)
+                lines.unshift("需要重新下载安装。");
+            else if (after.ok)
+                lines.unshift((data.actions || []).length ? "已执行修复。" : "安装完整，无需修复。");
+            else
+                lines.unshift("校验发现问题，请打开目录检查。");
+            DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, {
+                strTitle: "安装校验",
+                strDescription: lines.join("\n"),
+                strOKButtonText: "完成",
+                strCancelButtonText: "关闭",
+                onOK: () => {
+                },
+                onCancel: () => {
+                },
+            }));
             await loadInstalled();
         }
         catch (error) {
