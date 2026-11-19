@@ -3,6 +3,15 @@
 > English summary of recent releases. The full historical changelog is in [CHANGELOG.md](CHANGELOG.md).
 > [中文](CHANGELOG.md) | English
 
+## v0.28.16
+
+### Batch retry failed tasks
+
+- New callable `retry_all_tianyi_tasks` → `retry_all_failed_tasks()`: retries every `status=error` / `install_status=failed|gave_up` task in list order (up to 50); one failure does not stop the rest, returning `{attempted, succeeded, failed, results, errors}`.
+- The QAM download list gains a "Retry All" button: recover failed tasks with one click after a network outage; a toast summarizes success/failure and the panel refreshes.
+- Each task still goes through the normal retry path (complete files go straight to reinstall; automatic source fallback once); active/completed tasks are never batch-retried.
+- 2 new regression tests cover ordering, continuing after one error, the no-op case and the auto-fallback flag; 587 tests passed.
+
 ## v0.28.15
 
 ### Range resume probe

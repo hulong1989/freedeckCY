@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **About this project**: freedeckCY is a derivative fork of [Freedeck](https://github.com/panyiwei-home/Freedeck);
-> its version numbers start at **0.1.0** and are currently at **0.28.15**, which is not continuous with the original repository's 0.2–0.3 versions; the upstream author has stopped maintaining the project.
+> its version numbers start at **0.1.0** and are currently at **0.28.16**, which is not continuous with the original repository's 0.2–0.3 versions; the upstream author has stopped maintaining the project.
 > Differences from upstream (already aligned / stronger here / not adopted) are documented in [docs/ARCHITECTURE.en.md](docs/ARCHITECTURE.en.md) §13.
 >
 > QQ group: **1136434612** (usage discussion / issue reports; please mention freedeckCY when joining)
@@ -30,9 +30,9 @@ A **Decky Loader plugin** for the Steam Deck: using resource catalogs from Tiany
 
 | | Description |
 |---|---|
-| Current version | **0.28.15** (see [CHANGELOG.md](CHANGELOG.md) / [English summary](CHANGELOG.en.md)) |
+| Current version | **0.28.16** (see [CHANGELOG.md](CHANGELOG.md) / [English summary](CHANGELOG.en.md)) |
 | Code baseline | Forked from upstream Freedeck's early version (0.2) dated 2026-02; upstream is no longer maintained |
-| Tests | **585 passed**, covering offline logic for catalog, installation, cloud saves, Baidu, emulators, storage, updates and more |
+| Tests | **587 passed**, covering offline logic for catalog, installation, cloud saves, Baidu, emulators, storage, updates and more |
 | CI | Python tests / UI build / frontend hooks scope check / x86_64 and aarch64 runtime smoke tests |
 | Data directory | `~/.local/share/freedeckCY/` (`state.json` permissions 0600, directory 0700) |
 | Resource catalog | `defaults/tianyi_catalog/freedeckcy_catalog.csv` (7084 entries) |
@@ -67,7 +67,7 @@ A **Decky Loader plugin** for the Steam Deck: using resource catalogs from Tiany
 - **Integrity protection**: compares on-disk results against catalog sizes; anomalies are quarantined first and re-downloaded for self-healing. `7z t` validation (best-effort) before extraction; corrupted archives are automatically re-downloaded once.
 - **Extraction protection**: waits for `.aria2` files to be released and sizes to stabilize before extracting; empty files/HTML error pages are intercepted early.
 - **Steam config safety**: timestamped backups (12 kept) are made before writing `shortcuts.vdf` / `config.vdf`; files are not rewritten when unchanged.
-- **Download management**: pause/resume all, global speed limit, retry failed tasks; task progress is shown on the plugin home page.
+- **Download management**: pause/resume all, global speed limit, retry failed tasks individually or all at once; task progress is shown on the plugin home page.
 - **Install reliability**:
   - **Pre-install environment preflight**: checks that the download/install folders are writable and have free space; a manual check lives on the Settings "Environment" tab, and the install confirmation warns with "Download Anyway" when issues are found.
   - **Installed-game verify/repair**: checks the install folder, main executable/ROM and Steam shortcut item by item; one click rebuilds the shortcut, Proton mapping and four-piece artwork, and clearly reports when files are missing and a reinstall is required.
@@ -147,8 +147,8 @@ Releases provide installation packages with bundled runtime binaries:
 
 | Package | Applicable device |
 |---|---|
-| `freedeckCY-v0.28.15.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.28.15-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.28.16.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.28.16-arm64.zip` | DroidDeck / Android ARM64 |
 
 After downloading, use **Decky → Developer → Install plugin from file**, select the corresponding zip, and restart Decky Loader.
 Checksums are available in the `.sha256` files attached to the Release.
@@ -158,7 +158,7 @@ Checksums are available in the `.sha256` files attached to the Release.
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime              # download aria2c / 7zz / node to defaults/runtime/
-make package              # produces dist-artifacts/freedeckCY-v0.28.15.zip
+make package              # produces dist-artifacts/freedeckCY-v0.28.16.zip
 ```
 
 ### Option C: DroidDeck / ARM64
@@ -200,7 +200,7 @@ pnpm check:ui       # hooks dependency scope check
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # or make test; currently 585 cases
+.venv/bin/pytest -q          # or make test; currently 587 cases
 make check-ui                # frontend hooks scope check
 make doctor                  # environment diagnostics (read-only)
 make package-droiddeck       # ARM64 package
@@ -294,7 +294,7 @@ submissions/                Repository game submission JSON / schema
 backend/*.js                Node helper scripts (share-parsing fallback, cloud-save upload)
 scripts/                    Runtime fetching/packaging/diagnostics/catalog validation/submission merging
 docs/                       Architecture/development/roadmap/DroidDeck
-tests/                      pytest cases (585)
+tests/                      pytest cases (587)
 CHANGELOG.md                Version changes
 Makefile                    runtime / package / package-droiddeck / test / check-ui / doctor / ...
 ```

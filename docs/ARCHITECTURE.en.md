@@ -2,7 +2,7 @@
 
 # freedeckCY Architecture
 
-This document is aimed at secondary developers and maintainers. It describes the implementation structure of **this repository (the `main` branch)** of freedeckCY, and its content is synchronized with the freedeckCY **v0.28.15** (2026-11) code. Code references use repository-relative paths; `file:line` points to the current workspace and may drift after refactoring, while function names serve as stable anchors.
+This document is aimed at secondary developers and maintainers. It describes the implementation structure of **this repository (the `main` branch)** of freedeckCY, and its content is synchronized with the freedeckCY **v0.28.16** (2026-11) code. Code references use repository-relative paths; `file:line` points to the current workspace and may drift after refactoring, while function names serve as stable anchors.
 
 ---
 
@@ -24,7 +24,7 @@ This is the easiest trap when reading this repository: **the finished releases o
 
 | Location | Content | Notes |
 |---|---|---|
-| This repo, `main` | `package.json` version `0.28.15`, Tianyi Cloud Drive + Baidu Netdisk + multi-platform catalog, adapted to Steam Deck / DroidDeck | Forked from the early 2026-02 upstream Freedeck version (0.2), with version numbers restarting from 0.1.0; v0.1.1 completed the "four-piece set"; v0.2.0 completed catalog platformization / cover index / category filtering; v0.3.0 completed the full catalog and platform filtering UI; v0.3.1 did category cleanup and catalog data health checks; v0.4.0 did DroidDeck (Android/ARM64) adaptation; v0.5.0 completed first-tier browsing/paging/sorting/installed tab plus diagnostics export/update check; v0.6.0~v0.6.2 did the GBA emulator closed loop and remote JSON catalog; v0.7.0 built the generic emulator registry and integrated PSP/NDS; v0.8.0 did Ludusavi + gamewatch automatic cloud saves; v0.9.0 expanded the emulator registry to PS1/FC/MD (6 platforms); v0.10.0 switched all emulators to online download (no emulator bundled in the plugin); v0.11.0 completed 10 platforms + architecture capability matrix; v0.12.0 did emulator BIOS/firmware deployment + portable config; v0.13.0 did repository game submission (Issue/PR → catalog); v0.14.0 integrated the Baidu Netdisk official OpenAPI; v0.14.1 fixed 3DS (Azahar) compatibility on SteamOS 3.9.5 (prefer official Flatpak); v0.15.0 brought emulator saves into cloud save upload; v0.16.0 did emulator save restore + per-game splitting + PS1 multi-disc m3u; v0.17.0 changed Baidu Netdisk to QR-code login (BDUSS/Cookie main path, OpenAPI optional fallback); v0.18.0 did installed game scanning + Baidu QR error diagnostics; v0.19.0 made download/install directories support SD card selection; v0.20.0 did the Decky native game library (no longer depending on the web page); v0.21.0 moved "scan installed" to settings and auto-added Steam shortcuts; v0.22.0 did diagnostics self-check + one-click diagnostics bundle; v0.23.0 did native library fallback + Baidu QR timeout/click feedback; v0.24.0 fixed native library back/close; v0.25.0 stopped showing the plugin playtime block for existing Steam games; v0.26.x did architecture splitting and stability fixes; v0.27.0–v0.27.20 did the game library visual refactor, detail page/search/filter/update button alignment, and Steam Deck controller/trackpad adaptation; v0.28.14 added Chinese/English bilingual UI, first-run language selection, and install-reliability improvements (installed-game check/repair, health check, failure diagnostics/source fallback, pre-install environment preflight); v0.28.15 added Range resume probing (quarantine partial data and restart when recovery does not support resuming) |
+| This repo, `main` | `package.json` version `0.28.16`, Tianyi Cloud Drive + Baidu Netdisk + multi-platform catalog, adapted to Steam Deck / DroidDeck | Forked from the early 2026-02 upstream Freedeck version (0.2), with version numbers restarting from 0.1.0; v0.1.1 completed the "four-piece set"; v0.2.0 completed catalog platformization / cover index / category filtering; v0.3.0 completed the full catalog and platform filtering UI; v0.3.1 did category cleanup and catalog data health checks; v0.4.0 did DroidDeck (Android/ARM64) adaptation; v0.5.0 completed first-tier browsing/paging/sorting/installed tab plus diagnostics export/update check; v0.6.0~v0.6.2 did the GBA emulator closed loop and remote JSON catalog; v0.7.0 built the generic emulator registry and integrated PSP/NDS; v0.8.0 did Ludusavi + gamewatch automatic cloud saves; v0.9.0 expanded the emulator registry to PS1/FC/MD (6 platforms); v0.10.0 switched all emulators to online download (no emulator bundled in the plugin); v0.11.0 completed 10 platforms + architecture capability matrix; v0.12.0 did emulator BIOS/firmware deployment + portable config; v0.13.0 did repository game submission (Issue/PR → catalog); v0.14.0 integrated the Baidu Netdisk official OpenAPI; v0.14.1 fixed 3DS (Azahar) compatibility on SteamOS 3.9.5 (prefer official Flatpak); v0.15.0 brought emulator saves into cloud save upload; v0.16.0 did emulator save restore + per-game splitting + PS1 multi-disc m3u; v0.17.0 changed Baidu Netdisk to QR-code login (BDUSS/Cookie main path, OpenAPI optional fallback); v0.18.0 did installed game scanning + Baidu QR error diagnostics; v0.19.0 made download/install directories support SD card selection; v0.20.0 did the Decky native game library (no longer depending on the web page); v0.21.0 moved "scan installed" to settings and auto-added Steam shortcuts; v0.22.0 did diagnostics self-check + one-click diagnostics bundle; v0.23.0 did native library fallback + Baidu QR timeout/click feedback; v0.24.0 fixed native library back/close; v0.25.0 stopped showing the plugin playtime block for existing Steam games; v0.26.x did architecture splitting and stability fixes; v0.27.0–v0.27.20 did the game library visual refactor, detail page/search/filter/update button alignment, and Steam Deck controller/trackpad adaptation; v0.28.14 added Chinese/English bilingual UI, first-run language selection, and install-reliability improvements (installed-game check/repair, health check, failure diagnostics/source fallback, pre-install environment preflight); v0.28.15 added Range resume probing (quarantine partial data and restart when recovery does not support resuming); v0.28.16 added batch retry of failed tasks |
 | Releases v0.2.3 → v0.6 | Release packages about 50 MB | Add **Baidu Netdisk** support, **emulator integration**, **resource pool (user uploads)**, CRT filter, likes, and more |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 refactored versions | Emulators playable, "play later" tab, multi-volume download fix |
 
@@ -171,7 +171,7 @@ repo/
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（585 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
+├── tests/                      # pytest 单测（587 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -968,6 +968,16 @@ During recovery/rechain, `_readd_task_download()` first calls `tianyi_client.pro
 - normal downloads do not probe; each task probes at most once per recovery (`_readd_attempts` still limits to once per process);
 - `tests/test_resume_probe.py` covers 206 / 200+Accept-Ranges / 200+Content-Range / 200 without headers / error, header merging, rechain when supported, quarantine+restart when unsupported, and no probe without partial data.
 
+### 6.7.2 Batch retry of failed tasks (v0.28.16)
+
+The "Retry All" button in the QAM task list calls the callable `retry_all_tianyi_tasks` → `retry_all_failed_tasks()`:
+
+- snapshots `store.tasks` with `status=error` or `install_status in {failed, gave_up}` (up to 50); active/completed tasks are excluded;
+- calls `retry_task()` for each in list order, preserving the existing semantics (complete files go straight to reinstall; automatic one-time source fallback when the current source cannot re-fetch the direct link);
+- an exception for one task is recorded in `errors[{task_id,title,message}]` and does not stop the rest; returns `{attempted,succeeded,failed,results,errors}`;
+- the frontend button uses a dedicated `batchBusy="retry"` state with a 600s timeout, toasts a summary on completion, and calls `syncState(PANEL_POLL_MODE_ACTIVE)`;
+- unit tests cover ordering, continuing after one error, the no-op case and the `auto_fallback` flag.
+
 ### 6.8 Uninstall and Proton prefix reclamation (v0.1.1)
 
 When "Uninstall" is clicked in the QAM installed list:
@@ -1151,7 +1161,7 @@ Note: **the cookie is never sent back through the browser** — the login bridge
 
 ### P2: Engineering quality
 
-21. `tianyi_service.py` is about 10700 lines with a single class of 100+ methods; `src/index.tsx` is an about 3705-line single file. `tests/` (585 test cases) and GitHub Actions CI have been added, but there is **still no Python type checking** (mypy/ruff not wired in, see ROADMAP).
+21. `tianyi_service.py` is about 10700 lines with a single class of 100+ methods; `src/index.tsx` is an about 3705-line single file. `tests/` (587 test cases) and GitHub Actions CI have been added, but there is **still no Python type checking** (mypy/ruff not wired in, see ROADMAP).
 22. Everything is hardcoded Chinese, **no i18n**; many `unknown` / `as` assertions bypass TS types. (Known issue)
 23. ~~`clear_freedeckcy_tasks.sh` hardcodes `/home/deck`~~: **fixed in this completion** — uses `$HOME` and supports `FREEDECKCY_STATE_FILE` overrides.
 24. The log path still hardcodes `/tmp/freedeckcy.log` and is not configurable (rotation is in place, so it no longer grows without bound). (Known issue)

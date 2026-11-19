@@ -2,7 +2,7 @@
 
 > [English](ARCHITECTURE.en.md) | 中文
 
-本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.28.15**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
+本文面向二次开发者与维护者，说明 freedeckCY **本仓库（`main` 分支）**的实现结构，内容已同步到 freedeckCY **v0.28.16**（2026-11）的代码。文中代码引用均使用仓库内相对路径；`文件:行号` 指向当前工作区，重构后可能偏移，函数名可作稳定锚点。
 
 ---
 
@@ -24,7 +24,7 @@ freedeckCY 是一个运行在 **Steam Deck / SteamOS** 上的 **Decky Loader 插
 
 | 位置 | 内容 | 说明 |
 |---|---|---|
-| 本仓库 `main` | `package.json` 版本 `0.28.15`，天翼云盘 + 百度网盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块；v0.26.x 做架构拆分与稳定性修复；v0.27.0–v0.27.20 做游戏库视觉重构、详情页/搜索/筛选/更新按钮对齐、Steam Deck 手柄与触控板适配；v0.28.14 增加中英双语/首次语言选择与安装可靠性增强（已安装校验/修复、体检、失败诊断/换源、安装前环境自检）；v0.28.15 增加 Range 续传探测（恢复路径不支持续传时隔离半成品重下） |
+| 本仓库 `main` | `package.json` 版本 `0.28.16`，天翼云盘 + 百度网盘 + 多平台目录，适配 Steam Deck / DroidDeck | 从上游 Freedeck 2026-02 的早期版本（0.2）fork 而来，版本号重新从 0.1.0 起步；v0.1.1 完成"四件套"，v0.2.0 完成目录平台化/封面索引/分类筛选，v0.3.0 补齐全量目录与平台筛选 UI，v0.3.1 做分类清洗与目录数据体检，v0.4.0 做 DroidDeck（Android/ARM64）适配，v0.5.0 完成第一梯队浏览/分页/排序/已安装页签与诊断导出/更新检查，v0.6.0~v0.6.2 做 GBA 模拟器闭环与远程 JSON 目录，v0.7.0 做通用模拟器注册表并接入 PSP/NDS，v0.8.0 做 Ludusavi + gamewatch 自动云存档，v0.9.0 把模拟器注册表扩到 PS1/FC/MD（6 平台），v0.10.0 改为全部模拟器在线下载（插件包不集成），v0.11.0 补齐 10 平台 + 架构能力矩阵，v0.12.0 做模拟器 BIOS/固件部署 + portable 配置，v0.13.0 做仓库游戏提交（Issue/PR → 目录），v0.14.0 接入百度网盘官方 OpenAPI，v0.14.1 修复 3DS（Azahar）在 SteamOS 3.9.5 的兼容问题（优先官方 Flatpak），v0.15.0 把模拟器存档纳入云存档上传，v0.16.0 做模拟器存档恢复 + 按游戏拆分 + PS1 多碟 m3u，v0.17.0 百度网盘改为扫码登录（BDUSS/Cookie 主链路，OpenAPI 可选回退），v0.18.0 做扫描已安装游戏 + 百度扫码错误诊断，v0.19.0 下载/安装目录支持 SD 卡选择，v0.20.0 做 Decky 原生游戏库（不再依赖网页），v0.21.0 扫描已安装移到设置并自动补 Steam 快捷方式，v0.22.0 做诊断自检 + 一键诊断包，v0.23.0 原生库兜底 + 百度扫码超时/点击反馈，v0.24.0 修复原生库返回/关闭，v0.25.0 让 Steam 原有游戏不再显示插件时长块；v0.26.x 做架构拆分与稳定性修复；v0.27.0–v0.27.20 做游戏库视觉重构、详情页/搜索/筛选/更新按钮对齐、Steam Deck 手柄与触控板适配；v0.28.14 增加中英双语/首次语言选择与安装可靠性增强（已安装校验/修复、体检、失败诊断/换源、安装前环境自检）；v0.28.15 增加 Range 续传探测（恢复路径不支持续传时隔离半成品重下）；v0.28.16 增加失败任务批量重试 |
 | Releases v0.2.3 → v0.6 | 发布包约 50 MB | 增加**百度网盘**支持、**模拟器整合**、**资源池（用户上传）**、CRT 滤镜、点赞等 |
 | Releases NewFreedeck v0.1 → v0.3 | 2026-08 ~ 09 重构版 | 模拟器可玩、稍后再玩 tab、分卷下载修复 |
 
@@ -171,7 +171,7 @@ repo/
 │   ├── merge_v06_catalog.py    # 从上游 v0.6 目录合并生成 freedeckcy_catalog.csv + cover_index.csv（可复现）
 │   ├── normalize_catalog_categories.py  # 原地清洗分类（去平台名/去重/模拟器兜底，--check 只检查）
 │   └── validate_catalog.py     # 目录数据体检（--strict 用于 CI：重复/非法链接/分类混平台名/封面覆盖率…）
-├── tests/                      # pytest 单测（585 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
+├── tests/                      # pytest 单测（587 个用例，不联网、不碰 Steam 目录；模拟器下载/部署/存档发现/恢复计划/已安装扫描/挂载检测/自检走 mock；提交校验用临时 CSV；百度 HTTP/扫码走 mock；原生库/超时为前端构建验证）
 ├── docs/                       # 项目文档（ARCHITECTURE / DEVELOPMENT / ROADMAP / DROIDDECK / UPSTREAM_SERVER）
 ├── .github/workflows/ci.yml    # CI：pytest + 目录数据体检（validate_catalog --strict）+ pnpm build
 ├── gl/                         # 作者手工囤的数据：按日期 dump 的 CSV、模拟器分享链接 emu.csv
@@ -968,6 +968,16 @@ QAM 任务行在 `status=error` 或 `install_status=failed` 时显示「重试�
 - 正常下载路径不探测；每个任务每次恢复最多探测一次（`_readd_attempts` 继续限制每进程一次）；
 - 单测 `tests/test_resume_probe.py` 覆盖 206 / 200+Accept-Ranges / 200+Content-Range / 200 无头 / 异常、header 合并、支持时换链、不支持时隔离重下、无半成品时不探测。
 
+### 6.7.2 失败任务批量重试（v0.28.16）
+
+QAM 任务列表的「全部重试」调 callable `retry_all_tianyi_tasks` → `retry_all_failed_tasks()`：
+
+- 先快照 `store.tasks` 中 `status=error` 或 `install_status in {failed, gave_up}` 的任务（最多 50 个），活动/已完成任务不参与；
+- 按列表顺序逐个调用 `retry_task()`（因此仍保留「文件已完整直接重装」「当前源取链失败自动换源一次」等语义）；
+- 单个任务抛异常只记入 `errors[{task_id,title,message}]`，继续处理后续任务；返回 `{attempted,succeeded,failed,results,errors}`；
+- 前端按钮使用独立 `batchBusy="retry"` 状态，600s 超时，完成后 toast 汇总并 `syncState(PANEL_POLL_MODE_ACTIVE)` 刷新；
+- 单测覆盖顺序、单任务异常继续、无失败任务空操作与 `auto_fallback` 标记。
+
 ### 6.8 卸载与 Proton 前缀回收（v0.1.1）
 
 QAM 已安装列表点「卸载」时：
@@ -1151,7 +1161,7 @@ apply          → 校验 plan_id + confirm → 覆盖前把同名文件/目录�
 
 ### P2：工程性
 
-21. `tianyi_service.py` 约 10700 行、单类 100+ 方法；`src/index.tsx` 约 3705 行单文件。已补 `tests/`（585 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
+21. `tianyi_service.py` 约 10700 行、单类 100+ 方法；`src/index.tsx` 约 3705 行单文件。已补 `tests/`（587 个用例）与 GitHub Actions CI，但**仍无 Python 类型检查**（mypy/ruff 未接入，见 ROADMAP）。
 22. 全硬编码中文，**无 i18n**；大量 `unknown` / `as` 断言绕过 TS 类型。（已知问题）
 23. ~~`clear_freedeckcy_tasks.sh` 写死 `/home/deck`~~：**本次补全已修复**——改用 `$HOME` 并支持 `FREEDECKCY_STATE_FILE` 覆盖。
 24. 日志路径仍写死 `/tmp/freedeckcy.log`，不可配置（已轮转，不再是无限增长）。（已知问题）

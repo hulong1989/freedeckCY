@@ -2,6 +2,18 @@
 
 本项目从 v0.1.0 起使用独立版本号（fork 自 Freedeck，与上游 0.2–0.3 不连续）。
 
+## v0.28.16
+
+### 失败任务批量重试
+
+- 新增 callable `retry_all_tianyi_tasks` → `retry_all_failed_tasks()`：按列表顺序重试全部
+  `status=error` / `install_status=failed|gave_up` 的任务，最多 50 个；单个任务失败不会中断后续，
+  返回 `{attempted, succeeded, failed, results, errors}`。
+- QAM 下载列表新增「全部重试」按钮：网络恢复后一键恢复失败任务；完成后 toast 汇总成功/失败，
+  并刷新面板状态。
+- 每个任务仍走原有「重试」链路（含文件已完整直接重装、自动换源一次）；活动/已完成任务不会被批量重试。
+- 新增 2 个回归测试覆盖顺序、单任务异常继续、无可重试任务与自动换源标记；587 passed。
+
 ## v0.28.15
 
 ### Range 续传探测
