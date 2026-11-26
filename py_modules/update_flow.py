@@ -217,6 +217,86 @@ class UpdateFlowMixin:
         self._update_cache_at = now
         return dict(result)
 
+    @staticmethod
+    def _select_update_asset(update: Dict[str, Any]):
+        """按当前架构选择更新包；返回 (asset, error_message)。"""
+        assets = [item for item in list(update.get("assets") or []) if isinstance(item, dict)]
+        machine = str(platform.machine() or "").lower()
+        is_arm = machine in {"aarch64", "arm64"}
+        if is_arm:
+            candidates = [item for item in assets if str(item.get("name") or "").endswith("-arm64.zip")]
+        else:
+            candidates = [
+                item
+                for item in assets
+                if str(item.get("name") or "").endswith(".zip")
+                and not str(item.get("name") or "").endswith("-arm64.zip")
+            ]
+        if not candidates:
+            return None, "Release 中没有匹配当前架构的插件包"
+        return candidates[0], ""
+
+    async def _get_update_sha256(self, update: Dict[str, Any], asset: Dict[str, Any], insecure: bool) -> str:
+        """读取更新包 SHA256（asset.digest 或同名 .sha256 资产）。"""
+        expected_sha = ""
+        digest = str(asset.get("digest") or "").strip()
+        if digest.lower().startswith("sha256:"):
+            expected_sha = digest.split(":", 1)[1].strip().lower()
+        if expected_sha:
+            return expected_sha
+        asset_name = str(asset.get("name") or "")
+        sha_asset = next(
+            (item for item in list(update.get("assets") or []) if str(item.get("name") or "") == asset_name + ".sha256"),
+            None,
+        )
+        if not sha_asset:
+            return ""
+        timeout = aiohttp.ClientTimeout(total=15)
+        connector = aiohttp.TCPConnector(ssl=False if insecure else build_tls_context())
+        try:
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                async with session.get(str(sha_asset.get("url")), headers={"User-Agent": "freedeckCY"}) as resp:
+                    if int(resp.status) != 200:
+                        return ""
+                    text = (await resp.text())[:4096]
+                    match = re.search(r"\b([0-9a-fA-F]{64})\b", text)
+                    return match.group(1).lower() if match else ""
+        except Exception:
+            return ""
+
+    async def prepare_update_install(self) -> Dict[str, Any]:
+        """准备交给 Decky 安装的更新信息（只取 URL/SHA256，不下载）。"""
+        update = await self.check_update()
+        if not update.get("ok"):
+            return {"ok": False, "message": str(update.get("message") or "检查更新失败")}
+        if not update.get("has_update"):
+            return {
+                "ok": False,
+                "current": update.get("current", ""),
+                "latest": update.get("latest", ""),
+                "message": "当前已经是最新版本",
+            }
+        asset, error = self._select_update_asset(update)
+        if error or asset is None:
+            return {"ok": False, "message": error or "没有可用的更新包"}
+        insecure = bool(getattr(self, "_update_tls_insecure", False) or update.get("tls_insecure"))
+        expected_sha = await self._get_update_sha256(update, asset, insecure)
+        if not expected_sha:
+            return {"ok": False, "message": "Release 缺少 SHA256 校验值，已拒绝安装"}
+        return {
+            "ok": True,
+            "current": update.get("current", ""),
+            "latest": update.get("latest", ""),
+            "version": update.get("latest", ""),
+            "url": str(asset.get("url") or ""),
+            "filename": str(asset.get("name") or ""),
+            "size": max(0, _safe_int(asset.get("size"), 0)),
+            "sha256": expected_sha,
+            "tls_insecure": insecure,
+            "install_type": 2,
+            "message": "更新信息已准备，可交给 Decky 安装",
+        }
+
     async def download_update(self) -> Dict[str, Any]:
         """下载并校验官方 Release 更新包，返回本地路径（不自动覆盖插件）。"""
         update = await self.check_update()
@@ -229,43 +309,13 @@ class UpdateFlowMixin:
                 "latest": update.get("latest", ""),
                 "message": "当前已经是最新版本",
             }
-        assets = [item for item in list(update.get("assets") or []) if isinstance(item, dict)]
-        machine = str(platform.machine() or "").lower()
-        arch_suffix = "-arm64.zip" if machine in {"aarch64", "arm64"} else ".zip"
-        if arch_suffix == "-arm64.zip":
-            candidates = [item for item in assets if str(item.get("name") or "").endswith("-arm64.zip")]
-        else:
-            candidates = [
-                item
-                for item in assets
-                if str(item.get("name") or "").endswith(".zip")
-                and not str(item.get("name") or "").endswith("-arm64.zip")
-            ]
-        if not candidates:
-            return {"ok": False, "message": "Release 中没有匹配当前架构的插件包"}
-        asset = candidates[0]
+        asset, error = self._select_update_asset(update)
+        if error or asset is None:
+            return {"ok": False, "message": error or "没有可用的更新包"}
         update_insecure = bool(getattr(self, "_update_tls_insecure", False) or update.get("tls_insecure"))
         asset_name = str(asset.get("name") or "")
         asset_url = str(asset.get("url") or "")
-        expected_sha = ""
-        digest = str(asset.get("digest") or "").strip()
-        if digest.lower().startswith("sha256:"):
-            expected_sha = digest.split(":", 1)[1].strip().lower()
-        if not expected_sha:
-            sha_asset = next((item for item in assets if str(item.get("name") or "") == asset_name + ".sha256"), None)
-            if sha_asset:
-                try:
-                    timeout = aiohttp.ClientTimeout(total=15)
-                    sha_connector = aiohttp.TCPConnector(ssl=False if update_insecure else build_tls_context())
-                    async with aiohttp.ClientSession(timeout=timeout, connector=sha_connector) as session:
-                        async with session.get(str(sha_asset.get("url")), headers={"User-Agent": "freedeckCY"}) as resp:
-                            if int(resp.status) == 200:
-                                text = (await resp.text())[:4096]
-                                match = re.search(r"\b([0-9a-fA-F]{64})\b", text)
-                                if match:
-                                    expected_sha = match.group(1).lower()
-                except Exception as exc:
-                    return {"ok": False, "message": f"读取 SHA256 失败: {exc}"}
+        expected_sha = await self._get_update_sha256(update, asset, update_insecure)
         if not expected_sha:
             return {"ok": False, "message": "Release 缺少 SHA256 校验值，已拒绝下载"}
         target_dir = os.path.realpath(_default_update_download_dir())

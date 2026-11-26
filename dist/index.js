@@ -312,6 +312,32 @@ const EN_MISSING = {
     "全部重试失败": "Retry All Failed",
     "全部重试超时": "Retry All Timed Out",
     "成功": "Succeeded",
+    "清理": "Cleanup",
+    "存储清理": "Storage Cleanup",
+    "扫描可清理项": "Scan Cleanable Items",
+    "扫描中...": "Scanning...",
+    "可安全清理": "Safe to Clean",
+    "全部扫描项": "All Scanned Items",
+    "清理可安全删除项": "Clean Safe Items",
+    "清理存储": "Clean Storage",
+    "可删": "safe",
+    "保留": "keep",
+    "安装更新": "Install Update",
+    "准备中...": "Preparing...",
+    "重新下载": "Re-download",
+    "已开始重新下载": "Re-download Started",
+    "扫描完成": "Scan Complete",
+    "清理失败": "Cleanup Failed",
+    "扫描失败": "Scan Failed",
+    "扫描清理项失败": "Failed to scan cleanup items",
+    "清理超时": "Cleanup timed out",
+    "扫描清理项超时": "Scanning cleanup items timed out",
+    "当前 Decky 版本不支持自动安装，请使用「下载更新包」后手动安装": "This Decky version does not support automatic install; use download-update and install manually",
+    "准备更新超时": "Preparing update timed out",
+    "准备更新失败": "Preparing update failed",
+    "已发起": "Update started",
+    "请在 Decky 弹窗确认安装；完成后插件会自动重新加载。": "Confirm the install in the Decky prompt; the plugin reloads automatically when done.",
+    "更新包已下载": "Update package downloaded",
 };
 
 // @ts-nocheck
@@ -936,6 +962,8 @@ const restartSteamBackend = callable("restart_steam");
 const clearSteamRestartPending = callable("clear_steam_restart_pending");
 const clearTianyiCatalogUpdateNotice = callable("clear_tianyi_catalog_update_notice");
 const getTianyiStorageOptions = callable("get_tianyi_storage_options");
+const scanTianyiStorageCleanup = callable("scan_tianyi_storage_cleanup");
+const cleanTianyiStorageCleanup = callable("clean_tianyi_storage_cleanup");
 const listTianyiCatalog = callable("list_tianyi_catalog");
 const refreshTianyiCatalog = callable("refresh_tianyi_catalog");
 const updateTianyiCatalog = callable("update_tianyi_catalog");
@@ -947,11 +975,14 @@ const preflightTianyiInstall = callable("preflight_tianyi_install");
 const launchTianyiInstalledGame = callable("launch_tianyi_installed_game");
 const openTianyiInstalledFolder = callable("open_tianyi_installed_folder");
 const repairTianyiInstalledGame = callable("repair_tianyi_installed_game");
+callable("reinstall_tianyi_installed_game");
+const reinstallTianyiInstalledGames = callable("reinstall_tianyi_installed_games");
 callable("verify_tianyi_installed_game");
 const scanTianyiInstalledGames = callable("scan_tianyi_installed_games");
 const runTianyiDiagnostics = callable("run_tianyi_diagnostics");
 const checkTianyiUpdate = callable("check_tianyi_update");
 const downloadTianyiUpdate = callable("download_tianyi_update");
+const prepareTianyiUpdateInstall = callable("prepare_tianyi_update_install");
 const exportTianyiDiagnosticsFile = callable("export_tianyi_diagnostics_file");
 const uninstallTianyiInstalled = callable("uninstall_tianyi_installed_game");
 const getTianyiLoginUrl = callable("get_tianyi_login_url");
@@ -2168,6 +2199,34 @@ function InstallPreflightSection({ report, busy, onRun }) {
                     ] }) })) : null,
         ] }));
 }
+function StorageCleanupSection({ report, busy, message, onScan, onClean }) {
+    const groups = Array.isArray(report?.groups) ? report.groups : [];
+    const safeGroups = groups.filter((group) => group.safe && Number(group.count || 0) > 0).map((group) => group.id);
+    return (_local_SP_JSX.jsxs(DFL.PanelSection, { title: "存储清理", children: [
+            _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.86 }, children: "扫描插件更新包、失败/不支持续传时隔离的坏文件、历史云存档备份；只删除可安全重新获取的文件，历史备份默认保留。" }) }),
+            _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onScan, disabled: busy, children: busy ? "扫描中..." : "扫描可清理项" }) }),
+            message ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, opacity: 0.86, wordBreak: "break-word" }, children: message }) })) : null,
+            report ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "2px", width: "100%", fontSize: "12px" }, children: [
+                        _local_SP_JSX.jsx("div", { style: { fontWeight: 600, color: Number(report.safe_count || 0) > 0 ? "#ffd479" : "#9fe6a8" }, children: `可安全清理：${formatBytesText(Number(report.safe_bytes || 0))} · ${Number(report.safe_count || 0)} 个文件` }),
+                        _local_SP_JSX.jsx("div", { style: { opacity: 0.75, fontSize: "11px" }, children: `全部扫描项：${formatBytesText(Number(report.total_bytes || 0))}` }),
+                    ] }) })) : null,
+            groups.map((group, groupIndex) => {
+                const count = Number(group.count || 0);
+                const bytes = Number(group.bytes || 0);
+                const items = Array.isArray(group.items) ? group.items : [];
+                return (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%", fontSize: "11px", lineHeight: 1.5 }, children: [
+                            _local_SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px" }, children: [
+                                    _local_SP_JSX.jsx("span", { style: { fontWeight: 600 }, children: group.label || group.id || "清理项" }),
+                                    _local_SP_JSX.jsx("span", { style: { color: group.safe ? "#9fe6a8" : "#ffd479" }, children: `${count} 个 · ${formatBytesText(bytes)}${group.safe ? " · 可删" : " · 保留"}` }),
+                                ] }),
+                            group.description ? (_local_SP_JSX.jsx("div", { style: { opacity: 0.72 }, children: group.description })) : null,
+                            items.slice(0, 3).map((item, itemIndex) => (_local_SP_JSX.jsx("div", { style: { opacity: 0.7, wordBreak: "break-all" }, children: item.display_path || item.path || "-" }, `${group.id}-${itemIndex}`))),
+                            count > 3 ? (_local_SP_JSX.jsx("div", { style: { opacity: 0.6 }, children: `…另有 ${count - 3} 个` })) : null,
+                        ] }) }, `${group.id || "group"}-${groupIndex}`));
+            }),
+            report && safeGroups.length > 0 ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => onClean(safeGroups), disabled: busy, children: busy ? "处理中..." : "清理可安全删除项" }) })) : null,
+        ] }));
+}
 function SettingsPage() {
     const language = useLanguage();
     const [loading, setLoading] = SP_REACT.useState(true);
@@ -2176,6 +2235,9 @@ function SettingsPage() {
     const [scanningInstalled, setScanningInstalled] = SP_REACT.useState(false);
     const [preflightReport, setPreflightReport] = SP_REACT.useState(null);
     const [preflightBusy, setPreflightBusy] = SP_REACT.useState(false);
+    const [storageCleanupReport, setStorageCleanupReport] = SP_REACT.useState(null);
+    const [storageCleanupBusy, setStorageCleanupBusy] = SP_REACT.useState(false);
+    const [storageCleanupMessage, setStorageCleanupMessage] = SP_REACT.useState("");
     const [updatingCatalog, setUpdatingCatalog] = SP_REACT.useState(false);
     const [catalogUpdateMessage, setCatalogUpdateMessage] = SP_REACT.useState("");
     const [diagnosticsReport, setDiagnosticsReport] = SP_REACT.useState(null);
@@ -2186,6 +2248,7 @@ function SettingsPage() {
     const [updateInfo, setUpdateInfo] = SP_REACT.useState(null);
     const [checkingUpdate, setCheckingUpdate] = SP_REACT.useState(false);
     const [downloadingUpdate, setDownloadingUpdate] = SP_REACT.useState(false);
+    const [installingUpdate, setInstallingUpdate] = SP_REACT.useState(false);
     const [updateMessage, setUpdateMessage] = SP_REACT.useState("");
     const [activeTab, setActiveTab] = SP_REACT.useState("paths");
     const [settings, setSettings] = SP_REACT.useState(EMPTY_SETTINGS);
@@ -2698,6 +2761,35 @@ function SettingsPage() {
             setDownloadingUpdate(false);
         }
     }, [downloadingUpdate]);
+    const onInstallUpdate = SP_REACT.useCallback(async () => {
+        if (installingUpdate)
+            return;
+        setInstallingUpdate(true);
+        setUpdateMessage("");
+        try {
+            const result = await withTimeout(prepareTianyiUpdateInstall(), 30000, "准备更新超时");
+            const target = result.data || {};
+            if (result.status !== "success" || !target.ok) {
+                throw new Error(String(target.message || result.message || "准备更新失败"));
+            }
+            const backend = window.DeckyBackend;
+            if (!backend || typeof backend.call !== "function") {
+                throw new Error("当前 Decky 版本不支持自动安装，请使用「下载更新包」后手动安装");
+            }
+            setUpdateMessage(`正在把 ${target.version || target.latest || "更新"} 交给 Decky 安装...`);
+            await backend.call("utilities/install_plugin", target.url, "freedeckCY", target.version || target.latest, target.sha256, target.install_type ?? 2);
+            const message = `已发起 ${target.version || target.latest || "更新"} 更新，请在 Decky 弹窗确认安装；完成后插件会自动重新加载。`;
+            setUpdateMessage(message);
+            toaster.toast({ title: "freedeckCY 更新", body: message, duration: 8000 });
+        }
+        catch (error) {
+            setUpdateMessage(errorText(error));
+            toastError(error);
+        }
+        finally {
+            setInstallingUpdate(false);
+        }
+    }, [installingUpdate]);
     const onRunDiagnostics = SP_REACT.useCallback(async () => {
         if (diagnosticsBusy)
             return;
@@ -2793,6 +2885,60 @@ function SettingsPage() {
             setPreflightBusy(false);
         }
     }, [preflightBusy]);
+    const onScanStorageCleanup = SP_REACT.useCallback(async () => {
+        if (storageCleanupBusy)
+            return;
+        setStorageCleanupBusy(true);
+        setStorageCleanupMessage("");
+        try {
+            const result = await withTimeout(scanTianyiStorageCleanup(), 60000, "扫描清理项超时");
+            if (result.status !== "success" || !result.data) {
+                throw new Error(result.message || "扫描清理项失败");
+            }
+            setStorageCleanupReport(result.data);
+            setStorageCleanupMessage(`扫描完成：可安全清理 ${formatBytesText(Number(result.data.safe_bytes || 0))}（${Number(result.data.safe_count || 0)} 个文件）`);
+        }
+        catch (error) {
+            setStorageCleanupMessage(`扫描失败：${errorText(error)}`);
+            toastError(error);
+        }
+        finally {
+            setStorageCleanupBusy(false);
+        }
+    }, [storageCleanupBusy]);
+    const onCleanStorageCleanup = SP_REACT.useCallback((categories) => {
+        if (storageCleanupBusy)
+            return;
+        const selected = Array.isArray(categories) ? categories.filter(Boolean) : [];
+        if (!selected.length)
+            return;
+        DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "清理存储", strDescription: "将删除扫描结果中标记为可安全清理的文件（更新包、隔离的坏文件/半成品）；历史云存档备份不会删除。确定继续？", strOKButtonText: "清理", strCancelButtonText: "取消", onOK: () => {
+                void (async () => {
+                    setStorageCleanupBusy(true);
+                    try {
+                        const result = await withTimeout(cleanTianyiStorageCleanup({ categories: selected }), 120000, "清理超时");
+                        if (result.status !== "success" || !result.data) {
+                            throw new Error(result.message || "清理失败");
+                        }
+                        const data = result.data;
+                        const message = `已清理 ${Number(data.deleted_files || 0)} 个文件，释放 ${formatBytesText(Number(data.freed_bytes || 0))}${data.errors?.length ? `；${data.errors.length} 项跳过` : ""}`;
+                        setStorageCleanupMessage(message);
+                        toaster.toast({ title: "freedeckCY 清理", body: message });
+                        const refreshed = await withTimeout(scanTianyiStorageCleanup(), 60000, "扫描清理项超时");
+                        if (refreshed.status === "success" && refreshed.data) {
+                            setStorageCleanupReport(refreshed.data);
+                        }
+                    }
+                    catch (error) {
+                        setStorageCleanupMessage(`清理失败：${errorText(error)}`);
+                        toastError(error);
+                    }
+                    finally {
+                        setStorageCleanupBusy(false);
+                    }
+                })();
+            }, onCancel: () => { } }));
+    }, [storageCleanupBusy]);
     const onSaveBaiduApp = SP_REACT.useCallback(async () => {
         if (baiduBusy)
             return;
@@ -3118,6 +3264,11 @@ function SettingsPage() {
             content: (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u6E38\u620F\u76EE\u5F55", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: "\u4ECE\u670D\u52A1\u5668\u4E0B\u8F7D\u6700\u65B0\u7684\u6E38\u620F\u76EE\u5F55 CSV \u5230\u672C\u5730\uFF1B\u4E0B\u8F7D\u6210\u529F\u540E\u4F1A\u7ACB\u5373\u91CD\u65B0\u52A0\u8F7D\u3002" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.TextField, { label: "\u76EE\u5F55\u670D\u52A1\u5668 CSV \u5730\u5740\uFF08\u7559\u7A7A\u7528\u9ED8\u8BA4 GitHub\uFF09", value: settings.catalog_url, onChange: (event) => setSettings((prev) => ({ ...prev, catalog_url: getTextFieldValue(event) })) }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => savePatch({ catalog_url: settings.catalog_url }), disabled: saving, children: "\u4FDD\u5B58\u76EE\u5F55\u5730\u5740" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onUpdateCatalog(), disabled: updatingCatalog || saving, children: updatingCatalog ? "正在检查..." : "检查并更新游戏列表" }) }), catalogUpdateMessage ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.45, opacity: 0.8 }, children: catalogUpdateMessage }) })) : null] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u4E0B\u8F7D\u76EE\u5F55", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.download_dir || "未设置" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickDownloadDir, disabled: saving, children: "\u9009\u62E9\u4E0B\u8F7D\u76EE\u5F55" }) }), storageOptions.filter((item) => item.kind === "internal").map((item) => (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "download_dir"), disabled: saving, children: ["\u4E0B\u8F7D\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `download-${item.mount}`))), storageOptions.filter((item) => item.kind === "external").map((item) => (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "download_dir"), disabled: saving, children: ["\u4E0B\u8F7D\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `download-${item.mount}`))), !storageOptions.some((item) => item.kind === "external") ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", opacity: 0.75 }, children: "\u672A\u68C0\u6D4B\u5230\u53EF\u5199 SD \u5361/\u5916\u7F6E\u5B58\u50A8\uFF08\u8BF7\u5148\u5728 SteamOS/\u7CFB\u7EDF\u4E2D\u6302\u8F7D\uFF09" }) })) : null] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u76EE\u5F55", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5 }, children: settings.install_dir || "未设置" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onPickInstallDir, disabled: saving, children: "\u9009\u62E9\u5B89\u88C5\u76EE\u5F55" }) }), storageOptions.filter((item) => item.kind === "internal").map((item) => (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "install_dir"), disabled: saving, children: ["\u5B89\u88C5\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `install-${item.mount}`))), storageOptions.filter((item) => item.kind === "external").map((item) => (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", onClick: () => void onUseStorage(item, "install_dir"), disabled: saving, children: ["\u5B89\u88C5\u5230 ", item.label, "\uFF08\u5269\u4F59 ", item.free_text, "\uFF09"] }) }, `install-${item.mount}`)))] })] })),
         },
         {
+            id: "cleanup",
+            title: "清理",
+            content: _local_SP_JSX.jsx(StorageCleanupSection, { report: storageCleanupReport, busy: storageCleanupBusy, message: storageCleanupMessage, onScan: onScanStorageCleanup, onClean: onCleanStorageCleanup }),
+        },
+        {
             id: "install",
             title: "安装",
             content: (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u5B89\u88C5\u884C\u4E3A", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ToggleField, { label: "\u5B89\u88C5\u540E\u81EA\u52A8\u5220\u9664\u538B\u7F29\u5305", description: "\u4EC5\u5728\u81EA\u52A8\u5B89\u88C5\u6210\u529F\u540E\u751F\u6548", checked: Boolean(settings.auto_delete_package), onChange: (value) => savePatch({ auto_delete_package: value }), disabled: saving }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }, children: "\u4E0B\u8F7D\u5B8C\u6210\u540E\u81EA\u52A8\u5B89\u88C5\u5DF2\u56FA\u5B9A\u5F00\u542F\u3002" }) })] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u626B\u63CF\u5DF2\u5B89\u88C5", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: 0.86 }, children: "\u626B\u63CF\u8BBE\u7F6E\u91CC\u7684\u5B89\u88C5\u76EE\u5F55\u4E00\u5C42\uFF0C\u628A\u76EE\u5F55\u540D\u5339\u914D\u6807\u9898\u7684\u6E38\u620F\u8865\u56DE\u5217\u8868\uFF1BSteam \u91CC\u6CA1\u6709\u7684\u4F1A\u81EA\u52A8\u521B\u5EFA\u5FEB\u6377\u65B9\u5F0F\u3002" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onScanInstalledSettings, disabled: scanningInstalled || saving, children: scanningInstalled ? "扫描中..." : "扫描已安装游戏" }) })] })] })),
@@ -3166,7 +3317,7 @@ function SettingsPage() {
             title: "诊断",
             content: (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u66F4\u65B0", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: updateInfo
                                         ? `当前 ${updateInfo.current || "?"} · 最新 ${updateInfo.latest || "?"}`
-                                        : "检查 GitHub Release，下载并校验更新包；不会自动覆盖运行中的插件。" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%", alignItems: "center" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onCheckUpdate(), disabled: checkingUpdate || downloadingUpdate, style: { width: "auto", minWidth: "120px", padding: "8px 14px", flex: "0 0 auto" }, children: checkingUpdate ? "检查中..." : "检查更新" }), updateInfo?.has_update ? (_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onDownloadUpdate(), disabled: downloadingUpdate, style: { width: "auto", minWidth: "120px", padding: "8px 14px", flex: "0 0 auto" }, children: downloadingUpdate ? "下载中..." : "下载更新包" })) : null] }) }), updateMessage ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, color: updateInfo?.has_update ? "#ffd479" : "#b9c0cc", wordBreak: "break-word" }, children: updateMessage }) })) : null] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u81EA\u68C0", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u68C0\u67E5\u63D2\u4EF6\u7248\u672C\u3001\u72B6\u6001/\u4E0B\u8F7D/\u5B89\u88C5\u76EE\u5F55\u3001aria2/7zz/node\u3001Steam \u5FEB\u6377\u65B9\u5F0F\u3001SD \u5361\u3001\u7F51\u7EDC\u4E0E\u767E\u5EA6\u626B\u7801\u63A5\u53E3\u3002" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onRunDiagnostics(), disabled: diagnosticsBusy, children: diagnosticsBusy ? "自检中..." : "运行自检" }) }), diagnosticsError ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, color: "#ffb4a8", wordBreak: "break-word" }, children: `自检失败：${diagnosticsError}` }) })) : null, diagnosticsReport ? (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6 }, children: `v${diagnosticsReport.version || "?"} · ${diagnosticsReport.arch || "-"} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}` }) }), (diagnosticsReport.checks || []).map((check, checkIndex) => {
+                                        : "检查自有服务器/GitHub；可直接交给 Decky 安装（需在 Decky 弹窗确认），也可只下载更新包手动安装。" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%", alignItems: "center" }, children: [_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onCheckUpdate(), disabled: checkingUpdate || downloadingUpdate, style: { width: "auto", minWidth: "120px", padding: "8px 14px", flex: "0 0 auto" }, children: checkingUpdate ? "检查中..." : "检查更新" }), updateInfo?.has_update ? (_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onInstallUpdate(), disabled: installingUpdate || downloadingUpdate, style: { width: "auto", minWidth: "120px", padding: "8px 14px", flex: "0 0 auto" }, children: installingUpdate ? "准备中..." : "安装更新" })) : null, updateInfo?.has_update ? (_local_SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onDownloadUpdate(), disabled: downloadingUpdate || installingUpdate, style: { width: "auto", minWidth: "120px", padding: "8px 14px", flex: "0 0 auto" }, children: downloadingUpdate ? "下载中..." : "下载更新包" })) : null] }) }), updateMessage ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "11px", lineHeight: 1.5, color: updateInfo?.has_update ? "#ffd479" : "#b9c0cc", wordBreak: "break-word" }, children: updateMessage }) })) : null] }), _local_SP_JSX.jsxs(DFL.PanelSection, { title: "\u63D2\u4EF6\u81EA\u68C0", children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, opacity: 0.88 }, children: "\u68C0\u67E5\u63D2\u4EF6\u7248\u672C\u3001\u72B6\u6001/\u4E0B\u8F7D/\u5B89\u88C5\u76EE\u5F55\u3001aria2/7zz/node\u3001Steam \u5FEB\u6377\u65B9\u5F0F\u3001SD \u5361\u3001\u7F51\u7EDC\u4E0E\u767E\u5EA6\u626B\u7801\u63A5\u53E3\u3002" }) }), _local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => void onRunDiagnostics(), disabled: diagnosticsBusy, children: diagnosticsBusy ? "自检中..." : "运行自检" }) }), diagnosticsError ? (_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6, color: "#ffb4a8", wordBreak: "break-word" }, children: `自检失败：${diagnosticsError}` }) })) : null, diagnosticsReport ? (_local_SP_JSX.jsxs(_local_SP_JSX.Fragment, { children: [_local_SP_JSX.jsx(DFL.PanelSectionRow, { children: _local_SP_JSX.jsx("div", { style: { fontSize: "12px", lineHeight: 1.6 }, children: `v${diagnosticsReport.version || "?"} · ${diagnosticsReport.arch || "-"} · OK ${diagnosticsReport.summary?.ok || 0} / 警告 ${diagnosticsReport.summary?.warn || 0} / 失败 ${diagnosticsReport.summary?.fail || 0} / 跳过 ${diagnosticsReport.summary?.skip || 0}` }) }), (diagnosticsReport.checks || []).map((check, checkIndex) => {
                                         const status = String(check.status || "skip").toLowerCase();
                                         const color = status === "ok"
                                             ? "#9fe6a8"
@@ -3228,6 +3379,8 @@ function SettingsPage() {
         updateInfo,
         checkingUpdate,
         downloadingUpdate,
+        installingUpdate,
+        onInstallUpdate,
         updateMessage,
         onCheckUpdate,
         onDownloadUpdate,
@@ -3262,6 +3415,11 @@ function SettingsPage() {
         preflightReport,
         preflightBusy,
         onRunPreflight,
+        storageCleanupReport,
+        storageCleanupBusy,
+        storageCleanupMessage,
+        onScanStorageCleanup,
+        onCleanStorageCleanup,
     ]);
     const focusSettingsTabRow = SP_REACT.useCallback((tabId) => {
         const classMap = getGamepadTabClassMap();
@@ -4543,13 +4701,42 @@ function LibraryPage({ onClose }) {
             const data = result.data || {};
             const bad = (data.items || []).filter((item) => !item.ok);
             const repairable = bad.filter((item) => Boolean(item.game_id) && !item.needs_reinstall);
+            const reinstallable = bad.filter((item) => Boolean(item.game_id) && item.needs_reinstall);
             const lines = [`共 ${data.total || 0} 个游戏，正常 ${data.ok || 0} 个，异常 ${bad.length} 个。`];
             bad.slice(0, 12).forEach((item) => lines.push(`❌ ${item.title || item.game_id}${item.needs_reinstall ? " · 需重下" : ""}`));
             if (bad.length > 12)
                 lines.push(`…另有 ${bad.length - 12} 个`);
             if (repairable.length > 0)
-                lines.push("", `可修复 ${repairable.length} 个（需重下的无法自动修复）`);
-            DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "游戏健康中心", strDescription: lines.join("\n"), strOKButtonText: repairable.length > 0 ? "修复可修复项" : "完成", strCancelButtonText: "关闭", onOK: () => {
+                lines.push("", `可修复 ${repairable.length} 个`);
+            if (reinstallable.length > 0)
+                lines.push("", `需重下 ${reinstallable.length} 个，可点下方「重新下载」`);
+            DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "游戏健康中心", strDescription: lines.join("\n"), strOKButtonText: repairable.length > 0 ? "修复可修复项" : "完成", strMiddleButtonText: reinstallable.length > 0 ? `重新下载（${reinstallable.length}）` : undefined, strCancelButtonText: "关闭", onMiddleButton: () => {
+                    if (reinstallable.length === 0)
+                        return;
+                    void (async () => {
+                        setHealthBusy(true);
+                        try {
+                            const started = await withTimeout(reinstallTianyiInstalledGames({ game_ids: reinstallable.map((item) => item.game_id) }), 600000, "重新下载超时");
+                            if (started.status !== "success" || !started.data) {
+                                throw new Error(started.message || "重新下载失败");
+                            }
+                            const startedData = started.data;
+                            toaster.toast({
+                                title: "freedeckCY",
+                                body: startedData.failed > 0
+                                    ? `已开始重新下载 ${startedData.started || 0} 个，失败 ${startedData.failed} 个`
+                                    : `已开始重新下载 ${startedData.started || 0} 个游戏`,
+                            });
+                            await loadInstalled();
+                        }
+                        catch (error) {
+                            toastError(error);
+                        }
+                        finally {
+                            setHealthBusy(false);
+                        }
+                    })();
+                }, onOK: () => {
                     if (repairable.length === 0)
                         return;
                     void (async () => {
@@ -4629,9 +4816,11 @@ function LibraryPage({ onClose }) {
             DFL.showModal(_local_SP_JSX.jsx(DFL.ConfirmModal, {
                 strTitle: "安装校验",
                 strDescription: lines.join("\n"),
-                strOKButtonText: "完成",
+                strOKButtonText: after.needs_reinstall ? "重新下载" : "完成",
                 strCancelButtonText: "关闭",
                 onOK: () => {
+                    if (after.needs_reinstall)
+                        void onPrepareInstall(item);
                 },
                 onCancel: () => {
                 },
@@ -4644,7 +4833,7 @@ function LibraryPage({ onClose }) {
         finally {
             endBusy();
         }
-    }, [beginBusy, endBusy, loadInstalled]);
+    }, [beginBusy, endBusy, loadInstalled, onPrepareInstall]);
     const onUninstall = SP_REACT.useCallback((item) => {
         if (busyRef.current)
             return;

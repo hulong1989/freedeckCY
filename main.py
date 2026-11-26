@@ -449,6 +449,26 @@ class Plugin:
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
 
+    async def scan_tianyi_storage_cleanup(self) -> dict:
+        """扫描可清理的更新包/隔离文件/历史备份。"""
+        try:
+            data = await self._get_tianyi_service().scan_storage_cleanup()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def clean_tianyi_storage_cleanup(self, payload=None, categories=None) -> dict:
+        """清理选中的安全类别。"""
+        try:
+            if isinstance(payload, dict):
+                categories = payload.get("categories", categories)
+            if isinstance(categories, str):
+                categories = [categories]
+            data = await self._get_tianyi_service().clean_storage_cleanup(list(categories or []))
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
     async def get_tianyi_storage_options(self) -> dict:
         """下载/安装目录可选的存储位置（内置 + SD 卡）。"""
         try:
@@ -485,6 +505,14 @@ class Plugin:
         """下载并校验更新包（不自动覆盖插件）。"""
         try:
             data = await self._get_tianyi_service().download_update()
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def prepare_tianyi_update_install(self) -> dict:
+        """准备更新信息（URL/SHA256），供 Decky 原生安装。"""
+        try:
+            data = await self._get_tianyi_service().prepare_update_install()
             return {"status": "success", "data": data}
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}
@@ -633,6 +661,26 @@ class Plugin:
         """修复已安装游戏快捷方式、Proton 映射和 Steam 美术。"""
         try:
             data = await self._get_tianyi_service().repair_installed_game(game_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def reinstall_tianyi_installed_game(self, game_id: str = "") -> dict:
+        """重新下载安装已安装游戏。"""
+        try:
+            data = await self._get_tianyi_service().reinstall_installed_game(game_id)
+            return {"status": "success", "data": data}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc), "data": {}}
+
+    async def reinstall_tianyi_installed_games(self, payload=None, game_ids=None) -> dict:
+        """批量重新下载安装（健康中心需重下项）。"""
+        try:
+            if isinstance(payload, dict):
+                game_ids = payload.get("game_ids", game_ids)
+            if isinstance(game_ids, str):
+                game_ids = [game_ids]
+            data = await self._get_tianyi_service().reinstall_installed_games(list(game_ids or []))
             return {"status": "success", "data": data}
         except Exception as exc:
             return {"status": "error", "message": str(exc), "data": {}}

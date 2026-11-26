@@ -69,6 +69,8 @@ from emulator_manager import (
     supported_platforms,
 )
 from emulator_saves import build_restore_targets, collect_emulator_save_paths, restore_roots
+from storage_cleanup import clean_storage_cleanup as _clean_storage_cleanup
+from storage_cleanup import scan_storage_cleanup as _scan_storage_cleanup
 from storage_options import detect_storage_options
 from gamewatch import GameWatcher
 from save_manifest import load_manifest, match_manifest, resolve_manifest_paths
@@ -8145,9 +8147,90 @@ class TianyiService(UpdateFlowMixin):
         after = await self.verify_installed_game(record.game_id)
         return {"before": before, "after": after, "ok": bool(after.get("ok")), "needs_reinstall": bool(after.get("needs_reinstall")), "actions": actions}
 
+    async def reinstall_installed_game(self, game_id: str) -> Dict[str, Any]:
+        """对已安装游戏重新走下载/安装链路（保留原安装目录，不先删文件）。"""
+        record = self._find_installed_record(game_id=str(game_id or "").strip())
+        if record is None:
+            raise ValueError("未找到已安装游戏记录")
+        entry = self.catalog.get_by_game_id(record.game_id)
+        if entry is None:
+            raise ValueError("游戏目录中没有该条目，无法重新下载")
+        install_path = os.path.realpath(os.path.expanduser(str(record.install_path or "").strip()))
+        install_parent = os.path.dirname(install_path) if install_path and os.path.dirname(install_path) != "/" else ""
+        result = await self.start_install(
+            game_id=str(record.game_id or ""),
+            install_dir=install_parent or None,
+        )
+        tasks = result.get("tasks") if isinstance(result, dict) else []
+        return {
+            "game_id": str(record.game_id or ""),
+            "title": str(record.game_title or getattr(entry, "title", "") or ""),
+            "tasks": tasks if isinstance(tasks, list) else [],
+            "reused": bool(result.get("reused")) if isinstance(result, dict) else False,
+        }
+
+    async def reinstall_installed_games(self, game_ids: Sequence[str]) -> Dict[str, Any]:
+        """批量重新下载安装（健康中心「需重下」项），最多 20 个。"""
+        ids: List[str] = []
+        for value in game_ids or []:
+            text = str(value or "").strip()
+            if text and text not in ids:
+                ids.append(text)
+        ids = ids[:20]
+        results: List[Dict[str, Any]] = []
+        errors: List[Dict[str, Any]] = []
+        started = 0
+        for game_id in ids:
+            try:
+                item = await self.reinstall_installed_game(game_id)
+                started += 1
+                results.append(item)
+            except Exception as exc:
+                errors.append({"game_id": game_id, "message": _redact_text(_describe_exception(exc))[:300]})
+        return {
+            "attempted": len(ids),
+            "started": started,
+            "failed": len(errors),
+            "results": results,
+            "errors": errors,
+        }
+
     @staticmethod
     def _normalize_scan_title(value: str) -> str:
         return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", str(value or "").lower())
+
+    def _storage_cleanup_paths(self) -> Dict[str, str]:
+        """清理扫描使用的固定根目录。"""
+        settings = self.store.settings
+        download_dir = str(settings.download_dir or self.plugin.downloads_dir or os.path.expanduser("~/Downloads"))
+        install_dir = str(settings.install_dir or os.path.expanduser("~/Games/freedeckCY"))
+        return {
+            "download_dir": os.path.realpath(os.path.expanduser(download_dir)),
+            "install_dir": os.path.realpath(os.path.expanduser(install_dir)),
+            "update_dir": os.path.realpath(os.path.expanduser("~/Downloads")),
+            "backup_dir": os.path.realpath(os.path.join(config.DECKY_SEND_DIR, "backups", "legacy")),
+        }
+
+    async def scan_storage_cleanup(self) -> Dict[str, Any]:
+        """扫描更新包/隔离文件/历史备份，返回可清理项。"""
+        paths = self._storage_cleanup_paths()
+        return await asyncio.to_thread(_scan_storage_cleanup, **paths)
+
+    async def clean_storage_cleanup(self, categories: Sequence[str]) -> Dict[str, Any]:
+        """只清理扫描结果中标记为 safe 的类别。"""
+        selected = [str(item or "").strip() for item in categories or []]
+        selected = [item for item in selected if item]
+        if not selected:
+            return {"ok": False, "message": "未选择要清理的类别", "deleted_files": 0, "freed_bytes": 0, "errors": []}
+        paths = self._storage_cleanup_paths()
+        result = await asyncio.to_thread(_clean_storage_cleanup, categories=selected, **paths)
+        if result.get("deleted_files"):
+            config.logger.info(
+                "存储清理: 删除 %s 个文件，释放 %s 字节",
+                result.get("deleted_files"),
+                result.get("freed_bytes"),
+            )
+        return result
 
     async def get_storage_options(self) -> Dict[str, Any]:
         """返回内置存储与可写 SD/外置挂载，供下载/安装目录一键选择。"""
