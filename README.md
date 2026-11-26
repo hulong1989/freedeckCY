@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/hulong1989/freedeckCY)](LICENSE)
 
 > **关于本项目**：freedeckCY 是 [Freedeck](https://github.com/panyiwei-home/Freedeck) 的衍生分支（fork），
-> 版本号从 **0.1.0** 起步、当前 **0.28.16**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
+> 版本号从 **0.1.0** 起步、当前 **0.28.17**，与原仓库的 0.2–0.3 版本号不连续；上游作者已停止维护。
 > 与上游的差异（已对齐 / 我们更强 / 不采纳）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §13。
 >
 > 交流 QQ 群：**1136434612**（使用交流 / 问题反馈，加群请备注 freedeckCY）
@@ -30,9 +30,9 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 
 | | 说明 |
 |---|---|
-| 当前版本 | **0.28.16**（见 [CHANGELOG.md](CHANGELOG.md) / [English](CHANGELOG.en.md)） |
+| 当前版本 | **0.28.17**（见 [CHANGELOG.md](CHANGELOG.md) / [English](CHANGELOG.en.md)） |
 | 代码基线 | 从上游 Freedeck 2026-02 的早期版本（0.2）fork；上游已停止维护 |
-| 测试 | **587 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
+| 测试 | **599 passed**，覆盖目录、安装、云存档、百度、模拟器、存储、更新等离线逻辑 |
 | CI | Python 测试 / UI 构建 / 前端 hooks 作用域检查 / x86_64 与 aarch64 运行时冒烟 |
 | 数据目录 | `~/.local/share/freedeckCY/`（`state.json` 权限 0600，目录 0700） |
 | 资源目录 | `defaults/tianyi_catalog/freedeckcy_catalog.csv`（7084 条） |
@@ -71,7 +71,7 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
 - **安装可靠性**：
   - **安装前环境自检**：检查下载/安装目录可写性与剩余空间，设置页「环境」页可手动检查；安装确认弹窗发现异常时提示「仍然下载」。
   - **已安装校验/修复**：逐项检查安装目录、主程序/ROM、Steam 快捷方式；可一键重建快捷方式、Proton 映射与四件套封面，文件缺失时明确提示需重下。
-  - **全量体检**：库页顶栏汇总正常/异常/需重下，列出异常游戏；可一键修复所有可修复项。
+  - **全量体检**：库页顶栏汇总正常/异常/需重下，列出异常游戏；可一键修复可修复项，或对需重下的游戏直接「重新下载」。
   - **失败诊断/换源**：失败任务可查看阶段、原因与建议；在同一游戏的天翼/百度源间换源重试，当前源重试失败时也会自动换源一次。
 - **存储位置**：
   - 下载目录支持「内置硬盘 / SD 卡 / 外置存储」一键切换。
@@ -109,8 +109,9 @@ Steam Deck 的 **Decky Loader 插件**：用天翼云盘 / 百度网盘资源清
   - 服务器不可用时回退 GitHub Release。
   - 手动点「检查更新」强制绕过缓存；自动缓存 2 分钟。
   - 更新包固定保存到内置硬盘 `~/Downloads`，不再跟随 SD 卡下载目录。
-- **插件内更新**：插件设置「诊断 → 插件更新」检查、下载、校验；使用 Decky「从文件安装插件」升级。
+- **插件内更新**：设置「诊断 → 插件更新」检查；「安装更新」直接调用 Decky 原生安装器，确认后自动下载/校验/覆盖/重载；也可只下载更新包手动安装。
 - **诊断与自检**：检查插件版本、目录、运行时、Steam、SD 卡、网络、百度扫码、任务与日志；一键导出脱敏 zip。
+- **存储清理**：设置「清理」页扫描更新包、隔离的坏文件/半成品与历史云存档备份，按类别显示占用；只清理可安全重新获取的文件。
 
 ### 云存档、模拟器与时长
 
@@ -147,8 +148,8 @@ Releases 提供带运行时二进制的安装包：
 
 | 包 | 适用设备 |
 |---|---|
-| `freedeckCY-v0.28.16.zip` | Steam Deck / x86_64 Linux |
-| `freedeckCY-v0.28.16-arm64.zip` | DroidDeck / Android ARM64 |
+| `freedeckCY-v0.28.17.zip` | Steam Deck / x86_64 Linux |
+| `freedeckCY-v0.28.17-arm64.zip` | DroidDeck / Android ARM64 |
 
 下载后使用 **Decky → 开发者 → 从文件安装插件**，选择对应 zip，重启 Decky Loader。
 校验值见 Release 中的 `.sha256` 文件。
@@ -158,7 +159,7 @@ Releases 提供带运行时二进制的安装包：
 ```bash
 git clone <this-repo> freedeckCY && cd freedeckCY
 make runtime              # 下载 aria2c / 7zz / node 到 defaults/runtime/
-make package              # 产出 dist-artifacts/freedeckCY-v0.28.16.zip
+make package              # 产出 dist-artifacts/freedeckCY-v0.28.17.zip
 ```
 
 ### 方式 C：DroidDeck / ARM64
@@ -200,7 +201,7 @@ pnpm check:ui       # hooks 依赖作用域检查
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest -q          # 或 make test，当前 587 个用例
+.venv/bin/pytest -q          # 或 make test，当前 599 个用例
 make check-ui                # 前端 hooks 作用域检查
 make doctor                  # 环境诊断（只读）
 make package-droiddeck       # ARM64 包
@@ -294,7 +295,7 @@ submissions/                仓库游戏提交 JSON / schema
 backend/*.js                Node 辅助脚本（分享解析兜底、云存档上传）
 scripts/                    运行时获取/打包/诊断/目录校验/提交合并
 docs/                       架构/开发/路线图/DroidDeck
-tests/                      pytest 用例（587 个）
+tests/                      pytest 用例（599 个）
 CHANGELOG.md                版本变更
 Makefile                    runtime / package / package-droiddeck / test / check-ui / doctor / ...
 ```

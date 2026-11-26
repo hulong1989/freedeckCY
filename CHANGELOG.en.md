@@ -3,6 +3,15 @@
 > English summary of recent releases. The full historical changelog is in [CHANGELOG.md](CHANGELOG.md).
 > [中文](CHANGELOG.md) | English
 
+## v0.28.17
+
+### P0: update / cleanup / reinstall loop
+
+- **One-click plugin update**: new callable `prepare_tianyi_update_install` returns the arch-matching update URL / SHA256 / version; Settings → Diagnostics gains an "Install Update" button that calls Decky's native installer (`utilities/install_plugin`), then downloads, verifies, overwrites and reloads the plugin after Decky confirmation. Falls back to "Download update" when Decky cannot auto-install.
+- **Storage cleanup center**: new `storage_cleanup.py` + a Settings "Cleanup" tab; scans update packages, `*.freedeckcy-*` quarantined bad/partial files and legacy cloud-save backups, with per-category counts/sizes; only safe categories (updates, quarantine) are deleted, legacy backups are kept by default.
+- **Reinstall from health/verify**: installed-card verification turns the button into "Re-download" when `needs_reinstall`; the health center gains a "Re-download (N)" batch action that re-creates download tasks in the original install parent (up to 20, one failure does not stop the rest) and refreshes the installed list.
+- 12 new regression tests (update preparation / storage cleanup / batch reinstall); 599 tests passed.
+
 ## v0.28.16
 
 ### Batch retry failed tasks
